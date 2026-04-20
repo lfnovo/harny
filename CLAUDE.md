@@ -37,6 +37,9 @@ Infrastructure available to validator for empirical runs:
 - `npm run run -- --harness --assistant <name> --task <slug> "<prompt>"` — the full harness is invokable from inside validator Bash. If SDK auth fails in the nested subprocess, that is an `environment` blocker and the verdict must be `fail`.
 - `/tmp/harness-e2e-*` — throwaway dirs are fair game. `git init`, register a temp assistant, run.
 - Two concurrent runs in two terminals = the canonical concurrency test.
+- Guard hook for git history ops now has an **escape hatch**: commands that start with `cd /tmp/...`, `cd /private/tmp/...`, `cd /var/folders/...`, or use `git -C <path>` where `<path>` is outside the primary repo, are ALLOWED. This is so you can set up throwaway test repos (`git init && git commit -m seed`) in /tmp without fighting the guard. The sole-committer invariant still applies to the primary repo itself.
+
+**Independence requirement for validators**: your empirical exercise must be YOUR OWN invocation. Inspecting a developer's prior smoke-test artifacts is one input to your evidence, never a substitute for your own run. If an AC says "the harness runs in mode X and commits land", YOU invoke the harness in mode X yourself and observe the commits. Developer smoke-tests may be stale, partial, or accidentally passing due to environment factors that don't replicate. Independent execution is the only protection against blind spots.
 
 ## Config files
 

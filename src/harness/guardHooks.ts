@@ -11,7 +11,7 @@ const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"] as const;
 const WRITE_TOOLS_MATCHER = WRITE_TOOLS.join("|");
 
 const FORBIDDEN_GIT_COMMAND =
-  /\bgit\s+(commit|push|reset|rebase|merge|revert|cherry-pick|tag|am)\b|--amend\b/;
+  /\bgit\s+(?:[^;|&\s]+\s+)*?(commit|push|reset|rebase|merge|revert|cherry-pick|tag|am)(?:\s|;|\||&|$)|--amend\b/;
 
 function denyPreToolUse(reason: string): HookJSONOutput {
   return {
@@ -51,17 +51,43 @@ function developerPlanWriter(cwd: string, taskSlug: string): HookCallback {
   };
 }
 
-function developerGitCommitter(): HookCallback {
+function developerGitCommitter(primaryCwd: string): HookCallback {
+  const primary = resolve(primaryCwd);
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allowPreToolUse();
     if (input.tool_name !== "Bash") return allowPreToolUse();
     const command = readStringField(input.tool_input, "command");
     if (command == null) return allowPreToolUse();
     if (!FORBIDDEN_GIT_COMMAND.test(command)) return allowPreToolUse();
+    if (operatesOutsidePrimary(command, primary)) return allowPreToolUse();
     return denyPreToolUse(
-      "The harness is the sole committer. Do not run git commands that change history (commit, push, reset, rebase, merge, revert, cherry-pick, tag, am, or --amend). Propose a commit_message in your structured output instead.",
+      `The harness is the sole committer of the primary repo (${primary}). Do not run git history-modifying commands here (commit, push, reset, rebase, merge, revert, cherry-pick, tag, am, --amend). If you need to commit in a throwaway test repo, prefix with \`cd /tmp/<path>\` or use \`git -C /tmp/<path>\` — paths outside the primary repo are permitted. Propose a commit_message in your structured output instead for primary-repo commits.`,
     );
   };
+}
+
+function operatesOutsidePrimary(command: string, primaryResolved: string): boolean {
+  const cdMatch = command.match(/^\s*cd\s+(['"]?)([^'"&;|\s]+)\1/);
+  if (cdMatch) {
+    const target = resolve(primaryResolved, cdMatch[2]!);
+    if (!isUnderPrimary(target, primaryResolved)) return true;
+  }
+  const gitCMatches = [
+    ...command.matchAll(/\bgit\s+-C\s+(['"]?)([^'"&;|\s]+)\1/g),
+  ];
+  if (gitCMatches.length > 0) {
+    const allOutside = gitCMatches.every((m) => {
+      const target = resolve(primaryResolved, m[2]!);
+      return !isUnderPrimary(target, primaryResolved);
+    });
+    if (allOutside) return true;
+  }
+  return false;
+}
+
+function isUnderPrimary(target: string, primaryResolved: string): boolean {
+  if (target === primaryResolved) return true;
+  return target.startsWith(primaryResolved + "/");
 }
 
 function readStringField(toolInput: unknown, key: string): string | null {
@@ -89,7 +115,7 @@ export function buildGuardHooks(args: {
           matcher: WRITE_TOOLS_MATCHER,
           hooks: [developerPlanWriter(args.cwd, args.taskSlug)],
         },
-        { matcher: "Bash", hooks: [developerGitCommitter()] },
+        { matcher: "Bash", hooks: [developerGitCommitter(args.cwd)] },
       ],
     };
   }

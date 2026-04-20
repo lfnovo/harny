@@ -111,6 +111,51 @@ const cases: TestCase[] = [
     tool_input: { command: "npm test" },
     expectDeny: false,
   },
+  {
+    name: "developer allows git commit after cd to /tmp (throwaway)",
+    phase: "developer",
+    tool_name: "Bash",
+    tool_input: {
+      command: "cd /tmp/harness-e2e-abc && git commit -m seed",
+    },
+    expectDeny: false,
+  },
+  {
+    name: "developer allows git commit after cd to /private/tmp",
+    phase: "developer",
+    tool_name: "Bash",
+    tool_input: {
+      command: "cd /private/tmp/throwaway && git init && git commit -m seed",
+    },
+    expectDeny: false,
+  },
+  {
+    name: "developer allows git -C /tmp/... commit",
+    phase: "developer",
+    tool_name: "Bash",
+    tool_input: {
+      command: "git -C /tmp/harness-e2e-xyz commit -m seed",
+    },
+    expectDeny: false,
+  },
+  {
+    name: "developer still denies cd into primary subdir then git commit",
+    phase: "developer",
+    tool_name: "Bash",
+    tool_input: {
+      command: `cd ${CWD}/src && git commit -m sneaky`,
+    },
+    expectDeny: true,
+  },
+  {
+    name: "developer denies git -C pointing at primary",
+    phase: "developer",
+    tool_name: "Bash",
+    tool_input: {
+      command: `git -C ${CWD} commit -m sneaky`,
+    },
+    expectDeny: true,
+  },
 ];
 
 async function runCase(c: TestCase): Promise<{ pass: boolean; msg: string }> {

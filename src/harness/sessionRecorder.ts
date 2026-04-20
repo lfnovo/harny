@@ -58,7 +58,55 @@ type SessionRecord = {
   events: SDKMessage[];
 };
 
+const MAX_TRANSIENT_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 2000;
+const RETRY_MAX_DELAY_MS = 30000;
+
+function isTransientApiError(msg: string | null | undefined): boolean {
+  if (!msg) return false;
+  return /overloaded_error|rate_limit_error|\b5(?:29|02|03|04)\b|\boverloaded\b/i.test(
+    msg,
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function runPhase<T>(args: {
+  phase: PhaseName;
+  phaseConfig: ResolvedPhaseConfig;
+  cwd: string;
+  additionalDirectories?: string[];
+  taskSlug: string;
+  harnessTaskId: string | null;
+  prompt: string;
+  outputSchema: z.ZodType<T>;
+  resumeSessionId?: string | null;
+  verbose?: boolean;
+}): Promise<PhaseRunResult<T>> {
+  for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+    const result = await runPhaseAttempt(args);
+    if (
+      result.status !== "error" ||
+      !isTransientApiError(result.error) ||
+      attempt >= MAX_TRANSIENT_RETRIES
+    ) {
+      return result;
+    }
+    const delay = Math.min(
+      RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1),
+      RETRY_MAX_DELAY_MS,
+    );
+    console.log(
+      `[harness:${args.phase}] transient API error on attempt ${attempt}/${MAX_TRANSIENT_RETRIES}; retrying in ${Math.round(delay / 1000)}s`,
+    );
+    await sleep(delay);
+  }
+  throw new Error("unreachable: retry loop exited without returning");
+}
+
+async function runPhaseAttempt<T>(args: {
   phase: PhaseName;
   phaseConfig: ResolvedPhaseConfig;
   cwd: string;
