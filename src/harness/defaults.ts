@@ -82,7 +82,7 @@ export const DEFAULT_PLANNER: ResolvedPhaseConfig = {
   prompt: PLANNER_PROMPT,
   allowedTools: PLANNER_TOOLS,
   permissionMode: "auto",
-  maxTurns: 10,
+  maxTurns: 25,
   effort: "high",
   model: undefined,
   mcpServers: {},
