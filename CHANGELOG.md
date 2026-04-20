@@ -1,0 +1,24 @@
+# Changelog
+
+All notable changes to this project are documented here. The format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+## [0.1.0] — 2026-04-20
+
+### Added
+- CLI launcher (`src/runner.ts`) built on `@anthropic-ai/claude-agent-sdk`. Streams every SDK event into a per-session JSON file.
+- `assistants.json` registry of named working directories, selected via `--assistant <name>`. Paths resolve relative to the file itself. A gitignored config with `assistants.example.json` documenting the schema.
+- `--verbose` / `-v` flag that dumps every SDK event as it arrives.
+- Three-phase harness orchestration (planner → loop(developer → validator)), activated by `--harness`. Planner runs once; dev/validator loop until the plan is complete or iteration caps are hit.
+- `--task <slug>` with a timestamp fallback. The harness creates a `harness/<slug>` branch, commits `plan.json` after planning, and commits once per accepted task.
+- `plan.json` lives at `<cwd>/.harness/<slug>/plan.json` and is written only by the TypeScript layer. Agents return Zod-validated structured verdicts that the harness merges in.
+- Precondition checks before any work (is git repo, clean tree, branch absent). Fail fast on any violation.
+- Per-project `harness.json` at the target repo root overrides defaults per phase (prompts, tools, model, effort, `maxTurns`, MCP servers). Deep-merge, arrays replace. Library defaults live in `src/harness/defaults.ts`.
+- Structured outputs via the SDK's native `outputFormat: { type: "json_schema", ... }`. Schemas defined as Zod in `src/harness/verdict.ts`; `z.toJSONSchema()` feeds the SDK.
+- Ordinal prefix on session files (`NNNN_<session_id>.json`) so execution order is obvious without parsing UUIDs.
+- `.gitignore` inside each task directory so `sessions/` stays untracked while `plan.json` is versioned.
+- `harness.example.json` documenting the per-project config schema.
+
+### Fixed
+- `toJsonSchema()` strips the top-level `$schema` key produced by `z.toJSONSchema()`. The bundled `claude-code` binary silently ignores any schema that has `$schema` at the top, causing `structured_output` to come back undefined with no error — manifested as the planner "succeeding" with free-form text instead of the validated plan.
