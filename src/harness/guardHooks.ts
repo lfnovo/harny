@@ -28,11 +28,17 @@ function allowPreToolUse(): HookJSONOutput {
   return { continue: true };
 }
 
-function validatorReadOnly(): HookCallback {
+function validatorReadOnly(primaryCwd: string): HookCallback {
+  const primary = resolve(primaryCwd);
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allowPreToolUse();
+    const filePath = readStringField(input.tool_input, "file_path");
+    if (filePath) {
+      const abs = resolve(primary, filePath);
+      if (!isUnderPrimary(abs, primary)) return allowPreToolUse();
+    }
     return denyPreToolUse(
-      `Validator is read-only on code. Tool "${input.tool_name}" is not permitted. Report "fail" in your verdict instead of trying to fix the code.`,
+      `Validator is read-only on the primary repo (${primary}). Tool "${input.tool_name}" at ${filePath ?? "<unknown path>"} is not permitted inside the primary. Writes to paths outside the primary (e.g., /tmp/harness-e2e-*) are allowed for empirical test setup. Report "fail" in your verdict instead of trying to fix primary code.`,
     );
   };
 }
@@ -104,7 +110,10 @@ export function buildGuardHooks(args: {
   if (args.phase === "validator") {
     return {
       PreToolUse: [
-        { matcher: WRITE_TOOLS_MATCHER, hooks: [validatorReadOnly()] },
+        {
+          matcher: WRITE_TOOLS_MATCHER,
+          hooks: [validatorReadOnly(args.cwd)],
+        },
       ],
     };
   }

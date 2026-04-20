@@ -38,6 +38,37 @@ const cases: TestCase[] = [
     expectDeny: false,
   },
   {
+    name: "validator allows Write to /tmp (outside primary)",
+    phase: "validator",
+    tool_name: "Write",
+    tool_input: {
+      file_path: "/tmp/harness-e2e-val/hello.txt",
+      content: "hi",
+    },
+    expectDeny: false,
+  },
+  {
+    name: "validator allows Edit to /tmp (outside primary)",
+    phase: "validator",
+    tool_name: "Edit",
+    tool_input: {
+      file_path: "/tmp/harness-e2e-val/config.json",
+      old_string: "a",
+      new_string: "b",
+    },
+    expectDeny: false,
+  },
+  {
+    name: "validator still denies Write inside primary subdir",
+    phase: "validator",
+    tool_name: "Write",
+    tool_input: {
+      file_path: `${CWD}/src/evil.ts`,
+      content: "x",
+    },
+    expectDeny: true,
+  },
+  {
     name: "developer denies Edit on plan.json",
     phase: "developer",
     tool_name: "Edit",

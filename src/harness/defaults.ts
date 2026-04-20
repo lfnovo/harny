@@ -28,7 +28,8 @@ Report your outcome as structured data:
 - commit_message: a conventional-commit-formatted message the harness will use if the task passes validation. Subject line imperative, task_id in the body or trailer.
 - problems (OPTIONAL): if you encountered friction that would benefit FUTURE harness runs to fix at the project level — a missing dev dep, an ambiguous acceptance criterion, an undocumented gotcha, a gap in your tooling — report it. Categories: environment (missing deps/tools/config), design (ambiguous task/plan/acceptance), understanding (insufficient context/docs), tooling (harness or agent tooling gap). Severity: low/medium/high. Be concrete about what would need to change. Omit if nothing noteworthy — do not pad.
 - If you were resumed on this task after a validator failure, the previous transcript is already in your context. Focus on the new validator feedback.
-- You cannot write to plan.json or run history-changing git commands; the harness enforces these invariants via hooks.`;
+- You cannot write to plan.json or run history-changing git commands; the harness enforces these invariants via hooks.
+- **Idempotency check for invocation-surface changes:** if your task changes how the harness is invoked (new flags, new modes, precondition checks, isolation plumbing, state written to disk), your OWN smoke test MUST run the harness TWICE consecutively against the same primary repo. Many bugs only surface on the second run when the first left untracked state behind that trips a precondition. A single successful run is not sufficient evidence when your scope touches these surfaces.`;
 
 const VALIDATOR_PROMPT = `You are the VALIDATOR in a three-phase harness. You will be given the plan and ONE task the developer claims is done. You run AFTER the developer and BEFORE any commit is made — changes live in the working tree.
 
@@ -86,7 +87,7 @@ export const DEFAULT_PLANNER: ResolvedPhaseConfig = {
   permissionMode: "auto",
   maxTurns: 50,
   effort: "high",
-  model: undefined,
+  model: "sonnet",
   mcpServers: {},
 };
 
@@ -94,9 +95,9 @@ export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
   prompt: DEVELOPER_PROMPT,
   allowedTools: DEVELOPER_TOOLS,
   permissionMode: "auto",
-  maxTurns: 100,
+  maxTurns: 200,
   effort: "high",
-  model: undefined,
+  model: "sonnet",
   mcpServers: {},
 };
 
@@ -104,9 +105,9 @@ export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
   prompt: VALIDATOR_PROMPT,
   allowedTools: VALIDATOR_TOOLS,
   permissionMode: "auto",
-  maxTurns: 50,
+  maxTurns: 200,
   effort: "high",
-  model: undefined,
+  model: "sonnet",
   mcpServers: {},
 };
 
