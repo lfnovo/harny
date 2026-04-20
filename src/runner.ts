@@ -2,6 +2,7 @@ import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
 import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runHarness } from "./harness/orchestrator.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..");
@@ -40,16 +41,22 @@ async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
 function parseArgs(argv: string[]): {
   verbose: boolean;
   assistant: string | null;
+  harness: boolean;
+  task: string | null;
   prompt: string;
 } {
   let verbose = false;
   let assistant: string | null = null;
+  let harness = false;
+  let task: string | null = null;
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--verbose" || a === "-v") {
       verbose = true;
+    } else if (a === "--harness") {
+      harness = true;
     } else if (a === "--assistant") {
       const next = argv[i + 1];
       if (!next) throw new Error("--assistant requires a name");
@@ -57,12 +64,19 @@ function parseArgs(argv: string[]): {
       i++;
     } else if (a.startsWith("--assistant=")) {
       assistant = a.slice("--assistant=".length);
+    } else if (a === "--task") {
+      const next = argv[i + 1];
+      if (!next) throw new Error("--task requires a slug");
+      task = next;
+      i++;
+    } else if (a.startsWith("--task=")) {
+      task = a.slice("--task=".length);
     } else {
       rest.push(a);
     }
   }
 
-  return { verbose, assistant, prompt: rest.join(" ").trim() };
+  return { verbose, assistant, harness, task, prompt: rest.join(" ").trim() };
 }
 
 async function loadAssistant(name: string): Promise<Assistant> {
@@ -121,9 +135,33 @@ async function loadAssistant(name: string): Promise<Assistant> {
 }
 
 async function main() {
-  const { verbose, assistant: assistantName, prompt: promptArg } = parseArgs(
-    process.argv.slice(2),
-  );
+  const {
+    verbose,
+    assistant: assistantName,
+    harness,
+    task,
+    prompt: promptArg,
+  } = parseArgs(process.argv.slice(2));
+
+  if (harness) {
+    if (!assistantName) {
+      throw new Error("--harness requires --assistant <name>");
+    }
+    if (!promptArg) {
+      throw new Error("--harness requires a prompt describing the work");
+    }
+    const assistant = await loadAssistant(assistantName);
+    const result = await runHarness({
+      cwd: assistant.cwd,
+      userPrompt: promptArg,
+      taskSlug: task ?? undefined,
+      verbose,
+    });
+    console.log(
+      `[harness] finished status=${result.status} plan=${result.planPath}`,
+    );
+    return;
+  }
 
   const prompt =
     promptArg ||

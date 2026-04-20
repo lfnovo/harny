@@ -1,0 +1,47 @@
+{
+  "maxIterationsPerTask": 3,
+  "maxIterationsGlobal": 30,
+  "planner": {
+    "prompt": "Optional override of the planner system prompt. If omitted, library default is used.",
+    "allowedTools": [
+      "Read",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch",
+      "Skill",
+      "ToolSearch"
+    ],
+    "permissionMode": "auto",
+    "maxTurns": 10,
+    "effort": "high",
+    "model": "opus"
+  },
+  "developer": {
+    "allowedTools": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "Bash",
+      "Skill",
+      "ToolSearch"
+    ],
+    "permissionMode": "auto",
+    "maxTurns": 30,
+    "effort": "high",
+    "mcpServers": {
+      "playwright": {
+        "command": "npx",
+        "args": ["@playwright/mcp@latest"]
+      }
+    }
+  },
+  "validator": {
+    "allowedTools": ["Read", "Glob", "Grep", "Bash", "WebFetch"],
+    "permissionMode": "auto",
+    "maxTurns": 20,
+    "effort": "high"
+  }
+}
