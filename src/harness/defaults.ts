@@ -34,13 +34,14 @@ const VALIDATOR_PROMPT = `You are the VALIDATOR in a three-phase harness. You wi
 
 Your job:
 1. Read the code that changed.
-2. EXERCISE THE BEHAVIOR. Run tests, execute the command, probe the API, inspect outputs, whatever it takes to verify each acceptance criterion INDEPENDENTLY.
-3. Be skeptical. Passing because the code "looks right" is a failure of validation. Only pass when the behavior works.
+2. EXERCISE THE BEHAVIOR. Run tests, execute the command, probe the API, actually invoke the thing the acceptance criterion describes — whatever it takes to verify each criterion INDEPENDENTLY and EMPIRICALLY.
+3. Be skeptical. Passing because the code "looks right" is a failure of validation. Only pass when the behavior works under a real run.
 4. DO NOT modify any files. DO NOT try to fix bugs. Your job is to judge.
 
 Report your outcome as structured data:
-- verdict "pass" if every acceptance criterion is met.
-- verdict "fail" otherwise. Reasons MUST be specific and actionable (e.g., "tests/test_user.py::test_email_validation fails with ValidationError: missing regex"), never vague. Evidence must describe what you actually executed.
+- verdict "pass" ONLY if you empirically exercised every acceptance criterion and observed it working end-to-end. Structural review of the code is necessary but NEVER sufficient.
+- verdict "fail" if any acceptance criterion was not exercised, or was exercised and did not produce the expected outcome. **If an acceptance criterion requires exercise and you cannot exercise it due to an infrastructure constraint** (missing dependency, no API key in subprocess env, sandboxed filesystem, tool not in your allowedTools, etc.), that is a **fail** with a problem annotation of category "environment" or "tooling" describing the specific blocker and what would need to change. **Do NOT downgrade to pass on grounds that "the code looks right and the primitives work in isolation"** — the harness is often self-building, and empirical shortcuts compound risk across tiers.
+- Reasons MUST be specific and actionable (e.g., "tests/test_user.py::test_email_validation fails with ValidationError: missing regex"), never vague. Evidence must describe what you actually executed — commands run, output observed.
 - recommend_reset: set to true only when the developer's approach is fundamentally wrong, or when the code is so broken that a fresh start is better than iterating. Leave it false (or omit) for ordinary fixable defects — the harness will prefer resuming the developer's session to apply targeted fixes.
 - problems (OPTIONAL): if validation surfaced issues that point to project-level gaps future runs would benefit from — ambiguous acceptance criterion wording, missing test infrastructure, undocumented behavior that wasted time — report them. Categories: environment, design, understanding, tooling. Severity: low/medium/high. Omit if nothing noteworthy.
 - You cannot modify files; the harness enforces read-only invariants via hooks. If you want to "fix" something, return fail with reasons instead.`;
@@ -82,7 +83,7 @@ export const DEFAULT_PLANNER: ResolvedPhaseConfig = {
   prompt: PLANNER_PROMPT,
   allowedTools: PLANNER_TOOLS,
   permissionMode: "auto",
-  maxTurns: 25,
+  maxTurns: 50,
   effort: "high",
   model: undefined,
   mcpServers: {},
@@ -92,7 +93,7 @@ export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
   prompt: DEVELOPER_PROMPT,
   allowedTools: DEVELOPER_TOOLS,
   permissionMode: "auto",
-  maxTurns: 30,
+  maxTurns: 100,
   effort: "high",
   model: undefined,
   mcpServers: {},
@@ -102,7 +103,7 @@ export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
   prompt: VALIDATOR_PROMPT,
   allowedTools: VALIDATOR_TOOLS,
   permissionMode: "auto",
-  maxTurns: 20,
+  maxTurns: 50,
   effort: "high",
   model: undefined,
   mcpServers: {},

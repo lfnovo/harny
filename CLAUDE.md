@@ -23,6 +23,21 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 - **Branch only shows committed work.** Before returning on any terminal state (done/failed/exhausted/blocked_fatal), the tree is reset to the last commit so the branch is clean.
 - **Zod schemas must not emit `$schema`.** The bundled `claude-code` binary silently ignores a schema with a top-level `$schema` key — `structured_output` comes back undefined with no error. `verdict.ts:toJsonSchema()` strips it.
 
+## Validation discipline (self-build contract)
+
+While the harness is being built on itself, validator phases MUST exercise acceptance criteria **empirically**, not by inspection alone:
+
+- If an AC says "the harness runs in X mode", the validator must invoke the harness in X mode end-to-end and observe.
+- If an AC says "two runs don't collide", the validator must start two runs and observe non-interference.
+- If infrastructure prevents empirical exercise (missing dependency, API key not propagated into subprocess env, sandboxed filesystem, tool not in allowedTools, etc.), return **fail** with a `problems` annotation of category `environment` or `tooling` describing the blocker. **Do NOT downgrade to pass on grounds that "the code looks right and the primitives work in isolation"** — that shortcut compounds risk across tiers.
+
+This is a temporary self-build contract. Once workflows are formalized (Tier 1b+), validator strictness becomes a per-workflow override in `harness.json`.
+
+Infrastructure available to validator for empirical runs:
+- `npm run run -- --harness --assistant <name> --task <slug> "<prompt>"` — the full harness is invokable from inside validator Bash. If SDK auth fails in the nested subprocess, that is an `environment` blocker and the verdict must be `fail`.
+- `/tmp/harness-e2e-*` — throwaway dirs are fair game. `git init`, register a temp assistant, run.
+- Two concurrent runs in two terminals = the canonical concurrency test.
+
 ## Config files
 
 - `assistants.json` (repo root, gitignored) — named working directories. See `assistants.example.json`.
