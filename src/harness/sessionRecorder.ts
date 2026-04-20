@@ -66,6 +66,7 @@ export async function runPhase<T>(args: {
   harnessTaskId: string | null;
   prompt: string;
   outputSchema: z.ZodType<T>;
+  resumeSessionId?: string | null;
   verbose?: boolean;
 }): Promise<PhaseRunResult<T>> {
   const {
@@ -77,6 +78,7 @@ export async function runPhase<T>(args: {
     harnessTaskId,
     prompt,
     outputSchema,
+    resumeSessionId,
     verbose,
   } = args;
 
@@ -105,6 +107,8 @@ export async function runPhase<T>(args: {
 
   console.log(`[harness:${phase}] starting ordinal=${ordinal}`);
   if (harnessTaskId) console.log(`[harness:${phase}] task=${harnessTaskId}`);
+  if (resumeSessionId)
+    console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
 
   try {
     for await (const message of query({
@@ -126,6 +130,7 @@ export async function runPhase<T>(args: {
           type: "json_schema",
           schema: toJsonSchema(outputSchema),
         },
+        ...(resumeSessionId ? { resume: resumeSessionId } : {}),
         ...(phaseConfig.model ? { model: phaseConfig.model } : {}),
         ...(Object.keys(phaseConfig.mcpServers).length > 0
           ? { mcpServers: phaseConfig.mcpServers }

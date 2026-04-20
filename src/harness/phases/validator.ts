@@ -27,7 +27,7 @@ export async function runValidator(args: {
     "",
     `Developer reports: ${args.developerSummary}`,
     "",
-    "Independently verify each acceptance criterion by exercising the behavior.",
+    "Changes are in the working tree and NOT yet committed. Exercise the behavior to verify each acceptance criterion.",
   ].join("\n");
 
   const result = await runPhase({

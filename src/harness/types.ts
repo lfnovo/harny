@@ -24,6 +24,7 @@ export type HarnessConfigFile = {
   validator?: PhaseConfig;
   maxIterationsPerTask?: number;
   maxIterationsGlobal?: number;
+  maxRetriesBeforeReset?: number;
 };
 
 export type ResolvedPhaseConfig = Required<
@@ -39,6 +40,7 @@ export type ResolvedHarnessConfig = {
   validator: ResolvedPhaseConfig;
   maxIterationsPerTask: number;
   maxIterationsGlobal: number;
+  maxRetriesBeforeReset: number;
 };
 
 export type TaskStatus = "pending" | "in_progress" | "done" | "failed";
@@ -50,7 +52,7 @@ export type PlanTaskHistoryEntry =
       at: string;
       status: "done" | "blocked";
       summary: string;
-      commit_sha: string;
+      commit_message?: string;
       blocked_reason?: string;
     }
   | {
@@ -60,6 +62,7 @@ export type PlanTaskHistoryEntry =
       verdict: "pass" | "fail";
       reasons: string[];
       evidence: string;
+      recommend_reset?: boolean;
     };
 
 export type PlanTask = {
@@ -69,6 +72,7 @@ export type PlanTask = {
   acceptance: string[];
   status: TaskStatus;
   attempts: number;
+  commit_sha: string | null;
   history: PlanTaskHistoryEntry[];
 };
 
@@ -93,4 +97,3 @@ export type Plan = {
   iterations_global: number;
   tasks: PlanTask[];
 };
-

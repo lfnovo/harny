@@ -19,12 +19,16 @@ Your job:
 2. Implement the task completely. Meet every acceptance criterion.
 3. Stay within the scope of the current task. Do not pre-build future tasks.
 4. DO NOT edit the plan file (.harness/<task>/plan.json). The harness owns it.
-5. When the implementation is complete, run any relevant tests to confirm before committing.
-6. Commit your changes with a conventional commit message referencing the task id.
+5. DO NOT commit or run \`git\` commands that change history. The harness will commit on your behalf if the validator passes.
+6. When your implementation is complete, run any relevant tests or smoke checks to confirm.
 
-Report your outcome as structured data. Use status "blocked" (with a blocked_reason) only if you truly cannot proceed; otherwise use "done".`;
+Report your outcome as structured data:
+- status "done" when the implementation is finished (even if you suspect there may be bugs — let the validator judge).
+- status "blocked" ONLY if you truly cannot proceed (missing dependency, infeasible request, etc.). Blocked is treated by the harness as a fatal plan failure requiring human intervention — use it sparingly.
+- commit_message: a conventional-commit-formatted message the harness will use if the task passes validation. Subject line imperative, task_id in the body or trailer.
+- If you were resumed on this task after a validator failure, the previous transcript is already in your context. Focus on the new validator feedback.`;
 
-const VALIDATOR_PROMPT = `You are the VALIDATOR in a three-phase harness. You will be given the plan and ONE task the developer claims is done.
+const VALIDATOR_PROMPT = `You are the VALIDATOR in a three-phase harness. You will be given the plan and ONE task the developer claims is done. You run AFTER the developer and BEFORE any commit is made — changes live in the working tree.
 
 Your job:
 1. Read the code that changed.
@@ -32,7 +36,10 @@ Your job:
 3. Be skeptical. Passing because the code "looks right" is a failure of validation. Only pass when the behavior works.
 4. DO NOT modify any files. DO NOT try to fix bugs. Your job is to judge.
 
-If verdict is "fail", reasons MUST be specific and actionable (e.g., "tests/test_user.py::test_email_validation fails with ValidationError: missing regex"), never vague. Evidence must describe what was actually executed.`;
+Report your outcome as structured data:
+- verdict "pass" if every acceptance criterion is met.
+- verdict "fail" otherwise. Reasons MUST be specific and actionable (e.g., "tests/test_user.py::test_email_validation fails with ValidationError: missing regex"), never vague. Evidence must describe what you actually executed.
+- recommend_reset: set to true only when the developer's approach is fundamentally wrong, or when the code is so broken that a fresh start is better than iterating. Leave it false (or omit) for ordinary fixable defects — the harness will prefer resuming the developer's session to apply targeted fixes.`;
 
 const PLANNER_TOOLS = [
   "Read",
@@ -103,4 +110,5 @@ export const DEFAULT_HARNESS_CONFIG: ResolvedHarnessConfig = {
   validator: DEFAULT_VALIDATOR,
   maxIterationsPerTask: 3,
   maxIterationsGlobal: 30,
+  maxRetriesBeforeReset: 1,
 };

@@ -22,10 +22,14 @@ export const DeveloperVerdictSchema = z
   .object({
     task_id: z.string(),
     status: z.enum(["done", "blocked"]),
-    summary: z.string().describe("2-3 sentence description of what changed"),
-    commit_sha: z
+    summary: z
       .string()
-      .describe("Commit SHA if a commit was made, otherwise empty string"),
+      .describe("2-3 sentence description of what changed"),
+    commit_message: z
+      .string()
+      .describe(
+        "Proposed conventional-commit message (subject line only, or subject + body). The harness will commit on your behalf if validation passes. Empty string if status is blocked.",
+      ),
     blocked_reason: z
       .string()
       .optional()
@@ -43,6 +47,12 @@ export const ValidatorVerdictSchema = z
     evidence: z
       .string()
       .describe("What was actually run or observed to reach this verdict"),
+    recommend_reset: z
+      .boolean()
+      .optional()
+      .describe(
+        "Set to true (only when verdict is 'fail') if the developer's approach is fundamentally wrong, or if the code is so broken that a fresh start beats iterating on it.",
+      ),
   })
   .strict();
 

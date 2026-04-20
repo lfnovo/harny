@@ -56,5 +56,8 @@ export async function loadHarnessConfig(
       DEFAULT_HARNESS_CONFIG.maxIterationsPerTask,
     maxIterationsGlobal:
       parsed.maxIterationsGlobal ?? DEFAULT_HARNESS_CONFIG.maxIterationsGlobal,
+    maxRetriesBeforeReset:
+      parsed.maxRetriesBeforeReset ??
+      DEFAULT_HARNESS_CONFIG.maxRetriesBeforeReset,
   };
 }

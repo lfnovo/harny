@@ -16,8 +16,11 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 ## Invariants
 
 - **The TS harness is the sole writer of `plan.json`.** Agents return structured verdicts (Zod-validated) and the harness merges them. Never have an agent edit the plan.
-- **Validator is read-only on code** (no Edit/Write tools) and uses Bash to exercise the product. A fail keeps the task `in_progress` until `maxIterationsPerTask` is exceeded, then marks it `failed`.
-- **One commit per accepted task.** Planner also commits `plan.json`. Branch name is `harness/<task-slug>`. Preconditions (is git repo, clean tree, branch absent) fail fast.
+- **The harness is the sole committer.** The developer proposes a `commit_message` in its verdict but does NOT commit; the harness commits only after the validator passes, with the composed message `<dev>\n\ntask=<id>\nvalidator: <evidence>`.
+- **Validator is read-only on code** (no Edit/Write tools) and runs against the uncommitted working tree. It reports `verdict` (pass/fail), and on fail optionally `recommend_reset` to hint that the approach is fundamentally wrong.
+- **Retry = resume, reset = fresh.** On fail without reset, the next developer attempt resumes the previous session with only the new validator feedback in the prompt. On reset (validator-recommended or after `maxRetriesBeforeReset`), the tree is rewound with `git reset --hard <pre-phase-sha> && git clean -fd` and the next developer starts a brand-new session. `.harness/<slug>/` survives the clean because it is gitignored.
+- **Dev `blocked` is fatal.** If the developer returns `status: "blocked"`, the plan is immediately marked `failed` and the loop aborts. Rationale: either the dev could have unblocked itself (our prompt/tooling bug) or it truly couldn't (plan is infeasible). Both require human triage. This will change once human-in-the-loop feedback exists.
+- **Branch only shows committed work.** Before returning on any terminal state (done/failed/exhausted/blocked_fatal), the tree is reset to the last commit so the branch is clean.
 - **Zod schemas must not emit `$schema`.** The bundled `claude-code` binary silently ignores a schema with a top-level `$schema` key — `structured_output` comes back undefined with no error. `verdict.ts:toJsonSchema()` strips it.
 
 ## Config files
@@ -54,3 +57,5 @@ Switch to Streaming Input (prompt becomes an AsyncGenerator) when we need:
 - The `claude-code` binary embedded by the SDK uses `jsonSchema` internally; `outputFormat.schema` is translated at the SDK layer. If structured outputs are missing, check the schema for the `$schema` top-level key first.
 - `settingSources: ["project", "user"]` loads the target repo's `.claude/` skills and CLAUDE.md — phases benefit from project context automatically.
 - Session files buffer events in memory until the `system/init` event provides a session_id. In the unlikely event no init arrives, a `NNNN_no-session-<timestamp>.json` fallback is written.
+- Files per task dir: `plan.json` (versioned, single source of state), `sessions/NNNN_<uuid>.json` (per-phase transcripts, gitignored), `audit.jsonl` (append-only decision log, gitignored), `.gitignore` (locks both out of the repo).
+- `git clean -fd` only removes untracked files; gitignored `.harness/<slug>/` survives, which is what we want.

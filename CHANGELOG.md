@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+### Added
+- Validator now reports a third signal `recommend_reset` alongside `verdict` and `reasons`. When true, the harness wipes the working tree and starts the next attempt fresh instead of resuming.
+- `maxRetriesBeforeReset` config (default 1) — after N failed retries the harness forces a reset regardless of the validator's recommendation.
+- `audit.jsonl` append-only log at `.harness/<slug>/audit.jsonl` with every developer outcome, validator verdict, harness decision (retry/reset/commit/failed/blocked_fatal), and commit/reset execution records. Task-local `.gitignore` excludes it.
+- Retry path resumes the developer's previous session (`resume: sessionId`) with only the new validator feedback in the prompt; reset path starts a fresh session.
+- `commit_sha` at the task level in `plan.json` — records the single commit that represents the accepted task.
+
+### Changed
+- **Commits now happen only after validator pass.** The developer no longer commits during its phase; it proposes a conventional-commit `commit_message` in its structured output. The harness composes the final commit as `<developer message>\n\ntask=<id>\nvalidator: <evidence>` and creates it from the working tree.
+- Reset path uses `git reset --hard <pre-phase-sha>` + `git clean -fd` (ignored files survive, so `.harness/<slug>/` sessions + audit log are preserved).
+- `blocked` from the developer is now **fatal** — the whole plan is marked `failed` and the loop aborts. Rationale: if the agent could have unblocked itself it would have; if it couldn't, human triage is required. This is temporary until human-in-the-loop feedback exists.
+- On task fail (exhausted retries) or blocked, the working tree is reset to the pre-phase SHA so the branch only shows committed work.
+- Developer prompt no longer instructs the agent to commit; validator prompt notes that changes are uncommitted when it runs.
+
 ## [0.1.0] — 2026-04-20
 
 ### Added

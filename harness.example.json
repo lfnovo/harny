@@ -1,6 +1,7 @@
 {
   "maxIterationsPerTask": 3,
   "maxIterationsGlobal": 30,
+  "maxRetriesBeforeReset": 1,
   "planner": {
     "prompt": "Optional override of the planner system prompt. If omitted, library default is used.",
     "allowedTools": [

@@ -80,3 +80,25 @@ export async function stageAndCommit(
 export async function headSha(cwd: string): Promise<string> {
   return (await git(cwd, ["rev-parse", "HEAD"])).trim();
 }
+
+export async function resetHard(cwd: string, sha: string): Promise<void> {
+  await git(cwd, ["reset", "--hard", sha]);
+}
+
+export async function cleanUntracked(cwd: string): Promise<void> {
+  // -f to actually delete, -d to include directories. Does NOT touch
+  // ignored files (.gitignore'd) so .harness/<slug>/ and its contents
+  // survive the clean.
+  await git(cwd, ["clean", "-fd"]);
+}
+
+export async function commitComposed(
+  cwd: string,
+  message: string,
+): Promise<string | null> {
+  await git(cwd, ["add", "-A"]);
+  const { stdout } = await runGit(cwd, ["diff", "--cached", "--name-only"]);
+  if (stdout.trim().length === 0) return null;
+  await git(cwd, ["commit", "-m", message]);
+  return (await git(cwd, ["rev-parse", "HEAD"])).trim();
+}

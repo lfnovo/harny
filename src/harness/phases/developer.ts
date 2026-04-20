@@ -1,5 +1,9 @@
 import { runPhase } from "../sessionRecorder.js";
-import { DeveloperVerdictSchema, type DeveloperVerdict } from "../verdict.js";
+import {
+  DeveloperVerdictSchema,
+  type DeveloperVerdict,
+  type ValidatorVerdict,
+} from "../verdict.js";
 import type {
   Plan,
   PlanTask,
@@ -22,17 +26,19 @@ function describePlan(plan: Plan): string {
 }
 
 function describeTask(task: PlanTask): string {
-  const parts = [
+  return [
     `Current task: ${task.id} — ${task.title}`,
     `Description: ${task.description}`,
     `Acceptance criteria:`,
     ...task.acceptance.map((a, i) => `  ${i + 1}. ${a}`),
-  ];
-  if (task.attempts > 0 && task.history.length > 0) {
-    parts.push("", "Previous attempts on THIS task:");
-    for (const h of task.history) {
-      parts.push(formatHistoryForPrompt(h));
-    }
+  ].join("\n");
+}
+
+function describeTaskHistory(task: PlanTask): string {
+  if (task.history.length === 0) return "";
+  const parts = ["", "Previous attempts on THIS task:"];
+  for (const h of task.history) {
+    parts.push(formatHistoryForPrompt(h));
   }
   return parts.join("\n");
 }
@@ -43,9 +49,33 @@ function formatHistoryForPrompt(h: PlanTaskHistoryEntry): string {
       h.blocked_reason ? `, blocked_reason=${h.blocked_reason}` : ""
     }\n  summary: ${h.summary}`;
   }
-  return `- validator verdict (${h.at}): ${h.verdict}\n  reasons:\n${h.reasons
+  return `- validator verdict (${h.at}): ${h.verdict}${
+    h.recommend_reset ? " (recommended reset)" : ""
+  }\n  reasons:\n${h.reasons
     .map((r) => `    - ${r}`)
     .join("\n")}\n  evidence: ${h.evidence}`;
+}
+
+function buildResumePrompt(validator: ValidatorVerdict): string {
+  return [
+    "The validator reviewed your previous attempt and reported the following:",
+    "",
+    `Verdict: ${validator.verdict}`,
+    "Reasons:",
+    ...validator.reasons.map((r) => `  - ${r}`),
+    "",
+    `Evidence: ${validator.evidence}`,
+    "",
+    "You were not committed. The working tree still contains your previous changes. Fix exactly what the validator flagged, then report your outcome as structured data again.",
+  ].join("\n");
+}
+
+function buildFreshPrompt(plan: Plan, task: PlanTask): string {
+  const history = describeTaskHistory(task);
+  const body = [describePlan(plan), "", describeTask(task)];
+  if (history) body.push(history);
+  body.push("", "Do NOT commit. Report your outcome as structured data.");
+  return body.join("\n");
 }
 
 export async function runDeveloper(args: {
@@ -54,15 +84,15 @@ export async function runDeveloper(args: {
   taskSlug: string;
   plan: Plan;
   task: PlanTask;
+  resume?: {
+    sessionId: string;
+    lastValidator: ValidatorVerdict;
+  } | null;
   verbose?: boolean;
 }): Promise<{ sessionId: string; verdict: DeveloperVerdict }> {
-  const prompt = [
-    describePlan(args.plan),
-    "",
-    describeTask(args.task),
-    "",
-    `When complete, commit with a conventional message referencing ${args.task.id}.`,
-  ].join("\n");
+  const prompt = args.resume
+    ? buildResumePrompt(args.resume.lastValidator)
+    : buildFreshPrompt(args.plan, args.task);
 
   const result = await runPhase({
     phase: "developer",
@@ -72,6 +102,7 @@ export async function runDeveloper(args: {
     harnessTaskId: args.task.id,
     prompt,
     outputSchema: DeveloperVerdictSchema,
+    resumeSessionId: args.resume?.sessionId ?? null,
     verbose: args.verbose,
   });
 

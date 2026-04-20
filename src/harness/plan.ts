@@ -70,6 +70,7 @@ export function applyPlannerVerdict(
     acceptance: t.acceptance,
     status: "pending",
     attempts: 0,
+    commit_sha: null,
     history: [],
   }));
   return plan;
