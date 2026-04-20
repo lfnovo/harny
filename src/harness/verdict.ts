@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { ProblemSchema } from "./problem.js";
+
+const PROBLEMS_FIELD_DESCRIPTION =
+  "OPTIONAL. Problems encountered during this attempt that would benefit FUTURE runs of the harness if fixed at the project level (not fixed within this task). Examples: missing CLAUDE.md coverage of a critical area, missing dev dependency, ambiguous acceptance criterion, agent tool you wished you had. Leave empty/omit if nothing noteworthy.";
 
 export const PlannerVerdictSchema = z
   .object({
@@ -34,6 +38,10 @@ export const DeveloperVerdictSchema = z
       .string()
       .optional()
       .describe("Required when status is blocked"),
+    problems: z
+      .array(ProblemSchema)
+      .optional()
+      .describe(PROBLEMS_FIELD_DESCRIPTION),
   })
   .strict();
 
@@ -53,6 +61,10 @@ export const ValidatorVerdictSchema = z
       .describe(
         "Set to true (only when verdict is 'fail') if the developer's approach is fundamentally wrong, or if the code is so broken that a fresh start beats iterating on it.",
       ),
+    problems: z
+      .array(ProblemSchema)
+      .optional()
+      .describe(PROBLEMS_FIELD_DESCRIPTION),
   })
   .strict();
 

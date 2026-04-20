@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format loosely foll
 ## [Unreleased]
 
 ### Added
+- **Phase 2 Tier 0**: three invariant guard hooks registered per-phase in `sessionRecorder`. Validator `PreToolUse` denies `Write|Edit|MultiEdit|NotebookEdit` (read-only invariant). Developer `PreToolUse` denies writes to `.harness/<slug>/plan.json` (sole-writer invariant) and Bash commands matching history-changing git operations (`commit|push|reset|rebase|merge|revert|cherry-pick|tag|am` or `--amend`) (sole-committer invariant). Unit-tested via `scripts/guard-probe.ts` (13/13 cases).
+- **Phase 2 Tier 0**: problem annotation capture. `DeveloperVerdictSchema` and `ValidatorVerdictSchema` gain an optional `problems: Problem[]` field (`{category, severity, description}` with categories `environment | design | understanding | tooling`). Orchestrator writes one file per problem to `.harness/<slug>/problems/<id>.json` — idempotent, append-only, safe under git merges. Schema versioned at `schema_version: 1`. Dataset accumulates from day one for the future `/improve` consumer.
+- `PHASE2.md` — roadmap with 11 tiers, gating questions, completion criteria. Drives session-by-session pull-down of Phase 2 work.
+- Empirical probe (`scripts/hook-probe.ts`) proving hooks DO fire in Single Message Input mode, contradicting a claim in the streaming-vs-single doc. Streaming mode is therefore not a prerequisite for Phase 2.
 - Validator now reports a third signal `recommend_reset` alongside `verdict` and `reasons`. When true, the harness wipes the working tree and starts the next attempt fresh instead of resuming.
 - `maxRetriesBeforeReset` config (default 1) — after N failed retries the harness forces a reset regardless of the validator's recommendation.
 - `audit.jsonl` append-only log at `.harness/<slug>/audit.jsonl` with every developer outcome, validator verdict, harness decision (retry/reset/commit/failed/blocked_fatal), and commit/reset execution records. Task-local `.gitignore` excludes it.

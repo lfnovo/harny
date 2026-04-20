@@ -4,6 +4,7 @@ import {
   type DeveloperVerdict,
   type ValidatorVerdict,
 } from "../verdict.js";
+import { writeProblems } from "../problem.js";
 import type {
   Plan,
   PlanTask,
@@ -117,6 +118,16 @@ export async function runDeveloper(args: {
   }
   if (verdict.status === "blocked" && !verdict.blocked_reason) {
     throw new Error("developer returned status=blocked without blocked_reason");
+  }
+  if (verdict.problems && verdict.problems.length > 0) {
+    await writeProblems({
+      cwd: args.cwd,
+      taskSlug: args.taskSlug,
+      phase: "developer",
+      sessionId: result.sessionId,
+      taskId: args.task.id,
+      problems: verdict.problems,
+    });
   }
   return { sessionId: result.sessionId, verdict };
 }

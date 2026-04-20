@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { sessionsDir } from "./plan.js";
 import { toJsonSchema } from "./verdict.js";
+import { buildGuardHooks } from "./guardHooks.js";
 import type { PhaseName, ResolvedPhaseConfig } from "./types.js";
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
@@ -110,6 +111,8 @@ export async function runPhase<T>(args: {
   if (resumeSessionId)
     console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
 
+  const guardHooks = buildGuardHooks({ phase, cwd, taskSlug });
+
   try {
     for await (const message of query({
       prompt,
@@ -130,6 +133,7 @@ export async function runPhase<T>(args: {
           type: "json_schema",
           schema: toJsonSchema(outputSchema),
         },
+        ...(Object.keys(guardHooks).length > 0 ? { hooks: guardHooks } : {}),
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
         ...(phaseConfig.model ? { model: phaseConfig.model } : {}),
         ...(Object.keys(phaseConfig.mcpServers).length > 0

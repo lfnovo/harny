@@ -1,5 +1,6 @@
 import { runPhase } from "../sessionRecorder.js";
 import { ValidatorVerdictSchema, type ValidatorVerdict } from "../verdict.js";
+import { writeProblems } from "../problem.js";
 import type { Plan, PlanTask, ResolvedPhaseConfig } from "../types.js";
 
 function describeTaskForValidation(task: PlanTask): string {
@@ -49,6 +50,16 @@ export async function runValidator(args: {
     throw new Error(
       `validator returned task_id "${verdict.task_id}" but current task is "${args.task.id}"`,
     );
+  }
+  if (verdict.problems && verdict.problems.length > 0) {
+    await writeProblems({
+      cwd: args.cwd,
+      taskSlug: args.taskSlug,
+      phase: "validator",
+      sessionId: result.sessionId,
+      taskId: args.task.id,
+      problems: verdict.problems,
+    });
   }
   return { sessionId: result.sessionId, verdict };
 }

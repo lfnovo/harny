@@ -26,7 +26,9 @@ Report your outcome as structured data:
 - status "done" when the implementation is finished (even if you suspect there may be bugs — let the validator judge).
 - status "blocked" ONLY if you truly cannot proceed (missing dependency, infeasible request, etc.). Blocked is treated by the harness as a fatal plan failure requiring human intervention — use it sparingly.
 - commit_message: a conventional-commit-formatted message the harness will use if the task passes validation. Subject line imperative, task_id in the body or trailer.
-- If you were resumed on this task after a validator failure, the previous transcript is already in your context. Focus on the new validator feedback.`;
+- problems (OPTIONAL): if you encountered friction that would benefit FUTURE harness runs to fix at the project level — a missing dev dep, an ambiguous acceptance criterion, an undocumented gotcha, a gap in your tooling — report it. Categories: environment (missing deps/tools/config), design (ambiguous task/plan/acceptance), understanding (insufficient context/docs), tooling (harness or agent tooling gap). Severity: low/medium/high. Be concrete about what would need to change. Omit if nothing noteworthy — do not pad.
+- If you were resumed on this task after a validator failure, the previous transcript is already in your context. Focus on the new validator feedback.
+- You cannot write to plan.json or run history-changing git commands; the harness enforces these invariants via hooks.`;
 
 const VALIDATOR_PROMPT = `You are the VALIDATOR in a three-phase harness. You will be given the plan and ONE task the developer claims is done. You run AFTER the developer and BEFORE any commit is made — changes live in the working tree.
 
@@ -39,7 +41,9 @@ Your job:
 Report your outcome as structured data:
 - verdict "pass" if every acceptance criterion is met.
 - verdict "fail" otherwise. Reasons MUST be specific and actionable (e.g., "tests/test_user.py::test_email_validation fails with ValidationError: missing regex"), never vague. Evidence must describe what you actually executed.
-- recommend_reset: set to true only when the developer's approach is fundamentally wrong, or when the code is so broken that a fresh start is better than iterating. Leave it false (or omit) for ordinary fixable defects — the harness will prefer resuming the developer's session to apply targeted fixes.`;
+- recommend_reset: set to true only when the developer's approach is fundamentally wrong, or when the code is so broken that a fresh start is better than iterating. Leave it false (or omit) for ordinary fixable defects — the harness will prefer resuming the developer's session to apply targeted fixes.
+- problems (OPTIONAL): if validation surfaced issues that point to project-level gaps future runs would benefit from — ambiguous acceptance criterion wording, missing test infrastructure, undocumented behavior that wasted time — report them. Categories: environment, design, understanding, tooling. Severity: low/medium/high. Omit if nothing noteworthy.
+- You cannot modify files; the harness enforces read-only invariants via hooks. If you want to "fix" something, return fail with reasons instead.`;
 
 const PLANNER_TOOLS = [
   "Read",
