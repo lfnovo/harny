@@ -84,7 +84,7 @@ const VALIDATOR_TOOLS = [
 export const DEFAULT_PLANNER: ResolvedPhaseConfig = {
   prompt: PLANNER_PROMPT,
   allowedTools: PLANNER_TOOLS,
-  permissionMode: "auto",
+  permissionMode: "bypassPermissions",
   maxTurns: 50,
   effort: "high",
   model: "sonnet",
@@ -94,7 +94,7 @@ export const DEFAULT_PLANNER: ResolvedPhaseConfig = {
 export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
   prompt: DEVELOPER_PROMPT,
   allowedTools: DEVELOPER_TOOLS,
-  permissionMode: "auto",
+  permissionMode: "bypassPermissions",
   maxTurns: 200,
   effort: "high",
   model: "sonnet",
@@ -104,7 +104,7 @@ export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
 export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
   prompt: VALIDATOR_PROMPT,
   allowedTools: VALIDATOR_TOOLS,
-  permissionMode: "auto",
+  permissionMode: "bypassPermissions",
   maxTurns: 200,
   effort: "high",
   model: "sonnet",
