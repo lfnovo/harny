@@ -1,0 +1,16 @@
+{
+  "assistants": [
+    {
+      "name": "harness",
+      "cwd": ".",
+      "additionalDirectories": []
+    },
+    {
+      "name": "my-project",
+      "cwd": "/absolute/path/to/project",
+      "additionalDirectories": [
+        "/absolute/path/to/shared-libs"
+      ]
+    }
+  ]
+}
