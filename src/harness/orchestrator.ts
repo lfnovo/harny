@@ -266,6 +266,9 @@ export async function runHarness(args: {
 
   log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
   log(`[harness] workflow=${workflow.id} task=${taskSlug}`);
+  log(`[harness] user prompt >>>`);
+  log(args.userPrompt);
+  log(`[harness] user prompt <<<`);
 
   await assertIsGitRepo(primaryCwd);
 

@@ -187,12 +187,20 @@ async function runPhaseAttempt<T>(args: {
   let resultSubtype: string | null = null;
   let parkState: { askUserInput: AskUserQuestionInput; toolUseId: string | null } | null = null;
 
+  const logBlock = (header: string, body: string) => {
+    if (logMode === "quiet") return;
+    console.log(`[harness:${phase}] ${header} >>>`);
+    console.log(body);
+    console.log(`[harness:${phase}] ${header} <<<`);
+  };
+
   if (logMode !== "quiet") {
     console.log(`[harness:${phase}] starting ordinal=${ordinal}`);
     if (harnessTaskId) console.log(`[harness:${phase}] task=${harnessTaskId}`);
     if (resumeSessionId)
       console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
   }
+  logBlock("input", prompt);
 
   const guardHooks = buildGuardHooks({
     guards,
@@ -326,6 +334,7 @@ async function runPhaseAttempt<T>(args: {
   }
 
   if (parkState && record.session_id) {
+    logBlock("output (paused)", "parked for async review");
     return {
       sessionId: record.session_id,
       status: "paused_for_user_input",
@@ -338,6 +347,7 @@ async function runPhaseAttempt<T>(args: {
   }
 
   if (record.status === "error") {
+    logBlock("output (error)", record.error ?? "unknown error");
     return {
       sessionId: record.session_id ?? "",
       status: "error",
@@ -348,6 +358,7 @@ async function runPhaseAttempt<T>(args: {
     };
   }
   if (!record.session_id) {
+    logBlock("output (error)", "no session_id received from SDK");
     return {
       sessionId: "",
       status: "error",
@@ -358,16 +369,19 @@ async function runPhaseAttempt<T>(args: {
     };
   }
   if (resultSubtype !== "success") {
+    const msg = `phase ended with subtype=${resultSubtype ?? "unknown"}`;
+    logBlock("output (error)", msg);
     return {
       sessionId: record.session_id,
       status: "error",
-      error: `phase ended with subtype=${resultSubtype ?? "unknown"}`,
+      error: msg,
       structuredOutput: null,
       resultSubtype,
       events: record.events,
     };
   }
   if (structuredRaw == null) {
+    logBlock("output (error)", "result message had no structured_output");
     return {
       sessionId: record.session_id,
       status: "error",
@@ -380,15 +394,19 @@ async function runPhaseAttempt<T>(args: {
 
   const parsed = outputSchema.safeParse(structuredRaw);
   if (!parsed.success) {
+    const msg = `structured_output failed schema validation: ${parsed.error.message}`;
+    logBlock("output (error)", msg);
     return {
       sessionId: record.session_id,
       status: "error",
-      error: `structured_output failed schema validation: ${parsed.error.message}`,
+      error: msg,
       structuredOutput: null,
       resultSubtype,
       events: record.events,
     };
   }
+
+  logBlock("output", JSON.stringify(parsed.data, null, 2));
 
   return {
     sessionId: record.session_id,
