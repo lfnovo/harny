@@ -3,6 +3,7 @@ import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
 import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHarness } from "./harness/orchestrator.js";
+import { cleanRun } from "./harness/clean.js";
 import type { IsolationMode } from "./harness/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -50,6 +51,7 @@ function parseArgs(argv: string[]): {
   verbose: boolean;
   assistant: string | null;
   harness: boolean;
+  cleanSlug: string | null;
   task: string | null;
   isolation: IsolationMode | null;
   prompt: string;
@@ -93,10 +95,16 @@ function parseArgs(argv: string[]): {
     }
   }
 
+  let cleanSlug: string | null = null;
+  if (rest[0] === "harness" && rest[1] === "clean" && rest[2]) {
+    cleanSlug = rest[2];
+  }
+
   return {
     verbose,
     assistant,
     harness,
+    cleanSlug,
     task,
     isolation,
     prompt: rest.join(" ").trim(),
@@ -163,10 +171,21 @@ async function main() {
     verbose,
     assistant: assistantName,
     harness,
+    cleanSlug,
     task,
     isolation,
     prompt: promptArg,
   } = parseArgs(process.argv.slice(2));
+
+  if (cleanSlug !== null) {
+    if (!assistantName) {
+      console.error("harness clean requires --assistant <name>");
+      process.exit(1);
+    }
+    const assistant = await loadAssistant(assistantName);
+    await cleanRun(assistant.cwd, cleanSlug, verbose);
+    return;
+  }
 
   if (harness) {
     if (!assistantName) {
