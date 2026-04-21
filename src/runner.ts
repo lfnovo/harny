@@ -2,9 +2,10 @@ import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
 import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runHarness } from "./harness/orchestrator.js";
+import { runHarness, resumeHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
 import { getWorkflow } from "./harness/workflows/index.js";
+import { getRegistry } from "./harness/state/registry.js";
 import type { IsolationMode, LogMode } from "./harness/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -48,12 +49,18 @@ function parseIsolation(value: string): IsolationMode {
   );
 }
 
+type RegistryCmd =
+  | { kind: "ls"; status?: string; cwd?: string; workflow?: string }
+  | { kind: "show"; runId: string }
+  | { kind: "answer"; runId: string; text: string };
+
 function parseArgs(argv: string[]): {
   logMode: LogMode;
   assistant: string | null;
   harness: boolean;
   workflow: string | null;
   cleanSlug: string | null;
+  registryCmd: RegistryCmd | null;
   task: string | null;
   isolation: IsolationMode | null;
   inputPath: string | null;
@@ -118,8 +125,32 @@ function parseArgs(argv: string[]): {
   }
 
   let cleanSlug: string | null = null;
-  if (rest[0] === "harness" && rest[1] === "clean" && rest[2]) {
-    cleanSlug = rest[2];
+  let registryCmd: RegistryCmd | null = null;
+
+  if (rest[0] === "harness") {
+    const sub = rest[1];
+    if (sub === "clean" && rest[2]) {
+      cleanSlug = rest[2];
+    } else if (sub === "ls") {
+      let status: string | undefined;
+      let cwd: string | undefined;
+      let wf: string | undefined;
+      for (let i = 2; i < rest.length; i++) {
+        if (rest[i] === "--status" && rest[i + 1]) { status = rest[++i]; }
+        else if (rest[i]?.startsWith("--status=")) { status = rest[i]!.slice("--status=".length); }
+        else if (rest[i] === "--cwd" && rest[i + 1]) { cwd = rest[++i]; }
+        else if (rest[i]?.startsWith("--cwd=")) { cwd = rest[i]!.slice("--cwd=".length); }
+        else if (rest[i] === "--workflow" && rest[i + 1]) { wf = rest[++i]; }
+        else if (rest[i]?.startsWith("--workflow=")) { wf = rest[i]!.slice("--workflow=".length); }
+      }
+      registryCmd = { kind: "ls", status, cwd, workflow: wf };
+    } else if (sub === "show" && rest[2]) {
+      registryCmd = { kind: "show", runId: rest[2] };
+    } else if (sub === "answer" && rest[2]) {
+      const text = rest.slice(3).join(" ").trim();
+      if (!text) throw new Error("harness answer <runId> <text> — text is required");
+      registryCmd = { kind: "answer", runId: rest[2], text };
+    }
   }
 
   const logMode: LogMode = quiet ? "quiet" : verbose ? "verbose" : "compact";
@@ -129,6 +160,7 @@ function parseArgs(argv: string[]): {
     harness,
     workflow,
     cleanSlug,
+    registryCmd,
     task,
     isolation,
     inputPath,
@@ -198,11 +230,86 @@ async function main() {
     harness,
     workflow: workflowArg,
     cleanSlug,
+    registryCmd,
     task,
     isolation,
     inputPath,
     prompt: promptArg,
   } = parseArgs(process.argv.slice(2));
+
+  if (registryCmd !== null) {
+    const registry = getRegistry();
+    if (registryCmd.kind === "ls") {
+      const runs = registry.listRuns({
+        status: registryCmd.status,
+        cwd: registryCmd.cwd,
+        workflow_id: registryCmd.workflow,
+      });
+      if (runs.length === 0) {
+        console.log("No runs found.");
+        return;
+      }
+      const header = ["runId".padEnd(10), "workflow".padEnd(14), "status".padEnd(14), "started_at".padEnd(25), "branch"].join(" | ");
+      console.log(header);
+      console.log("-".repeat(header.length));
+      for (const r of runs) {
+        console.log([
+          r.id.slice(0, 8).padEnd(10),
+          (r.workflow_id ?? "").padEnd(14),
+          (r.status ?? "").padEnd(14),
+          (r.started_at ?? "").padEnd(25),
+          r.branch ?? "",
+        ].join(" | "));
+      }
+      return;
+    }
+
+    if (registryCmd.kind === "show") {
+      const run = registry.getRun(registryCmd.runId);
+      if (!run) {
+        console.error(`Run not found: ${registryCmd.runId}`);
+        process.exit(1);
+      }
+      console.log(`Run:       ${run.id}`);
+      console.log(`Workflow:  ${run.workflow_id}`);
+      console.log(`Status:    ${run.status}`);
+      console.log(`CWD:       ${run.cwd}`);
+      console.log(`Branch:    ${run.branch}`);
+      console.log(`TaskSlug:  ${run.task_slug}`);
+      console.log(`Started:   ${run.started_at}`);
+      if (run.ended_at) console.log(`Ended:     ${run.ended_at} (${run.ended_reason})`);
+      if (run.worktree_path) console.log(`Worktree:  ${run.worktree_path}`);
+
+      if (run.pending_question_id) {
+        const q = registry.getQuestion(run.pending_question_id);
+        if (q) {
+          console.log(`\nPending question (${q.id.slice(0, 8)}):`);
+          console.log(`  ${q.prompt}`);
+          if (q.options_json) {
+            const opts = JSON.parse(q.options_json) as string[];
+            opts.forEach((o, i) => console.log(`    ${i + 1}. ${o}`));
+          }
+          console.log(`\nTo resume: harness answer ${run.id} "<your answer>"`);
+        }
+      }
+
+      const events = registry.getEvents(run.id, 20);
+      if (events.length > 0) {
+        console.log(`\nLast ${events.length} events (newest first):`);
+        for (const e of events) {
+          console.log(`  [${e.at}] ${e.phase} / ${e.event_type}`);
+        }
+      }
+      return;
+    }
+
+    if (registryCmd.kind === "answer") {
+      console.log(`[harness] resuming run ${registryCmd.runId}...`);
+      const result = await resumeHarness(registryCmd.runId, registryCmd.text);
+      console.log(`[harness] finished status=${result.status}`);
+      return;
+    }
+  }
 
   if (cleanSlug !== null) {
     if (!assistantName) {

@@ -26,12 +26,8 @@ export const featureDev = defineWorkflow({
   run: async (ctx) => {
     ctx.log(`[harness] phase=planner`);
     const plannerResult = await runPlanner({
-      phaseConfig: ctx.config.phases.planner!,
-      primaryCwd: ctx.primaryCwd,
-      phaseCwd: ctx.phaseCwd,
-      taskSlug: ctx.taskSlug,
+      ctx,
       userPrompt: ctx.userPrompt,
-      logMode: ctx.logMode,
     });
     await ctx.updatePlan((plan) => {
       applyPlannerVerdict(plan, plannerResult.verdict, plannerResult.sessionId);
@@ -132,16 +128,12 @@ async function runDevLoop(
     );
 
     const devResult = await runDeveloper({
-      phaseConfig: ctx.config.phases.developer!,
-      primaryCwd: ctx.primaryCwd,
-      phaseCwd: ctx.phaseCwd,
-      taskSlug: ctx.taskSlug,
+      ctx,
       plan,
       task,
       resume: pendingResume
         ? { sessionId: pendingResume.sessionId, lastValidator: pendingResume.validator }
         : null,
-      logMode: ctx.logMode,
     });
 
     await ctx.updatePlan((p) => {
@@ -185,14 +177,10 @@ async function runDevLoop(
 
     ctx.log(`[harness] phase=validator task=${task.id}`);
     const valResult = await runValidator({
-      phaseConfig: ctx.config.phases.validator!,
-      primaryCwd: ctx.primaryCwd,
-      phaseCwd: ctx.phaseCwd,
-      taskSlug: ctx.taskSlug,
+      ctx,
       plan,
       task,
       developerSummary: devResult.verdict.summary,
-      logMode: ctx.logMode,
     });
 
     await ctx.updatePlan((p) => {

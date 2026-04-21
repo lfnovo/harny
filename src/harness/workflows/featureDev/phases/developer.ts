@@ -1,4 +1,3 @@
-import { runPhase } from "../../../sessionRecorder.js";
 import {
   DeveloperVerdictSchema,
   type DeveloperVerdict,
@@ -6,41 +5,29 @@ import {
 } from "../verdicts.js";
 import { writeProblems } from "../../../state/problem.js";
 import { buildFreshPrompt, buildResumePrompt } from "../plan.js";
-import type {
-  LogMode,
-  Plan,
-  PlanTask,
-  ResolvedPhaseConfig,
-} from "../../../types.js";
+import type { Plan, PlanTask } from "../../../types.js";
+import type { WorkflowContext } from "../../../workflow.js";
 
 export async function runDeveloper(args: {
-  phaseConfig: ResolvedPhaseConfig;
-  primaryCwd: string;
-  phaseCwd: string;
-  taskSlug: string;
+  ctx: WorkflowContext;
   plan: Plan;
   task: PlanTask;
   resume?: {
     sessionId: string;
     lastValidator: ValidatorVerdict;
   } | null;
-  logMode?: LogMode;
 }): Promise<{ sessionId: string; verdict: DeveloperVerdict }> {
-  const prompt = args.resume
-    ? buildResumePrompt(args.resume.lastValidator)
-    : buildFreshPrompt(args.plan, args.task);
+  const { ctx, plan, task, resume } = args;
+  const prompt = resume
+    ? buildResumePrompt(resume.lastValidator)
+    : buildFreshPrompt(plan, task);
 
-  const result = await runPhase({
+  const result = await ctx.runPhase({
     phase: "developer",
-    phaseConfig: args.phaseConfig,
-    primaryCwd: args.primaryCwd,
-    phaseCwd: args.phaseCwd,
-    taskSlug: args.taskSlug,
-    harnessTaskId: args.task.id,
     prompt,
     outputSchema: DeveloperVerdictSchema,
-    resumeSessionId: args.resume?.sessionId ?? null,
-    logMode: args.logMode,
+    harnessTaskId: task.id,
+    resumeSessionId: resume?.sessionId ?? null,
     guards: { noPlanWrites: true, noGitHistory: true },
   });
 
@@ -48,9 +35,9 @@ export async function runDeveloper(args: {
     throw new Error(`developer phase failed: ${result.error ?? "unknown"}`);
   }
   const verdict = result.structuredOutput;
-  if (verdict.task_id !== args.task.id) {
+  if (verdict.task_id !== task.id) {
     throw new Error(
-      `developer returned task_id "${verdict.task_id}" but current task is "${args.task.id}"`,
+      `developer returned task_id "${verdict.task_id}" but current task is "${task.id}"`,
     );
   }
   if (verdict.status === "blocked" && !verdict.blocked_reason) {
@@ -58,11 +45,11 @@ export async function runDeveloper(args: {
   }
   if (verdict.problems && verdict.problems.length > 0) {
     await writeProblems({
-      primaryCwd: args.primaryCwd,
-      taskSlug: args.taskSlug,
+      primaryCwd: ctx.primaryCwd,
+      taskSlug: ctx.taskSlug,
       phase: "developer",
       sessionId: result.sessionId,
-      taskId: args.task.id,
+      taskId: task.id,
       problems: verdict.problems,
     });
   }

@@ -218,31 +218,19 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 
 ---
 
-### Tier 2 — Estado centralizado (run registry + pause/resume)
+### Tier 2 — Estado centralizado (run registry + pause/resume) **[SHIPPED]**
 
-**Objetivo:** Estado persistido compartilhado entre canais. Permite multi-invocação + HITL persistido.
+**Status:** Entregue. DB em `~/.harness/runs.db`, schema v1 (`runs`, `run_events`, `pending_questions`). `ctx.runPhase` emite `phase_start`/`phase_end` para todas as fases de todos os workflows. `ctx.askUser` funciona em TTY (inline) e headless (park + `pending_questions`). `resumeHarness(runId, answer)` desbloqueia runs `waiting_human`. CLI: `harness ls/show/answer`. `docs` workflow demo do ciclo completo. featureDev phases migradas para `ctx.runPhase`. Typecheck limpo, guard-probe 21/21, worktree-smoke 3/3.
 
-**Approach:**
-- SQLite em `~/.harness/runs.db` via `better-sqlite3`. Schema:
-  - `runs(id, workflow_id, cwd, status, started_at, ended_at, ended_reason, pending_question_id)`
-  - `run_events(id, run_id, phase, event_type, payload_json, at)`
-  - `pending_questions(id, run_id, kind, prompt, options_json, asked_at, answered_at, answer_json)`
-- `run.status in (running | waiting_human | done | failed)`.
-- Orchestrator escreve início/fim de fase, transições, perguntas/respostas.
-- Pause/resume: quando fase emite `needs_user_input`, orchestrator parqueia, grava pergunta, retorna. Qualquer canal chama `resumeRun(runId, answer)`.
-
-**Por que terceiro:** HITL exige pergunta persistida. Multi-invocação exige estado compartilhado. Construir HITL sem registry = máquina de estados ad-hoc que vira retrabalho.
-
-**Dúvidas abertas:**
-- JSONL de phase fica canônico (human-greppable) e registry guarda só ponteiros + summary? Meu voto: sim.
-- Agente SDK permite parar limpo no meio de uma phase, ou só no fim? Precisa teste.
-- Um run = um cwd. Workflows cross-repo (ex: meta task) — designar pra isso ou punt?
-- Retenção: runs antigos (> 90 dias?) migram pra arquivo e somem do db?
+**O que ficou para Tier 3:**
+- Decisions abertas: JSONL permanece canônico; registry guarda só ponteiros + eventos de fase/harness.
+- Um run = um cwd (cross-repo workflows: punt para depois).
+- Retenção: sem política por enquanto.
 
 **Pronto quando:**
-- Rodar workflow via CLI cria linha em `runs` e streama eventos pra `run_events`.
-- `harness ls --status waiting_human --cwd <path>` lista com filtro.
-- Workflow que simula pergunta parqueia, persiste, retoma quando `harness answer <runId> <text>` é chamado.
+- [x] Rodar workflow via CLI cria linha em `runs` e streama eventos pra `run_events`.
+- [x] `harness ls --status waiting_human --cwd <path>` lista com filtro.
+- [x] Workflow que simula pergunta parqueia, persiste, retoma quando `harness answer <runId> <text>` é chamado.
 
 ---
 

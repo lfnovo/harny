@@ -101,6 +101,7 @@ export type Plan = {
   summary: string;
   iterations_global: number;
   tasks: PlanTask[];
+  run_id?: string;
   /**
    * Per-workflow extension bag. Workflows write their own keys here for
    * state that doesn't belong in core Plan fields (e.g. feature-dev writes

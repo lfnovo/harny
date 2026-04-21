@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { defineWorkflow } from "../workflow.js";
+import { defineWorkflow, type WorkflowContext } from "../workflow.js";
 import { ProblemSchema } from "../state/problem.js";
-import { runPhase, type PhaseRunResult } from "../sessionRecorder.js";
 import {
   markTaskInProgress,
   markTaskDone,
@@ -217,6 +216,271 @@ function buildReviewerPrompt(
   ].join("\n");
 }
 
+// --- Core write-review loop -------------------------------------------------
+
+async function runWriteReviewLoop(
+  ctx: WorkflowContext,
+  intent: string,
+): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }> {
+  const plan = ctx.plan;
+
+  const task: PlanTask = {
+    id: "docs-1",
+    title: intent.slice(0, 80),
+    description: intent,
+    acceptance: ["Reviewer approves with verdict=pass"],
+    status: "pending",
+    attempts: 0,
+    commit_sha: null,
+    history: [],
+  };
+
+  await ctx.updatePlan((p) => {
+    p.status = "in_progress";
+    p.tasks = [task];
+  });
+
+  const writerPhaseConfig: ResolvedPhaseConfig =
+    ctx.config.phases["writer"] ?? DEFAULT_WRITER;
+  const reviewerPhaseConfig: ResolvedPhaseConfig =
+    ctx.config.phases["reviewer"] ?? DEFAULT_REVIEWER;
+
+  let pendingResume: {
+    sessionId: string;
+    reviewer: ReviewerVerdict;
+  } | null = null;
+
+  while (true) {
+    if (plan.iterations_global >= ctx.config.maxIterationsGlobal) {
+      await ctx.updatePlan((p) => {
+        p.status = "exhausted";
+      });
+      ctx.log(`[harness] global iteration cap reached.`);
+      return { status: "exhausted" };
+    }
+
+    const prePhaseSha = await ctx.currentSha();
+
+    await ctx.updatePlan((p) => {
+      const t = p.tasks.find((x) => x.id === task.id)!;
+      markTaskInProgress(t);
+      p.iterations_global += 1;
+    });
+
+    ctx.log(
+      `[harness] phase=writer task=${task.id} attempt=${task.attempts}${pendingResume ? " (resuming)" : ""}`,
+    );
+
+    const writerPrompt = buildWriterPrompt(
+      intent,
+      task.id,
+      pendingResume?.reviewer ?? null,
+    );
+
+    const writerResult: import("../workflow.js").WorkflowPhaseResult<WriterVerdict> = await ctx.runPhase({
+      phase: "writer",
+      prompt: writerPrompt,
+      outputSchema: WriterVerdictSchema,
+      harnessTaskId: task.id,
+      resumeSessionId: pendingResume?.sessionId ?? null,
+      allowedTools: writerPhaseConfig.allowedTools,
+      guards: { noPlanWrites: true, noGitHistory: true },
+    });
+
+    await ctx.updatePlan((p) => {
+      const t = p.tasks.find((x) => x.id === task.id)!;
+      t.history.push({
+        role: "writer",
+        session_id: writerResult.sessionId,
+        at: new Date().toISOString(),
+        status: writerResult.structuredOutput?.status ?? "error",
+        summary: writerResult.structuredOutput?.summary ?? "",
+        files_written: writerResult.structuredOutput?.files_written ?? [],
+        ...(writerResult.structuredOutput?.commit_message
+          ? { commit_message: writerResult.structuredOutput.commit_message }
+          : {}),
+        ...(writerResult.structuredOutput?.blocked_reason
+          ? { blocked_reason: writerResult.structuredOutput.blocked_reason }
+          : {}),
+      });
+    });
+
+    await ctx.audit({
+      phase: "writer",
+      event: "completed",
+      session_id: writerResult.sessionId,
+      task_id: task.id,
+      attempt: task.attempts,
+      status: writerResult.structuredOutput?.status ?? "error",
+      summary: writerResult.structuredOutput?.summary ?? "",
+      ...(writerResult.structuredOutput?.files_written
+        ? { files_written: writerResult.structuredOutput.files_written }
+        : {}),
+      ...(writerResult.structuredOutput?.blocked_reason
+        ? { blocked_reason: writerResult.structuredOutput.blocked_reason }
+        : {}),
+    });
+
+    pendingResume = null;
+
+    if (writerResult.status !== "completed" || !writerResult.structuredOutput) {
+      await ctx.updatePlan((p) => {
+        const t = p.tasks.find((x) => x.id === task.id)!;
+        markTaskFailed(t);
+        p.status = "failed";
+      });
+      await ctx.resetHard(prePhaseSha);
+      await ctx.cleanUntracked();
+      ctx.log(`[harness] writer phase error: ${writerResult.error}`);
+      return { status: "failed" };
+    }
+
+    const writerVerdict = writerResult.structuredOutput;
+
+    if (writerVerdict.status === "blocked") {
+      await ctx.updatePlan((p) => {
+        const t = p.tasks.find((x) => x.id === task.id)!;
+        markTaskFailed(t);
+        p.status = "failed";
+      });
+      await ctx.audit({
+        phase: "harness",
+        event: "decision",
+        task_id: task.id,
+        attempt: task.attempts,
+        action: "blocked_fatal",
+        rationale: `writer reported blocked: ${writerVerdict.blocked_reason}`,
+      });
+      await ctx.resetHard(prePhaseSha);
+      await ctx.cleanUntracked();
+      ctx.log(
+        `[harness] writer reported blocked — plan marked failed. Reason: ${writerVerdict.blocked_reason}`,
+      );
+      return { status: "failed" };
+    }
+
+    ctx.log(`[harness] phase=reviewer task=${task.id}`);
+
+    const reviewerPrompt = buildReviewerPrompt(intent, task.id, writerVerdict);
+
+    const reviewerResult = await ctx.runPhase({
+      phase: "reviewer",
+      prompt: reviewerPrompt,
+      outputSchema: ReviewerVerdictSchema,
+      harnessTaskId: task.id,
+      allowedTools: reviewerPhaseConfig.allowedTools,
+      guards: { readOnly: true },
+    });
+
+    await ctx.updatePlan((p) => {
+      const t = p.tasks.find((x) => x.id === task.id)!;
+      t.history.push({
+        role: "reviewer",
+        session_id: reviewerResult.sessionId,
+        at: new Date().toISOString(),
+        verdict: reviewerResult.structuredOutput?.verdict ?? "error",
+        reasons: reviewerResult.structuredOutput?.reasons ?? [],
+        evidence: reviewerResult.structuredOutput?.evidence ?? "",
+      });
+    });
+
+    await ctx.audit({
+      phase: "reviewer",
+      event: "completed",
+      session_id: reviewerResult.sessionId,
+      task_id: task.id,
+      attempt: task.attempts,
+      verdict: reviewerResult.structuredOutput?.verdict ?? "error",
+      reasons: reviewerResult.structuredOutput?.reasons ?? [],
+      evidence: reviewerResult.structuredOutput?.evidence ?? "",
+    });
+
+    if (reviewerResult.status !== "completed" || !reviewerResult.structuredOutput) {
+      await ctx.updatePlan((p) => {
+        const t = p.tasks.find((x) => x.id === task.id)!;
+        markTaskFailed(t);
+        p.status = "failed";
+      });
+      await ctx.resetHard(prePhaseSha);
+      await ctx.cleanUntracked();
+      ctx.log(`[harness] reviewer phase error: ${reviewerResult.error}`);
+      return { status: "failed" };
+    }
+
+    const reviewerVerdict = reviewerResult.structuredOutput;
+
+    ctx.log(
+      `[harness] reviewer task=${task.id} verdict=${reviewerVerdict.verdict} reasons=${reviewerVerdict.reasons.length}`,
+    );
+
+    if (reviewerVerdict.verdict === "pass") {
+      const message = composeCommitMessage(
+        task.id,
+        writerVerdict.commit_message,
+        reviewerVerdict.evidence,
+      );
+      const sha = await ctx.commit(message);
+      await ctx.updatePlan((p) => {
+        const t = p.tasks.find((x) => x.id === task.id)!;
+        t.commit_sha = sha ?? null;
+        markTaskDone(t);
+        p.status = "done";
+      });
+      await ctx.audit({
+        phase: "harness",
+        event: "commit_executed",
+        task_id: task.id,
+        attempt: task.attempts,
+        commit_sha: sha ?? "",
+        message,
+      });
+      ctx.log(
+        `[harness] task ${task.id} committed sha=${(sha ?? "").slice(0, 8) || "(empty)"}`,
+      );
+      return { status: "done" };
+    }
+
+    // Reviewer rejected — check retry budget
+    if (task.attempts >= ctx.config.maxIterationsPerTask) {
+      await ctx.updatePlan((p) => {
+        const t = p.tasks.find((x) => x.id === task.id)!;
+        markTaskFailed(t);
+        p.status = "failed";
+      });
+      await ctx.resetHard(prePhaseSha);
+      await ctx.cleanUntracked();
+      await ctx.audit({
+        phase: "harness",
+        event: "decision",
+        task_id: task.id,
+        attempt: task.attempts,
+        action: "failed",
+        rationale: `task exceeded maxIterationsPerTask=${ctx.config.maxIterationsPerTask}`,
+      });
+      ctx.log(
+        `[harness] task ${task.id} exceeded retry budget; tree reset`,
+      );
+      return { status: "failed" };
+    }
+
+    await ctx.audit({
+      phase: "harness",
+      event: "decision",
+      task_id: task.id,
+      attempt: task.attempts,
+      action: "retry",
+      rationale: "reviewer rejected, resuming writer session with feedback",
+    });
+    pendingResume = {
+      sessionId: writerResult.sessionId,
+      reviewer: reviewerVerdict,
+    };
+    ctx.log(
+      `[harness] task ${task.id} will retry (resume writer session with reviewer feedback)`,
+    );
+  }
+}
+
 // --- Workflow ----------------------------------------------------------------
 
 export const docs = defineWorkflow({
@@ -229,272 +493,22 @@ export const docs = defineWorkflow({
     reviewer: DEFAULT_REVIEWER,
   },
   run: async (ctx) => {
-    const { intent } = ctx.input as { intent: string };
-    const plan = ctx.plan;
+    const rawInput = ctx.input as { intent?: string } | null | undefined;
+    let intent = rawInput?.intent?.trim() ?? "";
 
-    const task: PlanTask = {
-      id: "docs-1",
-      title: intent.slice(0, 80),
-      description: intent,
-      acceptance: ["Reviewer approves with verdict=pass"],
-      status: "pending",
-      attempts: 0,
-      commit_sha: null,
-      history: [],
-    };
-
-    await ctx.updatePlan((p) => {
-      p.status = "in_progress";
-      p.tasks = [task];
-    });
-
-    const writerPhaseConfig: ResolvedPhaseConfig =
-      ctx.config.phases["writer"] ?? DEFAULT_WRITER;
-    const reviewerPhaseConfig: ResolvedPhaseConfig =
-      ctx.config.phases["reviewer"] ?? DEFAULT_REVIEWER;
-
-    let pendingResume: {
-      sessionId: string;
-      reviewer: ReviewerVerdict;
-    } | null = null;
-
-    while (true) {
-      if (plan.iterations_global >= ctx.config.maxIterationsGlobal) {
-        await ctx.updatePlan((p) => {
-          p.status = "exhausted";
-        });
-        ctx.log(`[harness] global iteration cap reached.`);
-        return { status: "exhausted" };
+    if (intent.length < 10) {
+      const ask = await ctx.askUser({
+        prompt: 'Please describe what to document (e.g. "document the CLI flags and assistant config format")',
+      });
+      if (!ask.answered) {
+        return { status: "waiting_human" };
       }
-
-      const prePhaseSha = await ctx.currentSha();
-
-      await ctx.updatePlan((p) => {
-        const t = p.tasks.find((x) => x.id === task.id)!;
-        markTaskInProgress(t);
-        p.iterations_global += 1;
-      });
-
-      ctx.log(
-        `[harness] phase=writer task=${task.id} attempt=${task.attempts}${pendingResume ? " (resuming)" : ""}`,
-      );
-
-      const writerPrompt = buildWriterPrompt(
-        intent,
-        task.id,
-        pendingResume?.reviewer ?? null,
-      );
-
-      const writerResult: PhaseRunResult<WriterVerdict> = await runPhase({
-        phase: "writer",
-        phaseConfig: writerPhaseConfig,
-        primaryCwd: ctx.primaryCwd,
-        phaseCwd: ctx.phaseCwd,
-        taskSlug: ctx.taskSlug,
-        harnessTaskId: task.id,
-        prompt: writerPrompt,
-        outputSchema: WriterVerdictSchema,
-        resumeSessionId: pendingResume?.sessionId ?? null,
-        logMode: ctx.logMode,
-        guards: { noPlanWrites: true, noGitHistory: true },
-      });
-
-      await ctx.updatePlan((p) => {
-        const t = p.tasks.find((x) => x.id === task.id)!;
-        t.history.push({
-          role: "writer",
-          session_id: writerResult.sessionId,
-          at: new Date().toISOString(),
-          status: writerResult.structuredOutput?.status ?? "error",
-          summary: writerResult.structuredOutput?.summary ?? "",
-          files_written: writerResult.structuredOutput?.files_written ?? [],
-          ...(writerResult.structuredOutput?.commit_message
-            ? { commit_message: writerResult.structuredOutput.commit_message }
-            : {}),
-          ...(writerResult.structuredOutput?.blocked_reason
-            ? { blocked_reason: writerResult.structuredOutput.blocked_reason }
-            : {}),
-        });
-      });
-
-      await ctx.audit({
-        phase: "writer",
-        event: "completed",
-        session_id: writerResult.sessionId,
-        task_id: task.id,
-        attempt: task.attempts,
-        status: writerResult.structuredOutput?.status ?? "error",
-        summary: writerResult.structuredOutput?.summary ?? "",
-        ...(writerResult.structuredOutput?.files_written
-          ? { files_written: writerResult.structuredOutput.files_written }
-          : {}),
-        ...(writerResult.structuredOutput?.blocked_reason
-          ? { blocked_reason: writerResult.structuredOutput.blocked_reason }
-          : {}),
-      });
-
-      pendingResume = null;
-
-      if (writerResult.status !== "completed" || !writerResult.structuredOutput) {
-        await ctx.updatePlan((p) => {
-          const t = p.tasks.find((x) => x.id === task.id)!;
-          markTaskFailed(t);
-          p.status = "failed";
-        });
-        await ctx.resetHard(prePhaseSha);
-        await ctx.cleanUntracked();
-        ctx.log(`[harness] writer phase error: ${writerResult.error}`);
-        return { status: "failed" };
-      }
-
-      const writerVerdict = writerResult.structuredOutput;
-
-      if (writerVerdict.status === "blocked") {
-        await ctx.updatePlan((p) => {
-          const t = p.tasks.find((x) => x.id === task.id)!;
-          markTaskFailed(t);
-          p.status = "failed";
-        });
-        await ctx.audit({
-          phase: "harness",
-          event: "decision",
-          task_id: task.id,
-          attempt: task.attempts,
-          action: "blocked_fatal",
-          rationale: `writer reported blocked: ${writerVerdict.blocked_reason}`,
-        });
-        await ctx.resetHard(prePhaseSha);
-        await ctx.cleanUntracked();
-        ctx.log(
-          `[harness] writer reported blocked — plan marked failed. Reason: ${writerVerdict.blocked_reason}`,
-        );
-        return { status: "failed" };
-      }
-
-      ctx.log(`[harness] phase=reviewer task=${task.id}`);
-
-      const reviewerPrompt = buildReviewerPrompt(intent, task.id, writerVerdict);
-
-      const reviewerResult = await runPhase({
-        phase: "reviewer",
-        phaseConfig: reviewerPhaseConfig,
-        primaryCwd: ctx.primaryCwd,
-        phaseCwd: ctx.phaseCwd,
-        taskSlug: ctx.taskSlug,
-        harnessTaskId: task.id,
-        prompt: reviewerPrompt,
-        outputSchema: ReviewerVerdictSchema,
-        resumeSessionId: null,
-        logMode: ctx.logMode,
-        guards: { readOnly: true },
-      });
-
-      await ctx.updatePlan((p) => {
-        const t = p.tasks.find((x) => x.id === task.id)!;
-        t.history.push({
-          role: "reviewer",
-          session_id: reviewerResult.sessionId,
-          at: new Date().toISOString(),
-          verdict: reviewerResult.structuredOutput?.verdict ?? "error",
-          reasons: reviewerResult.structuredOutput?.reasons ?? [],
-          evidence: reviewerResult.structuredOutput?.evidence ?? "",
-        });
-      });
-
-      await ctx.audit({
-        phase: "reviewer",
-        event: "completed",
-        session_id: reviewerResult.sessionId,
-        task_id: task.id,
-        attempt: task.attempts,
-        verdict: reviewerResult.structuredOutput?.verdict ?? "error",
-        reasons: reviewerResult.structuredOutput?.reasons ?? [],
-        evidence: reviewerResult.structuredOutput?.evidence ?? "",
-      });
-
-      if (reviewerResult.status !== "completed" || !reviewerResult.structuredOutput) {
-        await ctx.updatePlan((p) => {
-          const t = p.tasks.find((x) => x.id === task.id)!;
-          markTaskFailed(t);
-          p.status = "failed";
-        });
-        await ctx.resetHard(prePhaseSha);
-        await ctx.cleanUntracked();
-        ctx.log(`[harness] reviewer phase error: ${reviewerResult.error}`);
-        return { status: "failed" };
-      }
-
-      const reviewerVerdict = reviewerResult.structuredOutput;
-
-      ctx.log(
-        `[harness] reviewer task=${task.id} verdict=${reviewerVerdict.verdict} reasons=${reviewerVerdict.reasons.length}`,
-      );
-
-      if (reviewerVerdict.verdict === "pass") {
-        const message = composeCommitMessage(
-          task.id,
-          writerVerdict.commit_message,
-          reviewerVerdict.evidence,
-        );
-        const sha = await ctx.commit(message);
-        await ctx.updatePlan((p) => {
-          const t = p.tasks.find((x) => x.id === task.id)!;
-          t.commit_sha = sha ?? null;
-          markTaskDone(t);
-          p.status = "done";
-        });
-        await ctx.audit({
-          phase: "harness",
-          event: "commit_executed",
-          task_id: task.id,
-          attempt: task.attempts,
-          commit_sha: sha ?? "",
-          message,
-        });
-        ctx.log(
-          `[harness] task ${task.id} committed sha=${(sha ?? "").slice(0, 8) || "(empty)"}`,
-        );
-        return { status: "done" };
-      }
-
-      // Reviewer rejected — check retry budget
-      if (task.attempts >= ctx.config.maxIterationsPerTask) {
-        await ctx.updatePlan((p) => {
-          const t = p.tasks.find((x) => x.id === task.id)!;
-          markTaskFailed(t);
-          p.status = "failed";
-        });
-        await ctx.resetHard(prePhaseSha);
-        await ctx.cleanUntracked();
-        await ctx.audit({
-          phase: "harness",
-          event: "decision",
-          task_id: task.id,
-          attempt: task.attempts,
-          action: "failed",
-          rationale: `task exceeded maxIterationsPerTask=${ctx.config.maxIterationsPerTask}`,
-        });
-        ctx.log(
-          `[harness] task ${task.id} exceeded retry budget; tree reset`,
-        );
-        return { status: "failed" };
-      }
-
-      await ctx.audit({
-        phase: "harness",
-        event: "decision",
-        task_id: task.id,
-        attempt: task.attempts,
-        action: "retry",
-        rationale: "reviewer rejected, resuming writer session with feedback",
-      });
-      pendingResume = {
-        sessionId: writerResult.sessionId,
-        reviewer: reviewerVerdict,
-      };
-      ctx.log(
-        `[harness] task ${task.id} will retry (resume writer session with reviewer feedback)`,
-      );
+      intent = ask.answer.trim();
     }
+
+    return runWriteReviewLoop(ctx, intent);
+  },
+  resumeFromAnswer: async (ctx, answer) => {
+    return runWriteReviewLoop(ctx, answer.trim());
   },
 });
