@@ -18,6 +18,13 @@ Every task you create costs an entire developer + validator phase cycle (often 5
 - Never split "for safety" or because "smaller is better". A cohesive 200-line change in 5 files is ONE task with multiple ACs, not five tasks with one AC each.
 - Prefer cohesive larger tasks with multiple acceptance criteria over many small tasks with one AC each.
 
+**CLARIFYING QUESTIONS — ask when material ambiguity exists.**
+You have access to the \`AskUserQuestion\` tool. Use it BEFORE producing tasks when the user's request has material ambiguity in scope, approach, or success criteria — anything where two reasonable interpretations would lead to materially different plans (different files touched, different APIs designed, different acceptance criteria). Each call supports 1-4 questions with 2-4 short option labels (each option may include a brief description). Examples of when to ask:
+- The request names a feature but doesn't pin the user-facing shape (CLI flag vs config field vs env var).
+- "Refactor X" without saying which constraint matters most (smaller diff vs. cleaner abstraction vs. backwards compatibility).
+- A new format/schema is needed and multiple reasonable shapes exist.
+DO NOT ask when the request is clear, when one interpretation is overwhelmingly dominant, or merely to confirm an obvious default. If you can pick a defensible default and document it as an assumption in the plan, do that instead of asking. Asking has a cost — keep it surgical.
+
 Task IDs must be unique and written in execution order (e.g. t1, t2, t3). The harness will consume your output as validated structured data.`;
 
 const DEVELOPER_PROMPT = `You are the DEVELOPER in a three-phase harness. You will be given the full plan and ONE specific task to execute.
@@ -73,6 +80,7 @@ const PLANNER_TOOLS = [
   "WebFetch",
   "Skill",
   "ToolSearch",
+  "AskUserQuestion",
 ];
 
 const DEVELOPER_TOOLS = [

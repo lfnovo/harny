@@ -11,6 +11,11 @@ function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
   return rest;
 }
 import { buildGuardHooks, type PhaseGuards } from "./guardHooks.js";
+import {
+  runAskUserQuestionTTY,
+  denyAskUserQuestionHeadless,
+  type AskUserQuestionInput,
+} from "./askUser.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig } from "./types.js";
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
@@ -205,6 +210,17 @@ async function runPhaseAttempt<T>(args: {
           schema: toJsonSchema(outputSchema),
         },
         ...(Object.keys(guardHooks).length > 0 ? { hooks: guardHooks } : {}),
+        canUseTool: async (toolName: string, input: Record<string, unknown>) => {
+          if (toolName === "AskUserQuestion") {
+            if (process.stdin.isTTY) {
+              return await runAskUserQuestionTTY(
+                input as unknown as AskUserQuestionInput,
+              );
+            }
+            return denyAskUserQuestionHeadless();
+          }
+          return { behavior: "allow", updatedInput: input };
+        },
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
         ...(phaseConfig.model ? { model: phaseConfig.model } : {}),
         ...(Object.keys(phaseConfig.mcpServers).length > 0
