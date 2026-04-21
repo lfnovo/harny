@@ -16,6 +16,10 @@ export type WorkflowPhaseResult<T> = {
   error: string | null;
 };
 
+export type AskUserResult =
+  | { answered: false; runId: string; questionId: string }
+  | { answered: true; answer: string };
+
 export type WorkflowContext = {
   taskSlug: string;
   userPrompt: string;
@@ -43,6 +47,10 @@ export type WorkflowContext = {
     guards?: PhaseGuards;
     resumeSessionId?: string | null;
   }) => Promise<WorkflowPhaseResult<T>>;
+  askUser: (args: {
+    prompt: string;
+    options?: string[];
+  }) => Promise<AskUserResult>;
 };
 
 export type Workflow<TInput = unknown> = {
@@ -56,7 +64,8 @@ export type Workflow<TInput = unknown> = {
    * overrides from the project's harness.json into ctx.config.phases.
    */
   phaseDefaults: Record<string, ResolvedPhaseConfig>;
-  run: (ctx: WorkflowContext) => Promise<{ status: "done" | "failed" | "exhausted" }>;
+  run: (ctx: WorkflowContext) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
+  resumeFromAnswer?: (ctx: WorkflowContext, answer: string) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
 };
 
 export function defineWorkflow<TInput = unknown>(
