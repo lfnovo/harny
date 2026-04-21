@@ -6,6 +6,25 @@ Complementa (não substitui): `CLAUDE.md` (invariantes, gotchas, preferências) 
 
 ---
 
+## Status (atualizado 2026-04-21)
+
+| Tier | Status | Notas |
+|---|---|---|
+| 0. Quick wins (guards + problems) | **DONE** | Tier 0 + várias evoluções de infra durante dogfood. Ver "Evoluções pós-Tier-0". |
+| 1a. Isolamento por worktree | **DONE** | Construído off-harness após 5 attempts de dogfood. `765afa7`. |
+| 1b. Workflow abstraction | **PENDING** | Splitado de Tier 1 original. Próximo a puxar. |
+| 2. Run registry + pause/resume | PENDING | |
+| 3. HITL (perguntas + approvals) | PENDING | |
+| 4. Multi-invocação (HTTP + webhooks + cron) | PENDING | |
+| 5. TODO tracking + display | **PARCIAL** | Logger compact/verbose/quiet entregue (`daa8c4c`). TodoWrite capture ainda pendente. |
+| 6. Web UI | PENDING | |
+| 7. Composição (sub-agents, user hooks, cost) | PENDING | |
+| 8. Isolamento remoto (dev machine) | PENDING | Interface já existe desde Tier 1a. |
+| 9. Mais templates de workflow | PENDING | Bloqueado por Tier 1b. |
+| 10. `/improve` skill | DEFERIDO (Post-Phase 2) | Schema captura desde Tier 0. |
+
+---
+
 ## Por que Phase 2
 
 Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI. Phase 2 generaliza isso em uma plataforma capaz de servir ao stack real de projetos do usuário, com múltiplas formas de iniciar e múltiplas formas de acompanhar.
@@ -111,9 +130,11 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 
 ---
 
-### Tier 0 — Quick wins
+### Tier 0 — Quick wins  **[DONE]**
 
 **Objetivo:** Travar invariantes na máquina + começar captura de dataset pro `/improve`.
+
+**Status:** Entregue em `15c30ca` (2026-04-20). Várias evoluções pós-entrega — ver "Evoluções pós-Tier-0" abaixo.
 
 **O que entra:**
 - 3 invariant guard hooks (PreToolUse):
@@ -136,9 +157,41 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 
 ---
 
-### Tier 1 — Workflow abstraction + isolamento por worktree
+### Tier 1 — Workflow abstraction + isolamento por worktree  **[SPLIT]**
 
-**Objetivo:** Generalizar o harness pra runner que aceita manifest de fases. Simultaneamente, estabelecer worktree como default de isolamento pra evitar contaminação de git em execuções paralelas.
+**Status:** Splitado em **1a (worktree, DONE)** e **1b (workflow abstraction, PENDING)**. A complexidade combinada justificou separar.
+
+---
+
+### Tier 1a — Isolamento por worktree  **[DONE]**
+
+**Status:** Entregue em `765afa7` (2026-04-20), construído **off-harness** após 5 attempts de dogfood que cada um expôs um bug novo de infraestrutura.
+
+**O que entrou:**
+- `IsolationMode = "worktree" | "inline"`, default `worktree`.
+- CLI flag `--isolation`, config `harness.json` field `isolation`.
+- Per-task worktree em `<primary>/.harness/worktrees/<slug>/`.
+- `.harness/<slug>/` (state) sempre no primary; phase cwd = worktree.
+- Auto-remove no done; preserva no fail/blocked/exhausted (debug).
+- `assertCleanTree` gated em `isolation === "inline"`.
+- Path-anchor refactor: `primaryCwd` (state) vs `phaseCwd` (SDK + git ops) propagado por todo o stack.
+- Guards refatorados: `validatorReadOnly` e `developerGitCommitter` aware de phaseCwd, com escape hatch pra paths fora.
+- `.harness/.gitignore` tracked (`*` + `!.gitignore`) — nunca mais runtime-write.
+- `addWorktree`, `removeWorktree`, `assertWorktreePathAbsent` em `git.ts`.
+- Smoke test: `scripts/worktree-smoke.ts` (3/3: primitivas, sequential, concurrent).
+
+**Decisões tomadas (resolvendo gating questions):**
+- Cleanup policy: imediato no done; preserva no fail.
+- Commit flow: orchestrator commita no branch do worktree, NÃO faz auto-merge pro main.
+- `.harness/<slug>/` path: repo principal (não `~/.harness/`).
+
+**Validado em produção:** 2 runs paralelos (`compact-logger` + `harness-clean-cli`) em worktrees distintos completaram sem colisão.
+
+---
+
+### Tier 1b — Workflow abstraction  **[PENDING — próximo a puxar]**
+
+**Objetivo:** Generalizar o harness pra runner que aceita manifest de fases.
 
 **Approach (workflow):**
 - `Workflow = { id, phases: Phase[] }`.
@@ -147,32 +200,19 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 - Migrar feature-dev pra essa forma: `[planner, loop(developer, validator)]`.
 - Adicionar template **issue-triage**: 1 fase, sem loop, input mínimo (issue payload), output estruturado (decisão).
 
-**Approach (worktree):**
-- `IsolationResolver` interface criada aqui (não esperar Tier 8).
-- Provider `worktree` default: `git worktree add <path> -b <branch>` antes das phases; `git worktree remove <path>` no cleanup.
-- `cwd` das phases = worktree path.
-- `.harness/<slug>/` fica no **repo principal**, não no worktree (audit sobrevive cleanup).
-- Provider `inline` mantido como escape hatch via `--isolation inline`.
-- Precondição muda: deixa de exigir clean tree no principal; exige só que branch alvo não exista.
-
-**Por que segundo:** Todo tier abaixo (registry, HITL, UI, cost) assume workflow shape. Worktree entra junto porque o registry do Tier 2 precisa armazenar `worktree_path` — fazer isso com registry já pronto vira migration desnecessária. Matar os dois coelhos na mesma cirurgia.
+**Por que próximo:** Todo tier abaixo (registry, HITL, UI, cost) assume workflow shape. Worktree (Tier 1a) já trouxe a infraestrutura paralela, então o registry do Tier 2 já consegue armazenar `worktree_path` sem migration. Workflow abstraction agora desbloqueia issue-triage (Tier 9) e a forma final de tudo downstream.
 
 **Dúvidas abertas (GATING):**
 - **Formato do manifest**: TS tipado com `defineWorkflow(...)` helper, JSON, ou YAML?
 - **`until` predicate do loop**: closure inline (exige manifest TS) ou registry de predicates nomeados?
 - **Output entre fases**: context object explícito, ou pipe estruturado nomeado?
 - **Issue-triage input**: raw GitHub payload, ou extrair `{title, body, labels, url}` antes de entregar ao agente?
-- **Worktree cleanup policy**: imediato no done, TTL (X dias) pra debug, ou só quando explícito?
-- **Worktree commit flow**: orchestrator faz merge pro branch de destino no success, ou deixa pro usuário?
-- **Path de `.harness/<slug>/`**: confirmar repo principal (atual) vs `~/.harness/<repo>/<slug>/` (fora do repo, mais limpo mas invisível)?
 
 **Pronto quando:**
 - `defineWorkflow(...)` descreve feature-dev em ~30 linhas.
-- `--workflow feature-dev` produz comportamento idêntico ao atual (com worktree default).
+- `--workflow feature-dev` produz comportamento idêntico ao atual.
 - `--workflow issue-triage --input <issue.json>` produz decisão estruturada.
 - Mesmo runner code path pra ambos; zero copy-paste.
-- 3 runs simultâneos (3 terminais, 3 workflows) não colidem no mesmo repo.
-- Worktree é criado no start, removido no done/failed; `.harness/<slug>/` no principal sobrevive.
 
 ---
 
@@ -259,7 +299,18 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 
 ---
 
-### Tier 5 — TODO tracking
+### Tier 5 — TODO tracking + display layer  **[PARCIAL]**
+
+**Status:** Logger de 3 modos (`--compact` default, `--verbose`, `--quiet`) entregue em `daa8c4c` (2026-04-21). TodoWrite capture do agente ainda pendente.
+
+**O que já entrou:**
+- `LogMode = "compact" | "verbose" | "quiet"`.
+- `--compact` (novo default) surfaceia só progresso significativo do orchestrator (phase transitions, validator verdict, decision, commit SHA).
+- `--verbose` / `-v` mantém comportamento antigo (full SDK event dump).
+- `--quiet` só status final + branch.
+- `logMode` propagado por orchestrator + phases + sessionRecorder.
+
+**O que falta (TODO tracking propriamente dito):**
 
 **Objetivo:** Expor o plano vivo de cada agente pra CLI e UI.
 
@@ -423,20 +474,66 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 
 ---
 
-## Dúvidas gating antes do Tier 1
+## Dúvidas gating
 
-Responder essas trava o design do Tier 1:
+### Resolvidas durante Tier 1a
+
+- ~~**Worktree cleanup**~~: **resolvido — imediato no done, preserva no fail/blocked/exhausted.**
+- ~~**Worktree commit flow**~~: **resolvido — orchestrator commita no branch do worktree, NÃO faz auto-merge pro main.** Usuário decide o destino.
+- ~~**`.harness/<slug>/` path**~~: **resolvido — repo principal.**
+- ~~**Problem annotation categories**~~: **resolvido — `{environment, design, understanding, tooling}` em uso e funcionando.**
+
+### Abertas pra Tier 1b (workflow abstraction)
 
 1. **Formato do manifest**: TS tipado (voto), JSON, YAML?
-2. **Problem annotation categories**: `{environment, design, understanding, tooling}` ok?
-3. **Issue-triage input**: raw payload ou extraído?
-4. **Output entre fases**: context object ou pipe nomeado?
-5. **Loop predicate**: closure inline ou registry de nomes?
-6. **Worktree cleanup**: imediato no done, TTL, ou explícito?
-7. **Worktree commit flow**: orchestrator faz merge pro branch de destino, ou deixa pro usuário?
-8. **`.harness/<slug>/` path**: repo principal (atual) ou `~/.harness/<repo>/<slug>/`?
+2. **Issue-triage input**: raw payload ou extraído?
+3. **Output entre fases**: context object ou pipe nomeado?
+4. **Loop predicate**: closure inline ou registry de nomes?
 
-Demais dúvidas têm resposta proposta no próprio tier e resolvem-se na sessão que puxar o tier.
+---
+
+## Evoluções pós-Tier-0 (decisões/fixes que não estavam no plano original)
+
+Várias mudanças importantes saíram durante o dogfood que valem ser documentadas aqui pro contexto futuro:
+
+### Defaults amplificados
+- **Model**: `sonnet` em todas as phases (default). Opus 4× mais caro e ~3-4× mais lento; Sonnet provou suficiente pra self-build. Per-projeto pode override no `harness.json`.
+- **maxTurns**: planner 50, dev 200, validator 200. Os antigos 10/30/20 eram insuficientes pra trabalho não-trivial (planner sob exploração, validator sob independência empírica).
+- **permissionMode**: `bypassPermissions`. `auto` em headless cai em "ask user" silenciosamente, bloqueia writes em /tmp pros validators.
+
+### Guard hooks evoluídos
+- **Validator read-only com escape hatch**: Write/Edit em paths fora do phaseCwd permitido (pra setup de fixtures em /tmp).
+- **Developer git-committer com escape hatch**: `cd /tmp/...` ou `git -C /tmp/...` permitidos (test repos descartáveis). Regex broadened pra pegar `git -C <path> commit` patterns.
+- **Static `.harness/.gitignore`** committado: `*` + `!.gitignore`. Não escrever em runtime.
+- **`assertCleanTree` mode-aware**: só roda em inline mode.
+
+### Contratos de prompt (pra economia + rigor)
+- **Validator independence**: empirical exercise é YOUR OWN invocation; dev artifacts são input, não substituto. Se infra impede, retorne `fail` com problem annotation, NÃO `pass` por inspeção.
+- **Validator efficiency**: ONE comprehensive nested run per task; pra mudanças cosméticas (logger, doc), structural review + smoke run basta. Não rodar nested harness por AC.
+- **Planner task granularity**: default smallest viable plan. 1 task pra refactor narrow; 2-3 pra surfaces múltiplas; 4+ só pra unidades shippable independentes. Cost framing explícita ("each task multiplies validator cost").
+- **Developer "run twice"**: smoke tests que mexem em invocation surface DEVEM rodar harness 2× consecutive (pega state-leak bugs).
+
+### Resilience
+- **Transient API retry**: até 3 attempts com exponential backoff (2s/4s/8s, cap 30s) em `runPhase` pra erros tipo `overloaded_error`, `rate_limit_error`, HTTP 5xx.
+
+### CLI ops
+- **`harness clean <slug>`** subcommand: cleanup idempotente (worktree + branch + state dir). Cobre o caso "harness foi killed/crashou e deixou sujeira".
+- **`--isolation worktree|inline`** flag.
+- **`--compact|--verbose|--quiet`** flags.
+
+---
+
+## Backlog descoberto durante dogfood
+
+Itens que apareceram como problem annotations ou observações durante runs reais. Não bloqueiam tiers seguintes mas valem priorizar:
+
+1. **`HARNESS_ASSISTANTS_FILE` env var** — validator no worktree não acha `assistants.json` (gitignored). Workaround atual: symlink. Real fix: env var configurável.
+2. **`node_modules` no worktree** — `npm` não funciona no worktree sem symlink hack. Real fix: env var ou wrapper que aponta pro primary.
+3. **Mock/fixture mechanism pra ACs estruturais** — algumas ACs (ex: "problems printados como linhas X em compact") não são empiricamente verificáveis sem injetar verdict mockado. Sugestão: dry-run mode ou test-fixture stub.
+4. **Plan.json não vai mais pro git history** — `.harness/.gitignore` com `*` excluiu plan.json do tracking. Audit.jsonl compensa parcialmente. Avaliar se vale untrack-but-snapshot ou se OK como está.
+5. **Merge entre branches paralelos sempre conflita em `runner.ts`** — inevitável quando ambos mexem em CLI parsing. Backlog: rebase script ou linear-only branch policy ou modularizar parseArgs.
+6. **Cleanup automático de worktrees órfãos** — quando harness é killed, worktree fica. `git worktree prune` resolve mas é manual. Já temos `harness clean <slug>` mas seria bom um `harness clean --all` ou cleanup-on-startup.
+7. **Validator empirical cost amplifies** — independence + nested harness invocations = recursão custosa. Possíveis mitigações futuras: usar Haiku pra nested runs, contrato "1 run per task max", ou skip nested quando a mudança é structural-only.
 
 ---
 
