@@ -1,5 +1,6 @@
 {
   "isolation": "worktree",
+  "defaultMode": "interactive",
   "maxIterationsPerTask": 3,
   "maxIterationsGlobal": 30,
   "maxRetriesBeforeReset": 1,
@@ -13,7 +14,8 @@
         "WebSearch",
         "WebFetch",
         "Skill",
-        "ToolSearch"
+        "ToolSearch",
+        "AskUserQuestion"
       ],
       "permissionMode": "bypassPermissions",
       "maxTurns": 50,

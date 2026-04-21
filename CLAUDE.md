@@ -4,16 +4,18 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 
 ## Key paths
 
-- `src/runner.ts` — CLI entry. Flags: `--assistant <name>`, `--task <slug>`, `--harness`, `--workflow <name>`, `--input <path>`, `--isolation <worktree|inline>`, `-v/--verbose`, `--quiet`.
-- `src/harness/orchestrator.ts` — generic interpreter. Resolves workflow from registry, sets up git/branch/worktree per workflow flags, builds `WorkflowContext`, calls `workflow.run(ctx)`, cleans up. Zero workflow-specific logic.
-- `src/harness/workflow.ts` — the `Workflow` contract: `id`, `needsBranch`, `needsWorktree`, `inputSchema?`, `phaseDefaults`, `run(ctx)`. Plus `WorkflowContext` (capabilities exposed to workflow body) and the `defineWorkflow()` helper.
-- `src/harness/sessionRecorder.ts` — generic `runPhase<T>()`. Calls `query()` with `cwd: phaseCwd`, captures every SDK event to `<primaryCwd>/.harness/<slug>/sessions/NNNN_<uuid>.json`, returns the validated `structured_output`. Retries up to 3 times on transient API errors (overloaded, rate_limit). Strips `$schema` from Zod-emitted JSON schemas before passing to the SDK.
-- `src/harness/state/` — files written to `.harness/<slug>/`:
+- `src/runner.ts` — CLI entry. Flags: `--assistant <name>`, `--task <slug>`, `--harness`, `--workflow <name>`, `--input <path>`, `--isolation <worktree|inline>`, `--mode <interactive|silent|async>`, `-v/--verbose`, `--quiet`. Subcommands: `harness clean <slug>`, `harness ls [--status X] [--cwd X] [--workflow X]`, `harness show <runId>`, `harness answer <runId> [<text> | --json '{...}']` (no-arg form walks parked batches interactively).
+- `src/harness/orchestrator.ts` — generic interpreter. Resolves workflow from registry, sets up git/branch/worktree per workflow flags, builds `WorkflowContext`, calls `workflow.run(ctx)`, cleans up. Zero workflow-specific logic. Catches `PausedForUserInputError` from phases and exits cleanly with `status: "waiting_human"`.
+- `src/harness/workflow.ts` — the `Workflow` contract: `id`, `needsBranch`, `needsWorktree`, `inputSchema?`, `phaseDefaults`, `defaultMode?`, `run(ctx)`, `resumeFromAnswer?(ctx, answer: string | Record<string,string>)`. Plus `WorkflowContext` (capabilities exposed to workflow body, including `mode: RunMode` and optional `resumeMeta` populated only on async resume) and the `defineWorkflow()` helper.
+- `src/harness/sessionRecorder.ts` — generic `runPhase<T>()`. Calls `query()` with `cwd: phaseCwd`, captures every SDK event to `<primaryCwd>/.harness/<slug>/sessions/NNNN_<uuid>.json`, returns the validated `structured_output`. Retries up to 3 times on transient API errors (overloaded, rate_limit). Strips `$schema` from Zod-emitted JSON schemas before passing to the SDK. Wires `canUseTool` mode-aware: silent strips `AskUserQuestion` from allowedTools; async parks via deny+interrupt (surfaces as `PhaseRunResult.status="paused_for_user_input"` + `parked` payload).
+- `src/harness/state/` — files written to `.harness/<slug>/` (or `~/.harness/` for the registry):
   - `plan.ts` — `Plan` I/O, atomic save, path helpers (`planDir`, `planFilePath`, `sessionsDir`, `worktreePathFor`).
   - `audit.ts` — append-only `audit.jsonl` with open `AuditEntry` shape (workflows declare their own typed entries).
   - `problem.ts` — `Problem` schema + `writeProblems` (one file per problem under `problems/`).
-- `src/harness/types.ts` — shared types: `LogMode`, `IsolationMode`, `PhaseName` (open string), `PhaseConfig`, `ResolvedPhaseConfig`, `HarnessConfigFile`, `ResolvedHarnessConfig`, `Plan`, `PlanTask`, `PlanTaskHistoryEntry` (open shape).
-- `src/harness/config.ts` — `loadHarnessConfig(cwd, workflow)` — workflow-aware: deep-merges `workflow.phaseDefaults` with `harness.json`'s `phases` map.
+  - `registry.ts` — SQLite registry at `~/.harness/runs.db` (`better-sqlite3`, sync). Tables: `runs`, `run_events`, `pending_questions`. Schema versioned via `PRAGMA user_version` (currently 2). `pending_questions` carries `kind` (`user_input` for code-side `ctx.askUser`, `ask_user_question_batch` for SDK AskUserQuestion parks) plus optional `phase_session_id` / `tool_use_id` / `phase_name` for batch resumes.
+- `src/harness/types.ts` — shared types: `LogMode`, `IsolationMode`, `RunMode`, `PhaseName` (open string), `PhaseConfig`, `ResolvedPhaseConfig`, `HarnessConfigFile`, `ResolvedHarnessConfig` (carries `mode`), `Plan`, `PlanTask`, `PlanTaskHistoryEntry` (open shape).
+- `src/harness/config.ts` — `loadHarnessConfig(cwd, workflow, cliMode?)` — workflow-aware: deep-merges `workflow.phaseDefaults` with `harness.json`'s `phases` map. Exports `resolveRunMode(cli, file, workflow)` with precedence: CLI > harness.json `defaultMode` > workflow `defaultMode` > auto (`process.stdin.isTTY` ? `interactive` : `silent`).
+- `src/harness/askUser.ts` — `resolveAnswer(options, raw)` (number/text/case-insensitive option resolver), `runAskUserQuestionTTY(input)` (renders the SDK AskUserQuestion batch in a TTY, validates per-question, returns the SDK-shaped `{behavior, updatedInput:{questions, answers}}`), `denyAskUserQuestionHeadless()`, `SilentModeError`, `PausedForUserInputError`.
 - `src/harness/git.ts` — preconditions, branch creation, commit helpers, and worktree primitives (`addWorktree`, `removeWorktree`, `assertWorktreePathAbsent`).
 - `src/harness/guardHooks.ts` — `PhaseGuards` (`{readOnly?, noPlanWrites?, noGitHistory?}`) + `buildGuardHooks` parameterized by guard config. Workflows declare guards per phase. Escape hatch: writes/git ops against paths outside phase cwd (e.g., `/tmp/harness-e2e-*`) are allowed.
 - `src/harness/clean.ts` — `harness clean <slug>` CLI subcommand: idempotent worktree + branch + state dir cleanup.
@@ -25,7 +27,7 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 - **The harness is the sole committer.** The developer proposes a `commit_message` in its verdict but does NOT commit; the harness commits only after the validator passes, with the composed message `<dev>\n\ntask=<id>\nvalidator: <evidence>`.
 - **Validator is read-only on code** (no Edit/Write tools) and runs against the uncommitted working tree. It reports `verdict` (pass/fail), and on fail optionally `recommend_reset` to hint that the approach is fundamentally wrong.
 - **Retry = resume, reset = fresh.** On fail without reset, the next developer attempt resumes the previous session with only the new validator feedback in the prompt. On reset (validator-recommended or after `maxRetriesBeforeReset`), the tree is rewound with `git reset --hard <pre-phase-sha> && git clean -fd` and the next developer starts a brand-new session. `.harness/<slug>/` survives the clean because it is gitignored.
-- **Dev `blocked` is fatal.** If the developer returns `status: "blocked"`, the plan is immediately marked `failed` and the loop aborts. Rationale: either the dev could have unblocked itself (our prompt/tooling bug) or it truly couldn't (plan is infeasible). Both require human triage. This will change once human-in-the-loop feedback exists.
+- **Dev `blocked` is fatal.** If the developer returns `status: "blocked"`, the plan is immediately marked `failed` and the loop aborts. Rationale: either the dev could have unblocked itself (our prompt/tooling bug) or it truly couldn't (plan is infeasible). Both require human triage. Note: `AskUserQuestion` (Tier 3b) gives the agent a way to surface ambiguity *before* getting stuck; "blocked" remains reserved for genuine infeasibility. Converting blocked → ask is still on the Tier 3 backlog.
 - **Branch only shows committed work.** Before returning on any terminal state (done/failed/exhausted/blocked_fatal), the tree is reset to the last commit so the branch is clean.
 - **Zod schemas must not emit `$schema`.** The bundled `claude-code` binary silently ignores a schema with a top-level `$schema` key — `structured_output` comes back undefined with no error. `sessionRecorder.ts` strips it before passing to the SDK.
 - **Preconditions are mode-aware.** `assertCleanTree` applies to the PRIMARY working tree only in inline-isolation mode. In worktree mode, phases run in a separate git worktree — the primary's cleanliness is irrelevant to safety and requiring it would block legitimate concurrent or sequential runs that leave untracked per-task state under `.harness/<slug>/` in the primary. When wiring a new isolation mode, gate `assertCleanTree` on `mode === "inline"`.
@@ -52,7 +54,8 @@ Infrastructure available to validator for empirical runs:
 ## Config files
 
 - `~/.harness/assistants.json` (user-global, all paths absolute) — named working directories registered for harness invocation. See `assistants.example.json` at the repo root for schema. Lives outside the repo so worktrees and multiple harness clones share one source of truth.
-- `harness.json` (target repo root, optional) — per-project phase overrides. See `harness.example.json`.
+- `~/.harness/runs.db` (user-global, SQLite) — run registry: every harness invocation lands here as a `runs` row plus `run_events` and (when applicable) `pending_questions`. Owned by `state/registry.ts`.
+- `harness.json` (target repo root, optional) — per-project overrides: `phases` map, `isolation`, `defaultMode`, `maxIterationsPerTask`, `maxIterationsGlobal`, `maxRetriesBeforeReset`. See `harness.example.json`.
 
 ## SDK input mode
 
@@ -83,8 +86,10 @@ Switch to Streaming Input (prompt becomes an AsyncGenerator) only when we need i
 
 - `npm run typecheck` after any code change.
 - End-to-end smoke tests live in throwaway `/tmp/harness-e2e-*` dirs: `git init`, add an entry to `~/.harness/assistants.json` (absolute path), run the harness with a small multi-step task, inspect `.harness/<slug>/plan.json` + `sessions/`.
-- `npm run run -- --harness --assistant <name> [--task <slug>] "<prompt>"` is the full flow.
+- `npm run run -- --harness --assistant <name> [--task <slug>] [--mode <interactive|silent|async>] "<prompt>"` is the full flow.
 - `npm run run -- --assistant <name> "<prompt>"` is the legacy single-query path; kept for quick probes.
+- Registry inspection: `npm run run -- harness ls [--status waiting_human]`, `harness show <runId>`. Resume parked runs with `harness answer <runId> [<text> | --json '{...}']` (no-arg form walks batches interactively).
+- `harness clean <slug> --assistant <name>` removes worktree + branch + state dir for a slug. Idempotent.
 
 ## Gotchas
 
