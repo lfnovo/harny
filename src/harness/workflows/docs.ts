@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { defineWorkflow } from "../workflow.js";
+import { defineWorkflow, type WorkflowPhaseResult } from "../workflow.js";
 import { ProblemSchema } from "../state/problem.js";
-import { runPhase, type PhaseRunResult } from "../sessionRecorder.js";
 import {
   markTaskInProgress,
   markTaskDone,
@@ -248,11 +247,6 @@ export const docs = defineWorkflow({
       p.tasks = [task];
     });
 
-    const writerPhaseConfig: ResolvedPhaseConfig =
-      ctx.config.phases["writer"] ?? DEFAULT_WRITER;
-    const reviewerPhaseConfig: ResolvedPhaseConfig =
-      ctx.config.phases["reviewer"] ?? DEFAULT_REVIEWER;
-
     let pendingResume: {
       sessionId: string;
       reviewer: ReviewerVerdict;
@@ -285,17 +279,12 @@ export const docs = defineWorkflow({
         pendingResume?.reviewer ?? null,
       );
 
-      const writerResult: PhaseRunResult<WriterVerdict> = await runPhase({
+      const writerResult: WorkflowPhaseResult<WriterVerdict> = await ctx.runPhase({
         phase: "writer",
-        phaseConfig: writerPhaseConfig,
-        primaryCwd: ctx.primaryCwd,
-        phaseCwd: ctx.phaseCwd,
-        taskSlug: ctx.taskSlug,
         harnessTaskId: task.id,
         prompt: writerPrompt,
         outputSchema: WriterVerdictSchema,
         resumeSessionId: pendingResume?.sessionId ?? null,
-        logMode: ctx.logMode,
         guards: { noPlanWrites: true, noGitHistory: true },
       });
 
@@ -375,17 +364,12 @@ export const docs = defineWorkflow({
 
       const reviewerPrompt = buildReviewerPrompt(intent, task.id, writerVerdict);
 
-      const reviewerResult = await runPhase({
+      const reviewerResult = await ctx.runPhase({
         phase: "reviewer",
-        phaseConfig: reviewerPhaseConfig,
-        primaryCwd: ctx.primaryCwd,
-        phaseCwd: ctx.phaseCwd,
-        taskSlug: ctx.taskSlug,
         harnessTaskId: task.id,
         prompt: reviewerPrompt,
         outputSchema: ReviewerVerdictSchema,
         resumeSessionId: null,
-        logMode: ctx.logMode,
         guards: { readOnly: true },
       });
 

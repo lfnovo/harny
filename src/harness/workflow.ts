@@ -41,6 +41,7 @@ export type WorkflowContext = {
     harnessTaskId?: string | null;
     allowedTools?: string[];
     guards?: PhaseGuards;
+    resumeSessionId?: string | null;
   }) => Promise<WorkflowPhaseResult<T>>;
 };
 

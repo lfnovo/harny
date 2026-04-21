@@ -118,6 +118,7 @@ export async function runHarness(args: {
       harnessTaskId?: string | null;
       allowedTools?: string[];
       guards?: import("./guardHooks.js").PhaseGuards;
+      resumeSessionId?: string | null;
     }): Promise<WorkflowPhaseResult<T>> => {
       const baseConfig = config.phases[phaseArgs.phase];
       if (!baseConfig) {
@@ -137,6 +138,7 @@ export async function runHarness(args: {
         harnessTaskId: phaseArgs.harnessTaskId ?? null,
         prompt: phaseArgs.prompt,
         outputSchema: phaseArgs.outputSchema,
+        resumeSessionId: phaseArgs.resumeSessionId ?? null,
         logMode,
         guards: phaseArgs.guards,
       });
