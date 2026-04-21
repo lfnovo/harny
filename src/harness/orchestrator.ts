@@ -1,4 +1,5 @@
 import { loadHarnessConfig } from "./config.js";
+import { runPhase as runPhaseSession } from "./sessionRecorder.js";
 import {
   createPlanSkeleton,
   planFilePath,
@@ -20,8 +21,8 @@ import {
 } from "./git.js";
 import { appendAudit } from "./audit.js";
 import { getWorkflow } from "./workflows/index.js";
-import type { IsolationMode, LogMode } from "./types.js";
-import type { WorkflowContext } from "./workflow.js";
+import type { IsolationMode, LogMode, PhaseName } from "./types.js";
+import type { WorkflowContext, WorkflowPhaseResult } from "./workflow.js";
 
 function defaultTaskSlug(): string {
   const now = new Date();
@@ -110,6 +111,35 @@ export async function runHarness(args: {
     commit: (message) => commitComposed(phaseCwd, message),
     resetHard: (sha) => resetHard(phaseCwd, sha),
     cleanUntracked: () => cleanUntracked(phaseCwd),
+    runPhase: async <T>(phaseArgs: {
+      phase: PhaseName;
+      prompt: string;
+      outputSchema: import("zod").ZodType<T>;
+      harnessTaskId?: string | null;
+      allowedTools?: string[];
+    }): Promise<WorkflowPhaseResult<T>> => {
+      const baseConfig = config.developer;
+      const phaseConfig = phaseArgs.allowedTools
+        ? { ...baseConfig, allowedTools: phaseArgs.allowedTools }
+        : baseConfig;
+      const result = await runPhaseSession({
+        phase: phaseArgs.phase,
+        phaseConfig,
+        primaryCwd,
+        phaseCwd,
+        taskSlug,
+        harnessTaskId: phaseArgs.harnessTaskId ?? null,
+        prompt: phaseArgs.prompt,
+        outputSchema: phaseArgs.outputSchema,
+        logMode,
+      });
+      return {
+        sessionId: result.sessionId,
+        status: result.status,
+        structuredOutput: result.structuredOutput,
+        error: result.error,
+      };
+    },
   };
 
   const cleanupWorktree = async (

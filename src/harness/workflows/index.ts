@@ -1,8 +1,10 @@
 import type { Workflow } from "../workflow.js";
 import { featureDev } from "./featureDev.js";
+import { issueTriage } from "./issueTriage.js";
 
 const registry = new Map<string, Workflow>([
   [featureDev.id, featureDev as Workflow],
+  [issueTriage.id, issueTriage as Workflow],
 ]);
 
 export function getWorkflow(id: string): Workflow {

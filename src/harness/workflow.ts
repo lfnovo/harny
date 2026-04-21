@@ -1,7 +1,14 @@
 import { z } from "zod";
 import type { Plan } from "./types.js";
 import type { AuditEntry } from "./audit.js";
-import type { LogMode, ResolvedHarnessConfig } from "./types.js";
+import type { LogMode, PhaseName, ResolvedHarnessConfig } from "./types.js";
+
+export type WorkflowPhaseResult<T> = {
+  sessionId: string;
+  status: "completed" | "error";
+  structuredOutput: T | null;
+  error: string | null;
+};
 
 export type WorkflowContext = {
   taskSlug: string;
@@ -21,6 +28,13 @@ export type WorkflowContext = {
   commit: (message: string) => Promise<string | null>;
   resetHard: (sha: string) => Promise<void>;
   cleanUntracked: () => Promise<void>;
+  runPhase: <T>(args: {
+    phase: PhaseName;
+    prompt: string;
+    outputSchema: z.ZodType<T>;
+    harnessTaskId?: string | null;
+    allowedTools?: string[];
+  }) => Promise<WorkflowPhaseResult<T>>;
 };
 
 export type Workflow<TInput = unknown> = {
