@@ -7,6 +7,7 @@ import { runHarness, resumeHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
 import { getWorkflow } from "./harness/workflows/index.js";
 import { getRegistry } from "./harness/state/registry.js";
+import { resolveAnswer } from "./harness/askUser.js";
 import type { IsolationMode, LogMode } from "./harness/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -315,8 +316,31 @@ async function main() {
     }
 
     if (registryCmd.kind === "answer") {
+      const run = registry.getRun(registryCmd.runId);
+      if (!run) {
+        console.error(`Run not found: ${registryCmd.runId}`);
+        process.exit(1);
+      }
+      let answerText = registryCmd.text;
+      if (run.pending_question_id) {
+        const q = registry.getQuestion(run.pending_question_id);
+        if (q) {
+          const opts = q.options_json
+            ? (JSON.parse(q.options_json) as string[])
+            : null;
+          const resolved = resolveAnswer(opts, registryCmd.text);
+          if (!resolved.ok) {
+            console.error(resolved.error);
+            process.exit(1);
+          }
+          answerText = resolved.value;
+          if (opts && opts.length > 0) {
+            console.log(`[harness] selected: ${answerText}`);
+          }
+        }
+      }
       console.log(`[harness] resuming run ${registryCmd.runId}...`);
-      const result = await resumeHarness(registryCmd.runId, registryCmd.text);
+      const result = await resumeHarness(registryCmd.runId, answerText);
       console.log(`[harness] finished status=${result.status}`);
       return;
     }

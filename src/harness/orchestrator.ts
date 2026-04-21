@@ -23,6 +23,7 @@ import {
   resetHard,
 } from "./git.js";
 import { appendAudit } from "./state/audit.js";
+import { resolveAnswer } from "./askUser.js";
 import { getRegistry } from "./state/registry.js";
 import { getWorkflow } from "./workflows/index.js";
 import type { IsolationMode, LogMode, PhaseName, ResolvedHarnessConfig } from "./types.js";
@@ -163,20 +164,37 @@ function buildCtx(args: {
     askUser: async (askArgs: { prompt: string; options?: string[] }) => {
       if (process.stdin.isTTY) {
         const rl = createInterface({ input: process.stdin, output: process.stdout });
-        const answer = await new Promise<string>((resolve) => {
-          const lines: string[] = [];
-          if (askArgs.options && askArgs.options.length > 0) {
-            lines.push(`${askArgs.prompt}`);
-            askArgs.options.forEach((o, i) => lines.push(`  ${i + 1}. ${o}`));
-            lines.push("Your choice: ");
-          } else {
-            lines.push(`${askArgs.prompt}\n> `);
-          }
-          rl.question(lines.join("\n"), (ans) => {
-            rl.close();
-            resolve(ans.trim());
+        const ask = (q: string) =>
+          new Promise<string>((resolve) => {
+            rl.question(q, (ans) => resolve(ans));
           });
-        });
+
+        const hasOptions = askArgs.options && askArgs.options.length > 0;
+        let promptText: string;
+        if (hasOptions) {
+          const lines = [askArgs.prompt];
+          askArgs.options!.forEach((o, i) => lines.push(`  ${i + 1}. ${o}`));
+          lines.push("Your choice (number or text): ");
+          promptText = lines.join("\n");
+        } else {
+          promptText = `${askArgs.prompt}\n> `;
+        }
+
+        let answer: string;
+        while (true) {
+          const raw = await ask(promptText);
+          const resolved = resolveAnswer(askArgs.options ?? null, raw);
+          if (resolved.ok) {
+            answer = resolved.value;
+            if (hasOptions) {
+              process.stdout.write(`\u2192 selected: ${answer}\n`);
+            }
+            break;
+          }
+          process.stdout.write(`${resolved.error}\n`);
+          promptText = "Your choice (number or text): ";
+        }
+        rl.close();
         return { answered: true, answer };
       }
 
