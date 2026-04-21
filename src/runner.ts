@@ -1,5 +1,6 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHarness } from "./harness/orchestrator.js";
@@ -10,7 +11,9 @@ import type { IsolationMode, LogMode } from "./harness/types.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..");
 const SESSIONS_DIR = join(ROOT_DIR, "sessions");
-const ASSISTANTS_FILE = join(ROOT_DIR, "assistants.json");
+// User-global config: list of named workspaces. Lives in ~/.harness/ so it's
+// independent of which harness clone you're using and survives worktree creation.
+const ASSISTANTS_FILE = join(homedir(), ".harness", "assistants.json");
 
 type Assistant = {
   name: string;
@@ -163,14 +166,22 @@ async function loadAssistant(name: string): Promise<Assistant> {
     );
   }
 
-  // Resolve paths relative to the assistants.json location.
-  const configDir = dirname(ASSISTANTS_FILE);
-  const resolvedCwd = isAbsolute(match.cwd)
-    ? match.cwd
-    : resolve(configDir, match.cwd);
-  const resolvedExtras = (match.additionalDirectories ?? []).map((p) =>
-    isAbsolute(p) ? p : resolve(configDir, p),
-  );
+  // assistants.json lives at ~/.harness/ (user-global). Paths must be absolute —
+  // relative paths against the config dir aren't meaningful in this location.
+  if (!isAbsolute(match.cwd)) {
+    throw new Error(
+      `Assistant "${name}" cwd must be an absolute path (got "${match.cwd}"). User-global assistants.json at ${ASSISTANTS_FILE} requires absolute paths.`,
+    );
+  }
+  const resolvedCwd = match.cwd;
+  const resolvedExtras = (match.additionalDirectories ?? []).map((p) => {
+    if (!isAbsolute(p)) {
+      throw new Error(
+        `Assistant "${name}" additionalDirectories entry "${p}" must be an absolute path.`,
+      );
+    }
+    return p;
+  });
 
   // Fail fast if the working directory doesn't exist.
   try {

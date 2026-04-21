@@ -1,8 +1,9 @@
 {
+  "_comment": "Live location: ~/.harness/assistants.json (user-global). All paths must be absolute.",
   "assistants": [
     {
       "name": "harness",
-      "cwd": ".",
+      "cwd": "/absolute/path/to/harness",
       "additionalDirectories": []
     },
     {

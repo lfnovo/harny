@@ -51,7 +51,7 @@ Infrastructure available to validator for empirical runs:
 
 ## Config files
 
-- `assistants.json` (repo root, gitignored) — named working directories. See `assistants.example.json`.
+- `~/.harness/assistants.json` (user-global, all paths absolute) — named working directories registered for harness invocation. See `assistants.example.json` at the repo root for schema. Lives outside the repo so worktrees and multiple harness clones share one source of truth.
 - `harness.json` (target repo root, optional) — per-project phase overrides. See `harness.example.json`.
 
 ## SDK input mode
@@ -74,7 +74,7 @@ Switch to Streaming Input (prompt becomes an AsyncGenerator) when we need:
 ## Workflow
 
 - `npm run typecheck` after any code change.
-- End-to-end smoke tests live in throwaway `/tmp/harness-e2e-*` dirs: `git init`, add an entry to `assistants.json`, run the harness with a small multi-step task, inspect `.harness/<slug>/plan.json` + `sessions/`.
+- End-to-end smoke tests live in throwaway `/tmp/harness-e2e-*` dirs: `git init`, add an entry to `~/.harness/assistants.json` (absolute path), run the harness with a small multi-step task, inspect `.harness/<slug>/plan.json` + `sessions/`.
 - `npm run run -- --harness --assistant <name> [--task <slug>] "<prompt>"` is the full flow.
 - `npm run run -- --assistant <name> "<prompt>"` is the legacy single-query path; kept for quick probes.
 
