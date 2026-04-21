@@ -68,9 +68,28 @@ export const ValidatorVerdictSchema = z
   })
   .strict();
 
+export const TriageVerdictSchema = z
+  .object({
+    task_id: z.string(),
+    action: z.enum(["comment", "label", "close", "assign", "none"]),
+    target_url: z.string(),
+    payload: z.object({
+      body: z.string().optional(),
+      labels: z.array(z.string()).optional(),
+      assignees: z.array(z.string()).optional(),
+    }),
+    reasoning: z.string(),
+    problems: z
+      .array(ProblemSchema)
+      .optional()
+      .describe(PROBLEMS_FIELD_DESCRIPTION),
+  })
+  .strict();
+
 export type PlannerVerdict = z.infer<typeof PlannerVerdictSchema>;
 export type DeveloperVerdict = z.infer<typeof DeveloperVerdictSchema>;
 export type ValidatorVerdict = z.infer<typeof ValidatorVerdictSchema>;
+export type TriageVerdict = z.infer<typeof TriageVerdictSchema>;
 
 export function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
   // The claude-code binary silently ignores the schema when the top-level has

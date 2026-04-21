@@ -51,6 +51,9 @@ function formatHistoryForPrompt(h: PlanTaskHistoryEntry): string {
       h.blocked_reason ? `, blocked_reason=${h.blocked_reason}` : ""
     }\n  summary: ${h.summary}`;
   }
+  if (h.role === "triage") {
+    return `- triage decision (${h.at}): action=${h.action}`;
+  }
   return `- validator verdict (${h.at}): ${h.verdict}${
     h.recommend_reset ? " (recommended reset)" : ""
   }\n  reasons:\n${h.reasons

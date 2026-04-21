@@ -6,7 +6,7 @@ import type {
   PlanTask,
   PlanTaskHistoryEntry,
 } from "./types.js";
-import type { PlannerVerdict } from "./verdict.js";
+import type { PlannerVerdict, TriageVerdict } from "./verdict.js";
 
 export function planDir(primaryCwd: string, taskSlug: string): string {
   return join(primaryCwd, ".harness", taskSlug);
@@ -118,4 +118,43 @@ export function markTaskFailed(task: PlanTask): void {
 
 export function isPlanComplete(plan: Plan): boolean {
   return plan.tasks.every((t) => t.status === "done");
+}
+
+export function createTriagePlanTask(url: string): PlanTask {
+  return {
+    id: "triage-1",
+    title: "Triage issue",
+    description: `Triage GitHub issue: ${url}`,
+    acceptance: [
+      "Decide an action (comment, label, close, assign, or none) for the issue based on its content.",
+    ],
+    status: "pending",
+    attempts: 0,
+    commit_sha: null,
+    history: [],
+  };
+}
+
+export function applyTriageVerdict(
+  plan: Plan,
+  task: PlanTask,
+  verdict: TriageVerdict,
+  sessionId: string,
+): void {
+  task.output = {
+    action: verdict.action,
+    target_url: verdict.target_url,
+    payload: verdict.payload,
+    reasoning: verdict.reasoning,
+    ...(verdict.problems ? { problems: verdict.problems } : {}),
+  };
+  task.history.push({
+    role: "triage",
+    session_id: sessionId,
+    at: new Date().toISOString(),
+    action: verdict.action,
+    reasoning: verdict.reasoning,
+  });
+  task.status = "done";
+  plan.status = "done";
 }

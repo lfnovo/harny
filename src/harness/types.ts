@@ -2,7 +2,7 @@ import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 
 export type LogMode = "compact" | "verbose" | "quiet";
 
-export type PhaseName = "planner" | "developer" | "validator";
+export type PhaseName = "planner" | "developer" | "validator" | "triage";
 
 export type IsolationMode = "worktree" | "inline";
 
@@ -69,6 +69,13 @@ export type PlanTaskHistoryEntry =
       reasons: string[];
       evidence: string;
       recommend_reset?: boolean;
+    }
+  | {
+      role: "triage";
+      session_id: string;
+      at: string;
+      action: string;
+      reasoning: string;
     };
 
 export type PlanTask = {
@@ -80,6 +87,7 @@ export type PlanTask = {
   attempts: number;
   commit_sha: string | null;
   history: PlanTaskHistoryEntry[];
+  output?: Record<string, unknown>;
 };
 
 export type PlanRunStatus =
