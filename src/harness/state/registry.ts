@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { mkdirSync } from "node:fs";
@@ -49,7 +49,7 @@ export type PendingQuestion = {
 };
 
 export class RunRegistry {
-  private db: Database.Database;
+  private db: Database;
 
   constructor(dbPath: string = DB_PATH) {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -58,8 +58,10 @@ export class RunRegistry {
   }
 
   private migrate(): void {
-    const rows = this.db.pragma("user_version") as { user_version: number }[];
-    const version = rows[0]?.user_version ?? 0;
+    const row = this.db
+      .prepare("PRAGMA user_version")
+      .get() as { user_version: number } | null;
+    const version = row?.user_version ?? 0;
     if (version < 1) {
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS runs (
@@ -99,14 +101,14 @@ export class RunRegistry {
           answer_json TEXT
         )
       `);
-      this.db.pragma("user_version = 1");
+      this.db.exec("PRAGMA user_version = 1");
     }
     if (version < 2) {
       // Tier 3b — async park for AskUserQuestion needs SDK session/tool/phase metadata.
       this.db.exec(`ALTER TABLE pending_questions ADD COLUMN phase_session_id TEXT`);
       this.db.exec(`ALTER TABLE pending_questions ADD COLUMN tool_use_id TEXT`);
       this.db.exec(`ALTER TABLE pending_questions ADD COLUMN phase_name TEXT`);
-      this.db.pragma("user_version = 2");
+      this.db.exec("PRAGMA user_version = 2");
     }
   }
 
@@ -158,7 +160,7 @@ export class RunRegistry {
     limit?: number;
   } = {}): Run[] {
     const conditions: string[] = [];
-    const params: unknown[] = [];
+    const params: (string | number)[] = [];
     if (opts.status) {
       conditions.push("status = ?");
       params.push(opts.status);

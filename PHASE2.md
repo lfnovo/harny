@@ -211,8 +211,8 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 - **Capabilities expostas via ctx**: `updatePlan/audit/currentSha/commit/resetHard/cleanUntracked/runPhase<T>()`. `runPhase` genérico permite workflows novos sem importar `sessionRecorder` direto.
 
 **Validado em produção (validator do próprio dogfood):**
-- feature-dev: nested `npm run run -- --workflow feature-dev --task ac5-val 'create hello.txt'` em `/tmp` produziu commit `76e22d26` com `hello.txt='hello world'`.
-- issue-triage: `npm run run -- --workflow issue-triage --input /tmp/issue.json 'triage this'` rodou end-to-end, `plan.json` ficou com `tasks[0].output.action='none'` + reasoning, sem branch/worktree criados.
+- feature-dev: nested `bun run run -- --workflow feature-dev --task ac5-val 'create hello.txt'` em `/tmp` produziu commit `76e22d26` com `hello.txt='hello world'`.
+- issue-triage: `bun run run -- --workflow issue-triage --input /tmp/issue.json 'triage this'` rodou end-to-end, `plan.json` ficou com `tasks[0].output.action='none'` + reasoning, sem branch/worktree criados.
 - `--harness` continuou funcionando como alias.
 - Erro de workflow desconhecido lista IDs disponíveis.
 

@@ -44,7 +44,7 @@ While the harness is being built on itself, validator phases MUST exercise accep
 This is a temporary self-build contract. Once workflows are formalized (Tier 1b+), validator strictness becomes a per-workflow override in `harness.json`.
 
 Infrastructure available to validator for empirical runs:
-- `npm run run -- --harness --assistant <name> --task <slug> "<prompt>"` — the full harness is invokable from inside validator Bash. If SDK auth fails in the nested subprocess, that is an `environment` blocker and the verdict must be `fail`.
+- `bun run run -- --harness --assistant <name> --task <slug> "<prompt>"` — the full harness is invokable from inside validator Bash. If SDK auth fails in the nested subprocess, that is an `environment` blocker and the verdict must be `fail`.
 - `/tmp/harness-e2e-*` — throwaway dirs are fair game. `git init`, register a temp assistant, run.
 - Two concurrent runs in two terminals = the canonical concurrency test.
 - Guard hook for git history ops now has an **escape hatch**: commands that start with `cd /tmp/...`, `cd /private/tmp/...`, `cd /var/folders/...`, or use `git -C <path>` where `<path>` is outside the primary repo, are ALLOWED. This is so you can set up throwaway test repos (`git init && git commit -m seed`) in /tmp without fighting the guard. The sole-committer invariant still applies to the primary repo itself.
@@ -84,11 +84,12 @@ Switch to Streaming Input (prompt becomes an AsyncGenerator) only when we need i
 
 ## Workflow
 
-- `npm run typecheck` after any code change.
+- **Runtime: Bun ≥ 1.3** (enforced by `engines.bun` in `package.json`). The project runs TypeScript natively — no `tsx`, no build step. Registry uses `bun:sqlite` (swapped from `better-sqlite3` when Bun native-module support for it was not available; tracked upstream at oven-sh/bun#4290).
+- `bun run typecheck` after any code change. (`tsc` is still the type-checker of record; Bun is only the runtime.)
 - End-to-end smoke tests live in throwaway `/tmp/harness-e2e-*` dirs: `git init`, add an entry to `~/.harness/assistants.json` (absolute path), run the harness with a small multi-step task, inspect `.harness/<slug>/plan.json` + `sessions/`.
-- `npm run run -- --harness --assistant <name> [--task <slug>] [--mode <interactive|silent|async>] "<prompt>"` is the full flow.
-- `npm run run -- --assistant <name> "<prompt>"` is the legacy single-query path; kept for quick probes.
-- Registry inspection: `npm run run -- harness ls [--status waiting_human]`, `harness show <runId>`. Resume parked runs with `harness answer <runId> [<text> | --json '{...}']` (no-arg form walks batches interactively).
+- `bun run run -- --harness --assistant <name> [--task <slug>] [--mode <interactive|silent|async>] "<prompt>"` is the full flow.
+- `bun run run -- --assistant <name> "<prompt>"` is the legacy single-query path; kept for quick probes.
+- Registry inspection: `bun run run -- harness ls [--status waiting_human]`, `harness show <runId>`. Resume parked runs with `harness answer <runId> [<text> | --json '{...}']` (no-arg form walks batches interactively).
 - `harness clean <slug> --assistant <name>` removes worktree + branch + state dir for a slug. Idempotent.
 
 ## Gotchas
