@@ -12,15 +12,15 @@ Complementa (não substitui): `CLAUDE.md` (invariantes, gotchas, preferências) 
 |---|---|---|
 | 0. Quick wins (guards + problems) | **DONE** | Tier 0 + várias evoluções de infra durante dogfood. Ver "Evoluções pós-Tier-0". |
 | 1a. Isolamento por worktree | **DONE** | Construído off-harness após 5 attempts de dogfood. `765afa7`. |
-| 1b. Workflow abstraction | **PENDING** | Splitado de Tier 1 original. Próximo a puxar. |
-| 2. Run registry + pause/resume | PENDING | |
+| 1b. Workflow abstraction | **DONE** | Self-build via harness, 2 commits, 0 retries. `a5e2445` + `e552e82`. |
+| 2. Run registry + pause/resume | PENDING | Próximo a puxar. |
 | 3. HITL (perguntas + approvals) | PENDING | |
 | 4. Multi-invocação (HTTP + webhooks + cron) | PENDING | |
 | 5. TODO tracking + display | **PARCIAL** | Logger compact/verbose/quiet entregue (`daa8c4c`). TodoWrite capture ainda pendente. |
 | 6. Web UI | PENDING | |
 | 7. Composição (sub-agents, user hooks, cost) | PENDING | |
 | 8. Isolamento remoto (dev machine) | PENDING | Interface já existe desde Tier 1a. |
-| 9. Mais templates de workflow | PENDING | Bloqueado por Tier 1b. |
+| 9. Mais templates de workflow | PENDING | Desbloqueado por Tier 1b. |
 | 10. `/improve` skill | DEFERIDO (Post-Phase 2) | Schema captura desde Tier 0. |
 
 ---
@@ -189,30 +189,32 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 
 ---
 
-### Tier 1b — Workflow abstraction  **[PENDING — próximo a puxar]**
+### Tier 1b — Workflow abstraction  **[DONE]**
 
-**Objetivo:** Generalizar o harness pra runner que aceita manifest de fases.
+**Status:** Entregue em `a5e2445` (workflow abstraction + featureDev migration) + `e552e82` (issue-triage), 2026-04-21. Self-build via dogfood: harness produziu ambos commits em ~60min, 2 tasks, 0 retries.
 
-**Approach (workflow):**
-- `Workflow = { id, phases: Phase[] }`.
-- `Phase = { name, promptTemplate, outputSchema, phaseConfig, loop? }`.
-- `loop = { until: (phaseOutput, context) => boolean, maxIterations }` pro padrão dev/validator.
-- Migrar feature-dev pra essa forma: `[planner, loop(developer, validator)]`.
-- Adicionar template **issue-triage**: 1 fase, sem loop, input mínimo (issue payload), output estruturado (decisão).
+**O que entrou:**
+- `src/harness/workflow.ts` — `Workflow<TInput>`, `WorkflowContext`, `WorkflowPhaseResult<T>`, `defineWorkflow()` helper de identidade pra inferência.
+- `src/harness/workflows/featureDev.ts` — workflow atual reexpresso. Manifest top-level com ~22 linhas (planner → `runDevLoop(ctx)`); `decideAfterValidator`, `composeCommitMessage`, `runDevLoop` como helpers privados embaixo.
+- `src/harness/workflows/issueTriage.ts` — novo template. `needsBranch:false`, `needsWorktree:false`, allowedTools restritos a `[Bash, Read, WebFetch, Grep, Glob]`. Sintetiza 1 PlanTask, roda 1 fase, persiste decisão em `task.output`.
+- `src/harness/workflows/index.ts` — registry com `getWorkflow(id)` que joga erro descritivo listando IDs conhecidos.
+- `src/harness/orchestrator.ts` — gutted de 484→152 linhas. Virou interpretador genérico: resolve workflow, configura git/worktree por flags, init plan, build context, chama `workflow.run(ctx)`, cleanup. Zero workflow-specific logic.
+- `src/runner.ts` — `--workflow <name>` flag (alias `--harness` = `--workflow feature-dev`); `--input <path>` lê JSON validado contra `inputSchema`.
+- `src/harness/verdict.ts` — `TriageVerdictSchema` com `{action: enum, target_url, payload, reasoning, problems?}`.
+- `src/harness/types.ts` + `plan.ts` — `PlanTask.output?` campo + `createTriagePlanTask(url)` + `applyTriageVerdict(plan, task, verdict, sessionId)` helpers.
 
-**Por que próximo:** Todo tier abaixo (registry, HITL, UI, cost) assume workflow shape. Worktree (Tier 1a) já trouxe a infraestrutura paralela, então o registry do Tier 2 já consegue armazenar `worktree_path` sem migration. Workflow abstraction agora desbloqueia issue-triage (Tier 9) e a forma final de tudo downstream.
+**Decisões tomadas (resolvendo gating questions):**
+- **Manifest**: TS tipado com `defineWorkflow(...)`. Permite closures inline pros predicates de loop e schemas Zod direto sem serialização.
+- **Loop predicate**: closure inline. Encaixa Q1.
+- **Output entre fases**: context object (mantém shape atual). `WorkflowContext` é o canal; cada workflow escreve no `plan` via `ctx.updatePlan(mutator)`.
+- **Issue-triage input**: `{ url: string }`, agente baixa via `gh issue view <url> --json ...`. Decisão D anterior também: triage só decide, não executa.
+- **Capabilities expostas via ctx**: `updatePlan/audit/currentSha/commit/resetHard/cleanUntracked/runPhase<T>()`. `runPhase` genérico permite workflows novos sem importar `sessionRecorder` direto.
 
-**Dúvidas abertas (GATING):**
-- **Formato do manifest**: TS tipado com `defineWorkflow(...)` helper, JSON, ou YAML?
-- **`until` predicate do loop**: closure inline (exige manifest TS) ou registry de predicates nomeados?
-- **Output entre fases**: context object explícito, ou pipe estruturado nomeado?
-- **Issue-triage input**: raw GitHub payload, ou extrair `{title, body, labels, url}` antes de entregar ao agente?
-
-**Pronto quando:**
-- `defineWorkflow(...)` descreve feature-dev em ~30 linhas.
-- `--workflow feature-dev` produz comportamento idêntico ao atual.
-- `--workflow issue-triage --input <issue.json>` produz decisão estruturada.
-- Mesmo runner code path pra ambos; zero copy-paste.
+**Validado em produção (validator do próprio dogfood):**
+- feature-dev: nested `npm run run -- --workflow feature-dev --task ac5-val 'create hello.txt'` em `/tmp` produziu commit `76e22d26` com `hello.txt='hello world'`.
+- issue-triage: `npm run run -- --workflow issue-triage --input /tmp/issue.json 'triage this'` rodou end-to-end, `plan.json` ficou com `tasks[0].output.action='none'` + reasoning, sem branch/worktree criados.
+- `--harness` continuou funcionando como alias.
+- Erro de workflow desconhecido lista IDs disponíveis.
 
 ---
 
@@ -483,12 +485,12 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 - ~~**`.harness/<slug>/` path**~~: **resolvido — repo principal.**
 - ~~**Problem annotation categories**~~: **resolvido — `{environment, design, understanding, tooling}` em uso e funcionando.**
 
-### Abertas pra Tier 1b (workflow abstraction)
+### Resolvidas durante Tier 1b
 
-1. **Formato do manifest**: TS tipado (voto), JSON, YAML?
-2. **Issue-triage input**: raw payload ou extraído?
-3. **Output entre fases**: context object ou pipe nomeado?
-4. **Loop predicate**: closure inline ou registry de nomes?
+- ~~**Formato do manifest**~~: **resolvido — TS tipado com `defineWorkflow(...)`.**
+- ~~**Issue-triage input**~~: **resolvido — `{ url: string }`, agente fetcha via `gh issue view`.**
+- ~~**Output entre fases**~~: **resolvido — context object (`WorkflowContext.updatePlan(mutator)`).**
+- ~~**Loop predicate**~~: **resolvido — closure inline (TS).**
 
 ---
 
