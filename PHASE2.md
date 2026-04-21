@@ -20,7 +20,7 @@ Complementa (não substitui): `CLAUDE.md` (invariantes, gotchas, preferências) 
 | 6. Web UI | PENDING | |
 | 7. Composição (sub-agents, user hooks, cost) | PENDING | |
 | 8. Isolamento remoto (dev machine) | PENDING | Interface já existe desde Tier 1a. |
-| 9. Mais templates de workflow | PENDING | Desbloqueado por Tier 1b. |
+| 9. Mais templates de workflow | **EM ANDAMENTO** | `docs` workflow entregue (`c224bd6`) — primeiro template novo via dogfood, validou abstração com zero core edits. `bug-fix` ainda pendente. |
 | 10. `/improve` skill | DEFERIDO (Post-Phase 2) | Schema captura desde Tier 0. |
 
 ---

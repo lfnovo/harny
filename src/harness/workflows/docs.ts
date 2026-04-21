@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { defineWorkflow } from "../workflow.js";
-import { ProblemSchema } from "../problem.js";
+import { ProblemSchema } from "../state/problem.js";
 import { runPhase, type PhaseRunResult } from "../sessionRecorder.js";
 import {
   markTaskInProgress,
   markTaskDone,
   markTaskFailed,
-} from "../plan.js";
+} from "../state/plan.js";
 import type { PlanTask, ResolvedPhaseConfig } from "../types.js";
 
 // --- Verdict schemas (local — not in core) ----------------------------------
