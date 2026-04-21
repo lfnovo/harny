@@ -4,7 +4,7 @@ import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
-import type { IsolationMode } from "./harness/types.js";
+import type { IsolationMode, LogMode } from "./harness/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..");
@@ -48,7 +48,7 @@ function parseIsolation(value: string): IsolationMode {
 }
 
 function parseArgs(argv: string[]): {
-  verbose: boolean;
+  logMode: LogMode;
   assistant: string | null;
   harness: boolean;
   cleanSlug: string | null;
@@ -57,6 +57,7 @@ function parseArgs(argv: string[]): {
   prompt: string;
 } {
   let verbose = false;
+  let quiet = false;
   let assistant: string | null = null;
   let harness = false;
   let task: string | null = null;
@@ -67,6 +68,8 @@ function parseArgs(argv: string[]): {
     const a = argv[i]!;
     if (a === "--verbose" || a === "-v") {
       verbose = true;
+    } else if (a === "--quiet") {
+      quiet = true;
     } else if (a === "--harness") {
       harness = true;
     } else if (a === "--assistant") {
@@ -100,8 +103,9 @@ function parseArgs(argv: string[]): {
     cleanSlug = rest[2];
   }
 
+  const logMode: LogMode = quiet ? "quiet" : verbose ? "verbose" : "compact";
   return {
-    verbose,
+    logMode,
     assistant,
     harness,
     cleanSlug,
@@ -168,7 +172,7 @@ async function loadAssistant(name: string): Promise<Assistant> {
 
 async function main() {
   const {
-    verbose,
+    logMode,
     assistant: assistantName,
     harness,
     cleanSlug,
@@ -183,7 +187,7 @@ async function main() {
       process.exit(1);
     }
     const assistant = await loadAssistant(assistantName);
-    await cleanRun(assistant.cwd, cleanSlug, verbose);
+    await cleanRun(assistant.cwd, cleanSlug, logMode === "verbose");
     return;
   }
 
@@ -200,11 +204,15 @@ async function main() {
       userPrompt: promptArg,
       taskSlug: task ?? undefined,
       isolation: isolation ?? undefined,
-      verbose,
+      logMode,
     });
-    console.log(
-      `[harness] finished status=${result.status} plan=${result.planPath}`,
-    );
+    if (logMode === "quiet") {
+      console.log(`[harness] status=${result.status} branch=${result.branch}`);
+    } else {
+      console.log(
+        `[harness] finished status=${result.status} plan=${result.planPath}`,
+      );
+    }
     return;
   }
 
@@ -231,17 +239,19 @@ async function main() {
 
   let currentPath: string | null = null;
 
-  console.log(`[harness] prompt: ${prompt}`);
-  if (assistant) {
-    console.log(`[harness] assistant: ${assistant.name}`);
-    console.log(`[harness] cwd: ${assistant.cwd}`);
-    if (assistant.additionalDirectories?.length) {
-      console.log(
-        `[harness] additionalDirectories: ${assistant.additionalDirectories.join(", ")}`,
-      );
+  if (logMode === "verbose") {
+    console.log(`[harness] prompt: ${prompt}`);
+    if (assistant) {
+      console.log(`[harness] assistant: ${assistant.name}`);
+      console.log(`[harness] cwd: ${assistant.cwd}`);
+      if (assistant.additionalDirectories?.length) {
+        console.log(
+          `[harness] additionalDirectories: ${assistant.additionalDirectories.join(", ")}`,
+        );
+      }
+    } else {
+      console.log(`[harness] assistant: (none, using process.cwd)`);
     }
-  } else {
-    console.log(`[harness] assistant: (none, using process.cwd)`);
   }
 
   try {
@@ -278,16 +288,16 @@ async function main() {
       ) {
         record.session_id = message.session_id;
         currentPath = join(SESSIONS_DIR, `${record.session_id}.json`);
-        console.log(`[harness] session_id: ${record.session_id}`);
-        console.log(`[harness] file: ${currentPath}`);
+        if (logMode === "verbose") {
+          console.log(`[harness] session_id: ${record.session_id}`);
+          console.log(`[harness] file: ${currentPath}`);
+        }
       }
 
       if (currentPath) await writeJsonAtomic(currentPath, record);
-      if (verbose) {
+      if (logMode === "verbose") {
         console.log(`[harness] event: ${message.type}`);
         console.dir(message, { depth: null, colors: true });
-      } else {
-        console.log(`[harness] event: ${message.type}`);
       }
     }
 

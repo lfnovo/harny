@@ -6,6 +6,7 @@ import {
 } from "../verdict.js";
 import { writeProblems } from "../problem.js";
 import type {
+  LogMode,
   Plan,
   PlanTask,
   PlanTaskHistoryEntry,
@@ -90,7 +91,7 @@ export async function runDeveloper(args: {
     sessionId: string;
     lastValidator: ValidatorVerdict;
   } | null;
-  verbose?: boolean;
+  logMode?: LogMode;
 }): Promise<{ sessionId: string; verdict: DeveloperVerdict }> {
   const prompt = args.resume
     ? buildResumePrompt(args.resume.lastValidator)
@@ -106,7 +107,7 @@ export async function runDeveloper(args: {
     prompt,
     outputSchema: DeveloperVerdictSchema,
     resumeSessionId: args.resume?.sessionId ?? null,
-    verbose: args.verbose,
+    logMode: args.logMode,
   });
 
   if (result.status !== "completed" || !result.structuredOutput) {

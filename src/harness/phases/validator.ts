@@ -1,7 +1,7 @@
 import { runPhase } from "../sessionRecorder.js";
 import { ValidatorVerdictSchema, type ValidatorVerdict } from "../verdict.js";
 import { writeProblems } from "../problem.js";
-import type { Plan, PlanTask, ResolvedPhaseConfig } from "../types.js";
+import type { LogMode, Plan, PlanTask, ResolvedPhaseConfig } from "../types.js";
 
 function describeTaskForValidation(task: PlanTask): string {
   return [
@@ -20,7 +20,7 @@ export async function runValidator(args: {
   plan: Plan;
   task: PlanTask;
   developerSummary: string;
-  verbose?: boolean;
+  logMode?: LogMode;
 }): Promise<{ sessionId: string; verdict: ValidatorVerdict }> {
   const prompt = [
     `Plan summary: ${args.plan.summary}`,
@@ -41,7 +41,7 @@ export async function runValidator(args: {
     harnessTaskId: args.task.id,
     prompt,
     outputSchema: ValidatorVerdictSchema,
-    verbose: args.verbose,
+    logMode: args.logMode,
   });
 
   if (result.status !== "completed" || !result.structuredOutput) {
