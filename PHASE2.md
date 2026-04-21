@@ -14,7 +14,7 @@ Complementa (não substitui): `CLAUDE.md` (invariantes, gotchas, preferências) 
 | 1a. Isolamento por worktree | **DONE** | Construído off-harness após 5 attempts de dogfood. `765afa7`. |
 | 1b. Workflow abstraction | **DONE** | Self-build via harness, 2 commits, 0 retries. `a5e2445` + `e552e82`. Boundary cleanup (A1+A2+A3) follow-up landed manually post-review. |
 | 2. Run registry + pause/resume | **DONE** | Self-build via dogfood, 1 reset cycle. `f9ba0d3`. |
-| 3. HITL (perguntas + approvals) | PENDING | |
+| 3. HITL (perguntas + approvals) | **PARCIAL** | Tier 3a (CLI askUser polish) `1d64cb0` + AskUserQuestion via canUseTool `2dc24bb` + Tier 3b (RunMode interactive\|silent\|async, async park/resume para AskUserQuestion) — manual. Tool approvals (`canUseTool` policy + matchers) ainda pendentes. |
 | 4. Multi-invocação (HTTP + webhooks + cron) | PENDING | |
 | 5. TODO tracking + display | **PARCIAL** | Logger compact/verbose/quiet entregue (`daa8c4c`). TodoWrite capture ainda pendente. |
 | 6. Web UI | PENDING | |

@@ -23,10 +23,10 @@ import {
   resetHard,
 } from "./git.js";
 import { appendAudit } from "./state/audit.js";
-import { resolveAnswer } from "./askUser.js";
+import { resolveAnswer, SilentModeError, PausedForUserInputError } from "./askUser.js";
 import { getRegistry } from "./state/registry.js";
 import { getWorkflow } from "./workflows/index.js";
-import type { IsolationMode, LogMode, PhaseName, ResolvedHarnessConfig } from "./types.js";
+import type { IsolationMode, LogMode, PhaseName, ResolvedHarnessConfig, RunMode } from "./types.js";
 import type { WorkflowContext, WorkflowPhaseResult } from "./workflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -65,6 +65,7 @@ function buildCtx(args: {
     input,
     config,
     logMode,
+    mode: config.mode,
     planPath,
     plan,
     log,
@@ -116,7 +117,7 @@ function buildCtx(args: {
         at: new Date().toISOString(),
       });
 
-      let phaseStatus: "completed" | "error" = "error";
+      let phaseStatus: "completed" | "error" | "paused_for_user_input" = "error";
       let phaseError: string | null = null;
       try {
         const result = await runPhaseSession({
@@ -131,6 +132,7 @@ function buildCtx(args: {
           resumeSessionId: phaseArgs.resumeSessionId ?? null,
           logMode,
           guards: phaseArgs.guards,
+          mode: config.mode,
         });
         phaseStatus = result.status;
         phaseError = result.error;
@@ -143,9 +145,33 @@ function buildCtx(args: {
           at: new Date().toISOString(),
         });
 
+        if (result.status === "paused_for_user_input" && result.parked) {
+          // Persist the parked AskUserQuestion batch + throw so the orchestrator
+          // outer catch maps it to status=waiting_human and exits cleanly.
+          const questionId = randomUUID();
+          registry.insertQuestion({
+            id: questionId,
+            run_id: runId,
+            kind: "ask_user_question_batch",
+            prompt: result.parked.askUserInput.questions[0]?.question ?? "(batch)",
+            options_json: JSON.stringify(result.parked.askUserInput.questions),
+            asked_at: new Date().toISOString(),
+            phase_session_id: result.sessionId,
+            tool_use_id: result.parked.toolUseId,
+            phase_name: phaseArgs.phase,
+          });
+          registry.updateRun(runId, { pending_question_id: questionId });
+          throw new PausedForUserInputError({
+            questionId,
+            phaseSessionId: result.sessionId,
+            toolUseId: result.parked.toolUseId,
+            phaseName: phaseArgs.phase,
+          });
+        }
+
         return {
           sessionId: result.sessionId,
-          status: result.status,
+          status: result.status === "paused_for_user_input" ? "error" : result.status,
           structuredOutput: result.structuredOutput,
           error: result.error,
         };
@@ -162,7 +188,10 @@ function buildCtx(args: {
       }
     },
     askUser: async (askArgs: { prompt: string; options?: string[] }) => {
-      if (process.stdin.isTTY) {
+      if (config.mode === "silent") {
+        throw new SilentModeError();
+      }
+      if (config.mode === "interactive") {
         const rl = createInterface({ input: process.stdin, output: process.stdout });
         const ask = (q: string) =>
           new Promise<string>((resolve) => {
@@ -221,6 +250,7 @@ export async function runHarness(args: {
   taskSlug?: string;
   workflowId?: string;
   isolation?: IsolationMode;
+  mode?: RunMode;
   logMode?: LogMode;
   input?: unknown;
 }): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human"; planPath: string; branch: string }> {
@@ -230,7 +260,7 @@ export async function runHarness(args: {
   const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
 
   const workflow = getWorkflow(args.workflowId ?? "feature-dev");
-  const config = await loadHarnessConfig(primaryCwd, workflow);
+  const config = await loadHarnessConfig(primaryCwd, workflow, args.mode);
   const isolation = args.isolation ?? config.isolation;
   const registry = getRegistry();
 
@@ -322,7 +352,18 @@ export async function runHarness(args: {
     }
   };
 
-  const result = await workflow.run(ctx);
+  let result: { status: "done" | "failed" | "exhausted" | "waiting_human" };
+  try {
+    result = await workflow.run(ctx);
+  } catch (err) {
+    if (err instanceof PausedForUserInputError) {
+      // ctx.runPhase already inserted pending_question + updateRun; just exit clean.
+      registry.updateRun(runId, { status: "waiting_human" });
+      log(`[harness] run parked (waiting_human, AskUserQuestion) runId=${runId} question=${err.questionId}`);
+      return { status: "waiting_human", planPath, branch };
+    }
+    throw err;
+  }
 
   if (result.status === "waiting_human") {
     registry.updateRun(runId, { status: "waiting_human" });
@@ -341,7 +382,10 @@ export async function runHarness(args: {
   return { status: result.status, planPath, branch };
 }
 
-export async function resumeHarness(runId: string, answer: string): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }> {
+export async function resumeHarness(
+  runId: string,
+  answer: string | Record<string, string>,
+): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }> {
   const registry = getRegistry();
   const run = registry.getRun(runId);
   if (!run) throw new Error(`Run not found: ${runId}`);
@@ -364,8 +408,19 @@ export async function resumeHarness(runId: string, answer: string): Promise<{ st
   const phaseCwd = run.worktree_path ?? primaryCwd;
   const logMode: LogMode = "compact";
 
+  // Load the parked question to know whether this is a code-side ctx.askUser
+  // resume or an SDK AskUserQuestion batch resume.
+  let resumeMeta: { phaseName: string; phaseSessionId: string; toolUseId: string | null } | undefined;
   if (run.pending_question_id) {
-    registry.answerQuestion(run.pending_question_id, answer);
+    const q = registry.getQuestion(run.pending_question_id);
+    if (q && q.kind === "ask_user_question_batch" && q.phase_session_id && q.phase_name) {
+      resumeMeta = {
+        phaseName: q.phase_name,
+        phaseSessionId: q.phase_session_id,
+        toolUseId: q.tool_use_id,
+      };
+    }
+    registry.answerQuestion(run.pending_question_id, JSON.stringify(answer));
   }
   registry.updateRun(runId, { status: "running", pending_question_id: null });
 
@@ -376,7 +431,7 @@ export async function resumeHarness(runId: string, answer: string): Promise<{ st
     primaryCwd,
     phaseCwd,
     worktreePath: run.worktree_path,
-    input: { intent: answer },
+    input: typeof answer === "string" ? { intent: answer } : { answers: answer },
     config,
     logMode,
     planPath,
@@ -384,6 +439,10 @@ export async function resumeHarness(runId: string, answer: string): Promise<{ st
     workflow,
     branch: run.branch,
   });
+
+  if (resumeMeta) {
+    ctx.resumeMeta = resumeMeta;
+  }
 
   const result = await workflow.resumeFromAnswer(ctx, answer);
 

@@ -7,6 +7,7 @@ import type {
   PhaseName,
   ResolvedHarnessConfig,
   ResolvedPhaseConfig,
+  RunMode,
 } from "./types.js";
 
 export type WorkflowPhaseResult<T> = {
@@ -28,6 +29,7 @@ export type WorkflowContext = {
   input: unknown;
   config: ResolvedHarnessConfig;
   logMode: LogMode;
+  mode: RunMode;
   planPath: string;
   plan: Plan;
   log: (msg: string) => void;
@@ -51,6 +53,17 @@ export type WorkflowContext = {
     prompt: string;
     options?: string[];
   }) => Promise<AskUserResult>;
+  /**
+   * Populated only when the harness is resuming a parked AskUserQuestion
+   * batch (Tier 3b async mode). Lets the workflow know which phase to
+   * re-invoke and which SDK session_id to resume with. Absent for fresh runs
+   * and for code-side ctx.askUser resumes.
+   */
+  resumeMeta?: {
+    phaseName: string;
+    phaseSessionId: string;
+    toolUseId: string | null;
+  };
 };
 
 export type Workflow<TInput = unknown> = {
@@ -64,8 +77,21 @@ export type Workflow<TInput = unknown> = {
    * overrides from the project's harness.json into ctx.config.phases.
    */
   phaseDefaults: Record<string, ResolvedPhaseConfig>;
+  /**
+   * Optional default run mode when the CLI/file don't specify one. CLI flag
+   * and harness.json defaultMode override this.
+   */
+  defaultMode?: RunMode;
   run: (ctx: WorkflowContext) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
-  resumeFromAnswer?: (ctx: WorkflowContext, answer: string) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
+  /**
+   * Resumes a parked run with the user's answer. The answer is a string for
+   * code-side ctx.askUser parks, or a Record<question, label> map for
+   * AskUserQuestion batch parks (Tier 3b).
+   */
+  resumeFromAnswer?: (
+    ctx: WorkflowContext,
+    answer: string | Record<string, string>,
+  ) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
 };
 
 export function defineWorkflow<TInput = unknown>(

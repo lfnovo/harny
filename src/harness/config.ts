@@ -6,6 +6,7 @@ import type {
   PhaseConfig,
   ResolvedHarnessConfig,
   ResolvedPhaseConfig,
+  RunMode,
 } from "./types.js";
 import type { Workflow } from "./workflow.js";
 
@@ -43,9 +44,28 @@ function mergePhase(
   };
 }
 
+/**
+ * Resolves the run mode using the precedence chain:
+ *   1. cliMode (--mode flag)
+ *   2. harness.json defaultMode
+ *   3. workflow.defaultMode
+ *   4. auto: process.stdin.isTTY ? "interactive" : "silent"
+ */
+export function resolveRunMode(
+  cliMode: RunMode | undefined,
+  fileDefault: RunMode | undefined,
+  workflowDefault: RunMode | undefined,
+): RunMode {
+  if (cliMode) return cliMode;
+  if (fileDefault) return fileDefault;
+  if (workflowDefault) return workflowDefault;
+  return process.stdin.isTTY ? "interactive" : "silent";
+}
+
 export async function loadHarnessConfig(
   cwd: string,
   workflow: Workflow,
+  cliMode?: RunMode,
 ): Promise<ResolvedHarnessConfig> {
   const path = join(cwd, "harness.json");
   let parsed: HarnessConfigFile = {};
@@ -87,5 +107,6 @@ export async function loadHarnessConfig(
       parsed.maxRetriesBeforeReset ??
       GENERIC_DEFAULTS.maxRetriesBeforeReset,
     isolation: parsed.isolation ?? GENERIC_DEFAULTS.isolation,
+    mode: resolveRunMode(cliMode, parsed.defaultMode, workflow.defaultMode),
   };
 }

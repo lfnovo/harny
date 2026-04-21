@@ -16,7 +16,7 @@ import {
   denyAskUserQuestionHeadless,
   type AskUserQuestionInput,
 } from "./askUser.js";
-import type { LogMode, PhaseName, ResolvedPhaseConfig } from "./types.js";
+import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from "./types.js";
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
   const tmp = `${path}.tmp`;
@@ -47,11 +47,17 @@ async function nextOrdinalPrefix(dir: string): Promise<string> {
 
 export type PhaseRunResult<T> = {
   sessionId: string;
-  status: "completed" | "error";
+  status: "completed" | "error" | "paused_for_user_input";
   error: string | null;
   structuredOutput: T | null;
   resultSubtype: string | null;
   events: SDKMessage[];
+  /** Set when status === "paused_for_user_input". The SDK input is the
+   *  AskUserQuestion batch (questions array); tool_use_id is the SDK's id. */
+  parked?: {
+    askUserInput: AskUserQuestionInput;
+    toolUseId: string | null;
+  };
 };
 
 type SessionRecord = {
@@ -98,9 +104,12 @@ export async function runPhase<T>(args: {
   resumeSessionId?: string | null;
   logMode?: LogMode;
   guards?: PhaseGuards;
+  mode?: RunMode;
 }): Promise<PhaseRunResult<T>> {
   for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
     const result = await runPhaseAttempt(args);
+    // Only retry on transient SDK errors. paused_for_user_input is intentional
+    // and must not be retried.
     if (
       result.status !== "error" ||
       !isTransientApiError(result.error) ||
@@ -135,6 +144,7 @@ async function runPhaseAttempt<T>(args: {
   resumeSessionId?: string | null;
   logMode?: LogMode;
   guards?: PhaseGuards;
+  mode?: RunMode;
 }): Promise<PhaseRunResult<T>> {
   const {
     phase,
@@ -149,6 +159,7 @@ async function runPhaseAttempt<T>(args: {
     resumeSessionId,
     logMode,
     guards = {},
+    mode = "interactive",
   } = args;
 
   const dir = sessionsDir(primaryCwd, taskSlug);
@@ -174,6 +185,7 @@ async function runPhaseAttempt<T>(args: {
   let currentPath: string | null = null;
   let structuredRaw: unknown = null;
   let resultSubtype: string | null = null;
+  let parkState: { askUserInput: AskUserQuestionInput; toolUseId: string | null } | null = null;
 
   if (logMode !== "quiet") {
     console.log(`[harness:${phase}] starting ordinal=${ordinal}`);
@@ -189,13 +201,21 @@ async function runPhaseAttempt<T>(args: {
     taskSlug,
   });
 
+  // In silent mode, the agent never sees AskUserQuestion at all — strip it
+  // before the SDK is told what tools are available. This is cleaner than
+  // exposing the tool and denying every call (which burns tokens).
+  const effectiveAllowedTools =
+    mode === "silent"
+      ? phaseConfig.allowedTools.filter((t) => t !== "AskUserQuestion")
+      : phaseConfig.allowedTools;
+
   try {
     for await (const message of query({
       prompt,
       options: {
         cwd: phaseCwd,
         ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
-        allowedTools: phaseConfig.allowedTools,
+        allowedTools: effectiveAllowedTools,
         permissionMode: phaseConfig.permissionMode,
         maxTurns: phaseConfig.maxTurns,
         effort: phaseConfig.effort,
@@ -210,14 +230,40 @@ async function runPhaseAttempt<T>(args: {
           schema: toJsonSchema(outputSchema),
         },
         ...(Object.keys(guardHooks).length > 0 ? { hooks: guardHooks } : {}),
-        canUseTool: async (toolName: string, input: Record<string, unknown>) => {
+        canUseTool: async (
+          toolName: string,
+          input: Record<string, unknown>,
+          ctx: { signal: AbortSignal; toolUseID?: string },
+        ) => {
           if (toolName === "AskUserQuestion") {
-            if (process.stdin.isTTY) {
-              return await runAskUserQuestionTTY(
-                input as unknown as AskUserQuestionInput,
-              );
+            if (mode === "silent") {
+              // Belt-and-suspenders: the tool is stripped from allowedTools
+              // already; this deny only fires if the SDK routes anyway.
+              return {
+                behavior: "deny",
+                message:
+                  "AskUserQuestion is disabled in silent mode. Pick a defensible default and document the assumption.",
+              };
             }
-            return denyAskUserQuestionHeadless();
+            if (mode === "async") {
+              // Park: stash the input, return deny+interrupt, the SDK's
+              // for-await loop will throw with subtype=error_during_execution.
+              // The outer catch converts parkState into PhaseRunResult with
+              // status=paused_for_user_input.
+              parkState = {
+                askUserInput: input as unknown as AskUserQuestionInput,
+                toolUseId: ctx.toolUseID ?? null,
+              };
+              return {
+                behavior: "deny",
+                message: "Parked for async review; harness will exit waiting_human.",
+                interrupt: true,
+              };
+            }
+            // interactive
+            return await runAskUserQuestionTTY(
+              input as unknown as AskUserQuestionInput,
+            );
           }
           return { behavior: "allow", updatedInput: input };
         },
@@ -262,14 +308,33 @@ async function runPhaseAttempt<T>(args: {
 
     record.status = "completed";
   } catch (err) {
-    record.status = "error";
-    record.error = err instanceof Error ? err.stack ?? err.message : String(err);
-    console.error(`[harness:${phase}] error:`, err);
+    if (parkState) {
+      // Expected: SDK throws after canUseTool returns deny+interrupt:true.
+      // Mark the session record as completed (not an error — the park is intentional).
+      record.status = "completed";
+      record.error = null;
+    } else {
+      record.status = "error";
+      record.error = err instanceof Error ? err.stack ?? err.message : String(err);
+      console.error(`[harness:${phase}] error:`, err);
+    }
   } finally {
     record.ended_at = new Date().toISOString();
     const finalPath =
       currentPath ?? join(dir, `${ordinal}_no-session-${Date.now()}.json`);
     await writeJsonAtomic(finalPath, record);
+  }
+
+  if (parkState && record.session_id) {
+    return {
+      sessionId: record.session_id,
+      status: "paused_for_user_input",
+      error: null,
+      structuredOutput: null,
+      resultSubtype,
+      events: record.events,
+      parked: parkState,
+    };
   }
 
   if (record.status === "error") {

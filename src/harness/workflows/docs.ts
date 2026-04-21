@@ -509,6 +509,10 @@ export const docs = defineWorkflow({
     return runWriteReviewLoop(ctx, intent);
   },
   resumeFromAnswer: async (ctx, answer) => {
-    return runWriteReviewLoop(ctx, answer.trim());
+    const intent =
+      typeof answer === "string"
+        ? answer.trim()
+        : Object.values(answer).join(" ").trim();
+    return runWriteReviewLoop(ctx, intent);
   },
 });

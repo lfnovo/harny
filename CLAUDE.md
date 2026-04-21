@@ -56,13 +56,21 @@ Infrastructure available to validator for empirical runs:
 
 ## SDK input mode
 
-Single Message Input (`prompt` is a string). One-shot per phase, fresh session every time — matches the harness goal of context reset per phase.
+Single Message Input (`prompt` is a string). One-shot per phase, fresh session every time — matches the harness goal of context reset per phase. Empirically verified that hooks AND `canUseTool` both fire in Single Mode (despite the SDK doc suggesting otherwise) — see `scripts/hook-probe.ts` and `scripts/canusetool-probe.ts`.
 
-Switch to Streaming Input (prompt becomes an AsyncGenerator) when we need:
-- Hooks (PreToolUse, PostToolUse, SessionStart, etc.)
-- `canUseTool` callback (custom per-tool-call approval)
-- Image attachments in messages
-- Dynamic message queueing / interruption
+Switch to Streaming Input (prompt becomes an AsyncGenerator) only when we need image attachments or dynamic message queueing/interruption — neither is required today.
+
+## Run modes (Tier 3b)
+
+`RunMode = "interactive" | "silent" | "async"` controls how human-in-the-loop interactions are handled. Resolution precedence (highest wins): `--mode` CLI flag > `harness.json` `defaultMode` > `Workflow.defaultMode` > auto (`process.stdin.isTTY` → `interactive`, else `silent`). Resolved into `ResolvedHarnessConfig.mode` and exposed on `WorkflowContext.mode`.
+
+- **interactive**: TTY readline for both `ctx.askUser` (workflow code-side) and the SDK's built-in `AskUserQuestion` tool. Numbered options selectable by number or text via `resolveAnswer`.
+- **silent**: `AskUserQuestion` is stripped from `phaseConfig.allowedTools` before `query()` (the agent never sees it); `ctx.askUser` throws `SilentModeError`. Workflows decide whether to catch and provide a default or fail.
+- **async**: `AskUserQuestion` calls park the entire batch as one `pending_questions` row (kind=`ask_user_question_batch`, with `phase_session_id` + `tool_use_id` + `phase_name` for resume). The `canUseTool` callback returns `{behavior:"deny", interrupt:true}`, which causes the SDK loop to throw with `subtype=error_during_execution`. `sessionRecorder` recognizes the captured `parkState` and returns `PhaseRunResult.status = "paused_for_user_input"`; `ctx.runPhase` writes the pending question and throws `PausedForUserInputError`. Orchestrator catches and exits cleanly with `status: "waiting_human"`. `ctx.askUser` (code-side) parks via the existing single-question path.
+
+**Resume (async)**: `harness answer <runId> --json '{"<question>":"<label>"}'` validates each answer against the parked `options_json` (per-question `resolveAnswer`), or `harness answer <runId>` with no args walks the batch interactively (reusing `runAskUserQuestionTTY`). `resumeHarness` populates `ctx.resumeMeta = { phaseName, phaseSessionId, toolUseId }` and dispatches to `Workflow.resumeFromAnswer(ctx, answer: string | Record<string,string>)`. `feature-dev` re-invokes the paused phase (currently planner only) with `resumeSessionId` + a Q&A prompt prefix; the model integrates the answers without re-asking (verified by `scripts/canusetool-probe.ts`). If the model asks a different question on resume, a new park row is created (multi-round async — documented limitation).
+
+**What we deliberately don't use**: `AbortSignal`-driven mid-stream cancellation. SDK sessions are treated as disposable; `resume:sessionId` + injected user-message prefix is the resume mechanism.
 
 ## User preferences
 

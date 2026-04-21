@@ -40,6 +40,12 @@ export type PendingQuestion = {
   asked_at: string;
   answered_at: string | null;
   answer_json: string | null;
+  /** SDK session_id of the phase that parked. NULL for legacy ctx.askUser parks. */
+  phase_session_id: string | null;
+  /** SDK tool_use_id of the AskUserQuestion call that triggered the park. */
+  tool_use_id: string | null;
+  /** Phase name that parked (so resumeFromAnswer knows which phase to re-invoke). */
+  phase_name: string | null;
 };
 
 export class RunRegistry {
@@ -94,6 +100,13 @@ export class RunRegistry {
         )
       `);
       this.db.pragma("user_version = 1");
+    }
+    if (version < 2) {
+      // Tier 3b — async park for AskUserQuestion needs SDK session/tool/phase metadata.
+      this.db.exec(`ALTER TABLE pending_questions ADD COLUMN phase_session_id TEXT`);
+      this.db.exec(`ALTER TABLE pending_questions ADD COLUMN tool_use_id TEXT`);
+      this.db.exec(`ALTER TABLE pending_questions ADD COLUMN phase_name TEXT`);
+      this.db.pragma("user_version = 2");
     }
   }
 
@@ -188,12 +201,25 @@ export class RunRegistry {
     prompt: string;
     options_json?: string | null;
     asked_at: string;
+    phase_session_id?: string | null;
+    tool_use_id?: string | null;
+    phase_name?: string | null;
   }): void {
     this.db
       .prepare(
-        `INSERT INTO pending_questions (id, run_id, kind, prompt, options_json, asked_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO pending_questions (id, run_id, kind, prompt, options_json, asked_at, phase_session_id, tool_use_id, phase_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(q.id, q.run_id, q.kind, q.prompt, q.options_json ?? null, q.asked_at);
+      .run(
+        q.id,
+        q.run_id,
+        q.kind,
+        q.prompt,
+        q.options_json ?? null,
+        q.asked_at,
+        q.phase_session_id ?? null,
+        q.tool_use_id ?? null,
+        q.phase_name ?? null,
+      );
   }
 
   answerQuestion(id: string, answer: string): void {

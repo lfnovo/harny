@@ -35,6 +35,30 @@ export const featureDev = defineWorkflow({
     await ctx.audit({ phase: "planner", event: "completed", session_id: plannerResult.sessionId, task_count: plannerResult.verdict.tasks.length });
     return runDevLoop(ctx);
   },
+  resumeFromAnswer: async (ctx, answer) => {
+    if (typeof answer === "string" || !ctx.resumeMeta) {
+      throw new Error(
+        "feature-dev resumeFromAnswer expects an AskUserQuestion batch (object answer + ctx.resumeMeta). Got string or missing resumeMeta.",
+      );
+    }
+    if (ctx.resumeMeta.phaseName !== "planner") {
+      throw new Error(
+        `feature-dev resumeFromAnswer for phase "${ctx.resumeMeta.phaseName}" is not yet supported (Tier 3b v1 only handles planner parks).`,
+      );
+    }
+    ctx.log(`[harness] resuming planner with answers from parked AskUserQuestion`);
+    const plannerResult = await runPlanner({
+      ctx,
+      userPrompt: ctx.userPrompt,
+      resumeSessionId: ctx.resumeMeta.phaseSessionId,
+      askUserAnswers: answer,
+    });
+    await ctx.updatePlan((plan) => {
+      applyPlannerVerdict(plan, plannerResult.verdict, plannerResult.sessionId);
+    });
+    await ctx.audit({ phase: "planner", event: "resumed_from_answer", session_id: plannerResult.sessionId, task_count: plannerResult.verdict.tasks.length });
+    return runDevLoop(ctx);
+  },
 });
 
 type IterationOutcome =

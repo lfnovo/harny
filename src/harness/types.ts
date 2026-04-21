@@ -10,6 +10,16 @@ export type PhaseName = string;
 
 export type IsolationMode = "worktree" | "inline";
 
+/**
+ * How the harness handles human-in-the-loop interactions:
+ * - interactive: TTY readline for both ctx.askUser and AskUserQuestion.
+ * - silent: no human available; AskUserQuestion is stripped from allowedTools
+ *   and ctx.askUser throws SilentModeError. Agent must make a defensible default.
+ * - async: park questions in pending_questions, exit waiting_human, resume
+ *   later via `harness answer <runId>` (or HTTP equivalent in Tier 4).
+ */
+export type RunMode = "interactive" | "silent" | "async";
+
 export type PhaseConfig = {
   prompt?: string;
   allowedTools?: string[];
@@ -37,6 +47,7 @@ export type HarnessConfigFile = {
   maxIterationsGlobal?: number;
   maxRetriesBeforeReset?: number;
   isolation?: IsolationMode;
+  defaultMode?: RunMode;
 };
 
 export type ResolvedPhaseConfig = Required<
@@ -53,6 +64,7 @@ export type ResolvedHarnessConfig = {
   maxIterationsGlobal: number;
   maxRetriesBeforeReset: number;
   isolation: IsolationMode;
+  mode: RunMode;
 };
 
 export type TaskStatus = "pending" | "in_progress" | "done" | "failed";
