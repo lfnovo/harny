@@ -4,15 +4,20 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 
 ## Key paths
 
-- `src/runner.ts` — CLI entry. Flags: `--assistant <name>`, `--task <slug>`, `--harness`, `--isolation <worktree|inline>`, `-v/--verbose`.
-- `src/harness/orchestrator.ts` — runs planner once, then loops `developer → validator` until the plan is complete or caps are hit. Handles isolation-mode branching (worktree vs inline), worktree lifecycle (create before phases, remove on done, preserve on failure).
-- `src/harness/phases/` — `planner.ts`, `developer.ts`, `validator.ts`. Each is a thin wrapper over `runPhase<T>()`. All take `primaryCwd` + `phaseCwd` (same in inline mode; different in worktree mode).
-- `src/harness/sessionRecorder.ts` — generic `runPhase<T>()`. Calls `query()` with `cwd: phaseCwd`, captures every SDK event to `<primaryCwd>/.harness/<slug>/sessions/NNNN_<uuid>.json`, returns the validated `structured_output`. Retries up to 3 times on transient API errors (overloaded, rate_limit).
-- `src/harness/plan.ts` — plan.json schema, atomic I/O, path helpers (all take `primaryCwd`), `worktreePathFor` helper.
-- `src/harness/verdict.ts` — Zod schemas for planner/developer/validator outputs and the `toJsonSchema()` helper.
-- `src/harness/config.ts` + `defaults.ts` — phase defaults and per-project `harness.json` loader (deep-merge; arrays REPLACE). Includes `isolation` config field.
+- `src/runner.ts` — CLI entry. Flags: `--assistant <name>`, `--task <slug>`, `--harness`, `--workflow <name>`, `--input <path>`, `--isolation <worktree|inline>`, `-v/--verbose`, `--quiet`.
+- `src/harness/orchestrator.ts` — generic interpreter. Resolves workflow from registry, sets up git/branch/worktree per workflow flags, builds `WorkflowContext`, calls `workflow.run(ctx)`, cleans up. Zero workflow-specific logic.
+- `src/harness/workflow.ts` — the `Workflow` contract: `id`, `needsBranch`, `needsWorktree`, `inputSchema?`, `phaseDefaults`, `run(ctx)`. Plus `WorkflowContext` (capabilities exposed to workflow body) and the `defineWorkflow()` helper.
+- `src/harness/sessionRecorder.ts` — generic `runPhase<T>()`. Calls `query()` with `cwd: phaseCwd`, captures every SDK event to `<primaryCwd>/.harness/<slug>/sessions/NNNN_<uuid>.json`, returns the validated `structured_output`. Retries up to 3 times on transient API errors (overloaded, rate_limit). Strips `$schema` from Zod-emitted JSON schemas before passing to the SDK.
+- `src/harness/state/` — files written to `.harness/<slug>/`:
+  - `plan.ts` — `Plan` I/O, atomic save, path helpers (`planDir`, `planFilePath`, `sessionsDir`, `worktreePathFor`).
+  - `audit.ts` — append-only `audit.jsonl` with open `AuditEntry` shape (workflows declare their own typed entries).
+  - `problem.ts` — `Problem` schema + `writeProblems` (one file per problem under `problems/`).
+- `src/harness/types.ts` — shared types: `LogMode`, `IsolationMode`, `PhaseName` (open string), `PhaseConfig`, `ResolvedPhaseConfig`, `HarnessConfigFile`, `ResolvedHarnessConfig`, `Plan`, `PlanTask`, `PlanTaskHistoryEntry` (open shape).
+- `src/harness/config.ts` — `loadHarnessConfig(cwd, workflow)` — workflow-aware: deep-merges `workflow.phaseDefaults` with `harness.json`'s `phases` map.
 - `src/harness/git.ts` — preconditions, branch creation, commit helpers, and worktree primitives (`addWorktree`, `removeWorktree`, `assertWorktreePathAbsent`).
-- `src/harness/guardHooks.ts` — PreToolUse hooks enforcing invariants. Validator read-only on phase cwd; developer can't touch `plan.json` or run history-modifying git inside phase cwd. Escape hatch: writes/git ops against paths outside phase cwd (e.g., `/tmp/harness-e2e-*`) are allowed.
+- `src/harness/guardHooks.ts` — `PhaseGuards` (`{readOnly?, noPlanWrites?, noGitHistory?}`) + `buildGuardHooks` parameterized by guard config. Workflows declare guards per phase. Escape hatch: writes/git ops against paths outside phase cwd (e.g., `/tmp/harness-e2e-*`) are allowed.
+- `src/harness/clean.ts` — `harness clean <slug>` CLI subcommand: idempotent worktree + branch + state dir cleanup.
+- `src/harness/workflows/` — workflow catalog. Each workflow is self-contained: own verdict schemas, prompts, defaults, helpers. Registry in `index.ts`. New workflows go here as a single file (small) or folder (large like `featureDev/`); core never edits.
 
 ## Invariants
 
@@ -22,7 +27,7 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 - **Retry = resume, reset = fresh.** On fail without reset, the next developer attempt resumes the previous session with only the new validator feedback in the prompt. On reset (validator-recommended or after `maxRetriesBeforeReset`), the tree is rewound with `git reset --hard <pre-phase-sha> && git clean -fd` and the next developer starts a brand-new session. `.harness/<slug>/` survives the clean because it is gitignored.
 - **Dev `blocked` is fatal.** If the developer returns `status: "blocked"`, the plan is immediately marked `failed` and the loop aborts. Rationale: either the dev could have unblocked itself (our prompt/tooling bug) or it truly couldn't (plan is infeasible). Both require human triage. This will change once human-in-the-loop feedback exists.
 - **Branch only shows committed work.** Before returning on any terminal state (done/failed/exhausted/blocked_fatal), the tree is reset to the last commit so the branch is clean.
-- **Zod schemas must not emit `$schema`.** The bundled `claude-code` binary silently ignores a schema with a top-level `$schema` key — `structured_output` comes back undefined with no error. `verdict.ts:toJsonSchema()` strips it.
+- **Zod schemas must not emit `$schema`.** The bundled `claude-code` binary silently ignores a schema with a top-level `$schema` key — `structured_output` comes back undefined with no error. `sessionRecorder.ts` strips it before passing to the SDK.
 - **Preconditions are mode-aware.** `assertCleanTree` applies to the PRIMARY working tree only in inline-isolation mode. In worktree mode, phases run in a separate git worktree — the primary's cleanliness is irrelevant to safety and requiring it would block legitimate concurrent or sequential runs that leave untracked per-task state under `.harness/<slug>/` in the primary. When wiring a new isolation mode, gate `assertCleanTree` on `mode === "inline"`.
 - **`.harness/.gitignore` is tracked, not runtime-written.** The repo ships a static `.harness/.gitignore` containing `*` + `!.gitignore` (ignore everything inside `.harness/` except this gitignore itself). Any runtime logic that would create or overwrite this file is unnecessary — the file is already there, tracked, and correct. Writing it at runtime is a source of "untracked file dirties the tree" bugs; do not reintroduce that pattern.
 

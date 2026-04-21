@@ -5,7 +5,7 @@ import {
   planFilePath,
   savePlan,
   worktreePathFor,
-} from "./plan.js";
+} from "./state/plan.js";
 import {
   addWorktree,
   assertBranchAbsent,
@@ -19,7 +19,7 @@ import {
   removeWorktree,
   resetHard,
 } from "./git.js";
-import { appendAudit } from "./audit.js";
+import { appendAudit } from "./state/audit.js";
 import { getWorkflow } from "./workflows/index.js";
 import type { IsolationMode, LogMode, PhaseName } from "./types.js";
 import type { WorkflowContext, WorkflowPhaseResult } from "./workflow.js";

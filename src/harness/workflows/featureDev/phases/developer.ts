@@ -4,7 +4,7 @@ import {
   type DeveloperVerdict,
   type ValidatorVerdict,
 } from "../verdicts.js";
-import { writeProblems } from "../../../problem.js";
+import { writeProblems } from "../../../state/problem.js";
 import { buildFreshPrompt, buildResumePrompt } from "../plan.js";
 import type {
   LogMode,

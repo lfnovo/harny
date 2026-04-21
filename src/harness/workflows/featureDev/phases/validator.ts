@@ -1,6 +1,6 @@
 import { runPhase } from "../../../sessionRecorder.js";
 import { ValidatorVerdictSchema, type ValidatorVerdict } from "../verdicts.js";
-import { writeProblems } from "../../../problem.js";
+import { writeProblems } from "../../../state/problem.js";
 import type { LogMode, Plan, PlanTask, ResolvedPhaseConfig } from "../../../types.js";
 
 function describeTaskForValidation(task: PlanTask): string {

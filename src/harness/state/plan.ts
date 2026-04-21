@@ -5,7 +5,7 @@ import type {
   Plan,
   PlanTask,
   PlanTaskHistoryEntry,
-} from "./types.js";
+} from "../types.js";
 
 export function planDir(primaryCwd: string, taskSlug: string): string {
   return join(primaryCwd, ".harness", taskSlug);

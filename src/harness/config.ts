@@ -1,13 +1,29 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { GENERIC_HARNESS_DEFAULTS } from "./defaults.js";
 import type {
   HarnessConfigFile,
+  IsolationMode,
   PhaseConfig,
   ResolvedHarnessConfig,
   ResolvedPhaseConfig,
 } from "./types.js";
 import type { Workflow } from "./workflow.js";
+
+/**
+ * Generic harness-level defaults (apply regardless of workflow).
+ * Per-phase configs come from each workflow's `phaseDefaults` declaration.
+ */
+const GENERIC_DEFAULTS: {
+  isolation: IsolationMode;
+  maxIterationsPerTask: number;
+  maxIterationsGlobal: number;
+  maxRetriesBeforeReset: number;
+} = {
+  isolation: "worktree",
+  maxIterationsPerTask: 3,
+  maxIterationsGlobal: 30,
+  maxRetriesBeforeReset: 1,
+};
 
 function mergePhase(
   base: ResolvedPhaseConfig,
@@ -64,12 +80,12 @@ export async function loadHarnessConfig(
   return {
     phases,
     maxIterationsPerTask:
-      parsed.maxIterationsPerTask ?? GENERIC_HARNESS_DEFAULTS.maxIterationsPerTask,
+      parsed.maxIterationsPerTask ?? GENERIC_DEFAULTS.maxIterationsPerTask,
     maxIterationsGlobal:
-      parsed.maxIterationsGlobal ?? GENERIC_HARNESS_DEFAULTS.maxIterationsGlobal,
+      parsed.maxIterationsGlobal ?? GENERIC_DEFAULTS.maxIterationsGlobal,
     maxRetriesBeforeReset:
       parsed.maxRetriesBeforeReset ??
-      GENERIC_HARNESS_DEFAULTS.maxRetriesBeforeReset,
-    isolation: parsed.isolation ?? GENERIC_HARNESS_DEFAULTS.isolation,
+      GENERIC_DEFAULTS.maxRetriesBeforeReset,
+    isolation: parsed.isolation ?? GENERIC_DEFAULTS.isolation,
   };
 }

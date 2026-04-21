@@ -8,7 +8,7 @@ import {
   markTaskDone,
   markTaskFailed,
   markTaskInProgress,
-} from "../../plan.js";
+} from "../../state/plan.js";
 import { applyPlannerVerdict } from "./plan.js";
 import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from "./defaults.js";
 import type { PlanTask } from "../../types.js";

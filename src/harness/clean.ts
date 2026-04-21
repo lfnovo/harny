@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 import { removeWorktree } from "./git.js";
-import { worktreePathFor, planDir } from "./plan.js";
+import { worktreePathFor, planDir } from "./state/plan.js";
 import { spawn } from "node:child_process";
 
 function runGit(

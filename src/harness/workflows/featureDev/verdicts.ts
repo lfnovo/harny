@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ProblemSchema } from "../../problem.js";
+import { ProblemSchema } from "../../state/problem.js";
 
 const PROBLEMS_FIELD_DESCRIPTION =
   "OPTIONAL. Problems encountered during this attempt that would benefit FUTURE runs of the harness if fixed at the project level (not fixed within this task). Examples: missing CLAUDE.md coverage of a critical area, missing dev dependency, ambiguous acceptance criterion, agent tool you wished you had. Leave empty/omit if nothing noteworthy.";

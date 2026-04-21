@@ -2,8 +2,14 @@ import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { mkdir, readdir, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { sessionsDir } from "./plan.js";
-import { toJsonSchema } from "./jsonSchema.js";
+import { sessionsDir } from "./state/plan.js";
+// The bundled `claude-code` binary silently ignores schemas with a top-level
+// `$schema` key (which Zod emits by default). Strip it before passing in.
+function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
+  const { $schema, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
+  void $schema;
+  return rest;
+}
 import { buildGuardHooks, type PhaseGuards } from "./guardHooks.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig } from "./types.js";
 

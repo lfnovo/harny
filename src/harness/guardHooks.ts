@@ -4,7 +4,7 @@ import type {
   HookCallbackMatcher,
   HookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { planFilePath } from "./plan.js";
+import { planFilePath } from "./state/plan.js";
 
 /**
  * Composable guard policy. A workflow declares which invariants apply per

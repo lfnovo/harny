@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineWorkflow } from "../workflow.js";
-import { ProblemSchema } from "../problem.js";
-import { markTaskInProgress } from "../plan.js";
+import { ProblemSchema } from "../state/problem.js";
+import { markTaskInProgress } from "../state/plan.js";
 import type {
   Plan,
   PlanTask,

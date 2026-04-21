@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Plan } from "./types.js";
-import type { AuditEntry } from "./audit.js";
+import type { AuditEntry } from "./state/audit.js";
 import type { PhaseGuards } from "./guardHooks.js";
 import type {
   LogMode,
