@@ -5,7 +5,7 @@ import { z } from "zod";
 import { sessionsDir } from "./plan.js";
 import { toJsonSchema } from "./verdict.js";
 import { buildGuardHooks } from "./guardHooks.js";
-import type { PhaseName, ResolvedPhaseConfig } from "./types.js";
+import type { LogMode, PhaseName, ResolvedPhaseConfig } from "./types.js";
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
   const tmp = `${path}.tmp`;
@@ -85,7 +85,7 @@ export async function runPhase<T>(args: {
   prompt: string;
   outputSchema: z.ZodType<T>;
   resumeSessionId?: string | null;
-  verbose?: boolean;
+  logMode?: LogMode;
 }): Promise<PhaseRunResult<T>> {
   for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
     const result = await runPhaseAttempt(args);
@@ -100,9 +100,11 @@ export async function runPhase<T>(args: {
       RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1),
       RETRY_MAX_DELAY_MS,
     );
-    console.log(
-      `[harness:${args.phase}] transient API error on attempt ${attempt}/${MAX_TRANSIENT_RETRIES}; retrying in ${Math.round(delay / 1000)}s`,
-    );
+    if (args.logMode !== "quiet") {
+      console.log(
+        `[harness:${args.phase}] transient API error on attempt ${attempt}/${MAX_TRANSIENT_RETRIES}; retrying in ${Math.round(delay / 1000)}s`,
+      );
+    }
     await sleep(delay);
   }
   throw new Error("unreachable: retry loop exited without returning");
@@ -119,7 +121,7 @@ async function runPhaseAttempt<T>(args: {
   prompt: string;
   outputSchema: z.ZodType<T>;
   resumeSessionId?: string | null;
-  verbose?: boolean;
+  logMode?: LogMode;
 }): Promise<PhaseRunResult<T>> {
   const {
     phase,
@@ -132,7 +134,7 @@ async function runPhaseAttempt<T>(args: {
     prompt,
     outputSchema,
     resumeSessionId,
-    verbose,
+    logMode,
   } = args;
 
   const dir = sessionsDir(primaryCwd, taskSlug);
@@ -159,10 +161,12 @@ async function runPhaseAttempt<T>(args: {
   let structuredRaw: unknown = null;
   let resultSubtype: string | null = null;
 
-  console.log(`[harness:${phase}] starting ordinal=${ordinal}`);
-  if (harnessTaskId) console.log(`[harness:${phase}] task=${harnessTaskId}`);
-  if (resumeSessionId)
-    console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
+  if (logMode !== "quiet") {
+    console.log(`[harness:${phase}] starting ordinal=${ordinal}`);
+    if (harnessTaskId) console.log(`[harness:${phase}] task=${harnessTaskId}`);
+    if (resumeSessionId)
+      console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
+  }
 
   const guardHooks = buildGuardHooks({
     phase,
@@ -208,7 +212,9 @@ async function runPhaseAttempt<T>(args: {
       ) {
         record.session_id = message.session_id;
         currentPath = join(dir, `${ordinal}_${message.session_id}.json`);
-        console.log(`[harness:${phase}] session=${message.session_id}`);
+        if (logMode !== "quiet") {
+          console.log(`[harness:${phase}] session=${message.session_id}`);
+        }
       }
 
       if (message.type === "result") {
@@ -223,11 +229,9 @@ async function runPhaseAttempt<T>(args: {
       }
 
       if (currentPath) await writeJsonAtomic(currentPath, record);
-      if (verbose) {
+      if (logMode === "verbose") {
         console.log(`[harness:${phase}] event: ${message.type}`);
         console.dir(message, { depth: null, colors: true });
-      } else {
-        console.log(`[harness:${phase}] event: ${message.type}`);
       }
     }
 

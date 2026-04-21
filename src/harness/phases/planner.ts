@@ -1,6 +1,6 @@
 import { runPhase } from "../sessionRecorder.js";
 import { PlannerVerdictSchema, type PlannerVerdict } from "../verdict.js";
-import type { ResolvedPhaseConfig } from "../types.js";
+import type { LogMode, ResolvedPhaseConfig } from "../types.js";
 
 export async function runPlanner(args: {
   phaseConfig: ResolvedPhaseConfig;
@@ -8,7 +8,7 @@ export async function runPlanner(args: {
   phaseCwd: string;
   taskSlug: string;
   userPrompt: string;
-  verbose?: boolean;
+  logMode?: LogMode;
 }): Promise<{ sessionId: string; verdict: PlannerVerdict }> {
   const prompt = `User request:
 ${args.userPrompt}
@@ -24,7 +24,7 @@ Produce the implementation plan as described in your instructions.`;
     harnessTaskId: null,
     prompt,
     outputSchema: PlannerVerdictSchema,
-    verbose: args.verbose,
+    logMode: args.logMode,
   });
 
   if (result.status !== "completed" || !result.structuredOutput) {

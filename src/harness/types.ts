@@ -1,5 +1,7 @@
 import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 
+export type LogMode = "compact" | "verbose" | "quiet";
+
 export type PhaseName = "planner" | "developer" | "validator";
 
 export type IsolationMode = "worktree" | "inline";

@@ -30,6 +30,7 @@ import { runDeveloper } from "./phases/developer.js";
 import { runValidator } from "./phases/validator.js";
 import type {
   IsolationMode,
+  LogMode,
   PlanTask,
   ResolvedHarnessConfig,
 } from "./types.js";
@@ -134,17 +135,20 @@ export async function runHarness(args: {
   userPrompt: string;
   taskSlug?: string;
   isolation?: IsolationMode;
-  verbose?: boolean;
-}): Promise<{ status: "done" | "failed" | "exhausted"; planPath: string }> {
+  logMode?: LogMode;
+}): Promise<{ status: "done" | "failed" | "exhausted"; planPath: string; branch: string }> {
   const primaryCwd = args.cwd;
   const taskSlug = args.taskSlug?.trim() || defaultTaskSlug();
   const branch = `harness/${taskSlug}`;
+  const logMode = args.logMode ?? "compact";
+  const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
+  const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
 
   const config = await loadHarnessConfig(primaryCwd);
   const isolation = args.isolation ?? config.isolation;
 
-  console.log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
-  console.log(`[harness] task=${taskSlug} branch=${branch}`);
+  log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
+  log(`[harness] task=${taskSlug} branch=${branch}`);
 
   await assertIsGitRepo(primaryCwd);
   await assertBranchAbsent(primaryCwd, branch);
@@ -167,10 +171,10 @@ export async function runHarness(args: {
     await assertWorktreePathAbsent(worktreePath);
     await addWorktree(primaryCwd, worktreePath, branch);
     phaseCwd = worktreePath;
-    console.log(`[harness] worktree=${worktreePath}`);
+    log(`[harness] worktree=${worktreePath}`);
   }
 
-  console.log(
+  log(
     `[harness] caps: per-task=${config.maxIterationsPerTask} retries-before-reset=${config.maxRetriesBeforeReset} global=${config.maxIterationsGlobal}`,
   );
 
@@ -181,14 +185,14 @@ export async function runHarness(args: {
     if (outcome === "done") {
       try {
         await removeWorktree(primaryCwd, worktreePath, { force: true });
-        console.log(`[harness] worktree removed: ${worktreePath}`);
+        log(`[harness] worktree removed: ${worktreePath}`);
       } catch (err) {
-        console.warn(
+        warn(
           `[harness] worktree cleanup failed: ${(err as Error).message}`,
         );
       }
     } else {
-      console.log(
+      log(
         `[harness] worktree preserved for debug: ${worktreePath} (branch: ${branch})`,
       );
     }
@@ -206,14 +210,14 @@ export async function runHarness(args: {
   await savePlan(planPath, plan);
 
   // --- Planner phase -------------------------------------------------------
-  console.log(`[harness] phase=planner`);
+  log(`[harness] phase=planner`);
   const plannerResult = await runPlanner({
     phaseConfig: config.planner,
     primaryCwd,
     phaseCwd,
     taskSlug,
     userPrompt: args.userPrompt,
-    verbose: args.verbose,
+    logMode,
   });
   applyPlannerVerdict(plan, plannerResult.verdict, plannerResult.sessionId);
   await savePlan(planPath, plan);
@@ -232,26 +236,26 @@ export async function runHarness(args: {
     if (isPlanComplete(plan)) {
       plan.status = "done";
       await savePlan(planPath, plan);
-      console.log(`[harness] all tasks done.`);
+      log(`[harness] all tasks done.`);
       await cleanupWorktree("done");
-      return { status: "done", planPath };
+      return { status: "done", planPath, branch };
     }
 
     if (plan.iterations_global >= config.maxIterationsGlobal) {
       plan.status = "exhausted";
       await savePlan(planPath, plan);
-      console.log(`[harness] global iteration cap reached.`);
+      log(`[harness] global iteration cap reached.`);
       await cleanupWorktree("exhausted");
-      return { status: "exhausted", planPath };
+      return { status: "exhausted", planPath, branch };
     }
 
     const task = findNextPendingTask(plan);
     if (!task) {
       plan.status = "failed";
       await savePlan(planPath, plan);
-      console.log(`[harness] no pending tasks but plan not complete (failed).`);
+      log(`[harness] no pending tasks but plan not complete (failed).`);
       await cleanupWorktree("failed");
-      return { status: "failed", planPath };
+      return { status: "failed", planPath, branch };
     }
 
     if (pendingResume && task.history.length === 0) pendingResume = null;
@@ -262,7 +266,7 @@ export async function runHarness(args: {
     markTaskInProgress(task);
     await savePlan(planPath, plan);
 
-    console.log(
+    log(
       `[harness] phase=developer task=${task.id} attempt=${task.attempts} global=${plan.iterations_global}${
         pendingResume ? " (resuming)" : ""
       }`,
@@ -281,7 +285,7 @@ export async function runHarness(args: {
             lastValidator: pendingResume.validator,
           }
         : null,
-      verbose: args.verbose,
+      logMode,
     });
 
     task.history.push({
@@ -330,15 +334,15 @@ export async function runHarness(args: {
       });
       await resetHard(phaseCwd, prePhaseSha);
       await cleanUntracked(phaseCwd);
-      console.log(
+      log(
         `[harness] developer reported blocked — plan marked failed. Reason: ${devResult.verdict.blocked_reason}`,
       );
       await cleanupWorktree("blocked_fatal");
-      return { status: "failed", planPath };
+      return { status: "failed", planPath, branch };
     }
 
     // --- Validator phase ---------------------------------------------------
-    console.log(`[harness] phase=validator task=${task.id}`);
+    log(`[harness] phase=validator task=${task.id}`);
     const valResult = await runValidator({
       phaseConfig: config.validator,
       primaryCwd,
@@ -347,7 +351,7 @@ export async function runHarness(args: {
       plan,
       task,
       developerSummary: devResult.verdict.summary,
-      verbose: args.verbose,
+      logMode,
     });
 
     task.history.push({
@@ -376,6 +380,17 @@ export async function runHarness(args: {
         : {}),
     });
 
+    log(
+      `[harness] validator task=${task.id} verdict=${valResult.verdict.verdict} reasons=${valResult.verdict.reasons.length}`,
+    );
+    if (valResult.verdict.problems && valResult.verdict.problems.length > 0) {
+      for (const p of valResult.verdict.problems) {
+        log(
+          `[harness] problem category=${p.category} severity=${p.severity} detail=${p.description}`,
+        );
+      }
+    }
+
     const outcome = await decideAfterValidator({
       primaryCwd,
       phaseCwd,
@@ -391,8 +406,9 @@ export async function runHarness(args: {
       task.commit_sha = outcome.commitSha || null;
       markTaskDone(task);
       await savePlan(planPath, plan);
-      console.log(
-        `[harness] task ${task.id} committed sha=${outcome.commitSha.slice(0, 8) || "(empty)"}`,
+      const subject = devResult.verdict.commit_message.split("\n")[0] ?? "";
+      log(
+        `[harness] task ${task.id} committed sha=${outcome.commitSha.slice(0, 8) || "(empty)"} subject="${subject}"`,
       );
     } else if (outcome.kind === "retry") {
       await appendAudit(primaryCwd, taskSlug, {
@@ -407,7 +423,7 @@ export async function runHarness(args: {
         sessionId: outcome.resumeSessionId,
         validator: outcome.validator,
       };
-      console.log(`[harness] task ${task.id} will retry (resume dev session)`);
+      log(`[harness] task ${task.id} will retry (resume dev session)`);
     } else if (outcome.kind === "reset") {
       const before = await headSha(phaseCwd);
       await resetHard(phaseCwd, prePhaseSha);
@@ -432,7 +448,7 @@ export async function runHarness(args: {
         head_before: before,
         head_after: after,
       });
-      console.log(
+      log(
         `[harness] task ${task.id} tree reset to ${after.slice(0, 8)}`,
       );
     } else {
@@ -448,11 +464,11 @@ export async function runHarness(args: {
         action: "failed",
         rationale: outcome.reason,
       });
-      console.log(
+      log(
         `[harness] task ${task.id} failed (${outcome.reason}); tree reset`,
       );
       await cleanupWorktree("failed");
-      return { status: "failed", planPath };
+      return { status: "failed", planPath, branch };
     }
   }
 }
