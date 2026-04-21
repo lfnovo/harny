@@ -4,6 +4,7 @@ import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
+import { getWorkflow } from "./harness/workflows/index.js";
 import type { IsolationMode, LogMode } from "./harness/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,17 +52,21 @@ function parseArgs(argv: string[]): {
   logMode: LogMode;
   assistant: string | null;
   harness: boolean;
+  workflow: string | null;
   cleanSlug: string | null;
   task: string | null;
   isolation: IsolationMode | null;
+  inputPath: string | null;
   prompt: string;
 } {
   let verbose = false;
   let quiet = false;
   let assistant: string | null = null;
   let harness = false;
+  let workflow: string | null = null;
   let task: string | null = null;
   let isolation: IsolationMode | null = null;
+  let inputPath: string | null = null;
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -72,6 +77,20 @@ function parseArgs(argv: string[]): {
       quiet = true;
     } else if (a === "--harness") {
       harness = true;
+    } else if (a === "--workflow") {
+      const next = argv[i + 1];
+      if (!next) throw new Error("--workflow requires a name");
+      workflow = next;
+      i++;
+    } else if (a.startsWith("--workflow=")) {
+      workflow = a.slice("--workflow=".length);
+    } else if (a === "--input") {
+      const next = argv[i + 1];
+      if (!next) throw new Error("--input requires a file path");
+      inputPath = next;
+      i++;
+    } else if (a.startsWith("--input=")) {
+      inputPath = a.slice("--input=".length);
     } else if (a === "--assistant") {
       const next = argv[i + 1];
       if (!next) throw new Error("--assistant requires a name");
@@ -108,9 +127,11 @@ function parseArgs(argv: string[]): {
     logMode,
     assistant,
     harness,
+    workflow,
     cleanSlug,
     task,
     isolation,
+    inputPath,
     prompt: rest.join(" ").trim(),
   };
 }
@@ -175,9 +196,11 @@ async function main() {
     logMode,
     assistant: assistantName,
     harness,
+    workflow: workflowArg,
     cleanSlug,
     task,
     isolation,
+    inputPath,
     prompt: promptArg,
   } = parseArgs(process.argv.slice(2));
 
@@ -191,20 +214,57 @@ async function main() {
     return;
   }
 
-  if (harness) {
+  const workflowId = harness ? "feature-dev" : workflowArg;
+
+  if (workflowId !== null) {
+    // Validate the workflow exists early so we get a useful error message.
+    try {
+      getWorkflow(workflowId!);
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exit(1);
+    }
+
     if (!assistantName) {
-      throw new Error("--harness requires --assistant <name>");
+      throw new Error("--workflow (or --harness) requires --assistant <name>");
     }
     if (!promptArg) {
-      throw new Error("--harness requires a prompt describing the work");
+      throw new Error("--workflow (or --harness) requires a prompt describing the work");
     }
+
+    let input: unknown = undefined;
+    if (inputPath) {
+      let raw: string;
+      try {
+        raw = await readFile(inputPath, "utf8");
+      } catch (err) {
+        throw new Error(`Could not read --input file "${inputPath}": ${(err as Error).message}`);
+      }
+      try {
+        input = JSON.parse(raw);
+      } catch (err) {
+        throw new Error(`Invalid JSON in --input file "${inputPath}": ${(err as Error).message}`);
+      }
+      // Validate against workflow's inputSchema if present.
+      const wf = getWorkflow(workflowId!);
+      if (wf.inputSchema) {
+        const result = wf.inputSchema.safeParse(input);
+        if (!result.success) {
+          throw new Error(`--input validation failed for workflow "${workflowId}": ${result.error.message}`);
+        }
+        input = result.data;
+      }
+    }
+
     const assistant = await loadAssistant(assistantName);
     const result = await runHarness({
       cwd: assistant.cwd,
       userPrompt: promptArg,
       taskSlug: task ?? undefined,
+      workflowId: workflowId!,
       isolation: isolation ?? undefined,
       logMode,
+      input,
     });
     if (logMode === "quiet") {
       console.log(`[harness] status=${result.status} branch=${result.branch}`);
