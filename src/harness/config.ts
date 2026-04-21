@@ -59,5 +59,6 @@ export async function loadHarnessConfig(
     maxRetriesBeforeReset:
       parsed.maxRetriesBeforeReset ??
       DEFAULT_HARNESS_CONFIG.maxRetriesBeforeReset,
+    isolation: parsed.isolation ?? DEFAULT_HARNESS_CONFIG.isolation,
   };
 }

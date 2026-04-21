@@ -115,6 +115,7 @@ export const DEFAULT_HARNESS_CONFIG: ResolvedHarnessConfig = {
   planner: DEFAULT_PLANNER,
   developer: DEFAULT_DEVELOPER,
   validator: DEFAULT_VALIDATOR,
+  isolation: "worktree",
   maxIterationsPerTask: 3,
   maxIterationsGlobal: 30,
   maxRetriesBeforeReset: 1,

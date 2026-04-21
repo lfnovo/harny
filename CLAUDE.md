@@ -4,14 +4,15 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 
 ## Key paths
 
-- `src/runner.ts` — CLI entry. Flags: `--assistant <name>`, `--task <slug>`, `--harness`, `-v/--verbose`.
-- `src/harness/orchestrator.ts` — runs planner once, then loops `developer → validator` until the plan is complete or caps are hit.
-- `src/harness/phases/` — `planner.ts`, `developer.ts`, `validator.ts`. Each is a thin wrapper over `runPhase<T>()`.
-- `src/harness/sessionRecorder.ts` — generic `runPhase<T>()`. Calls `query()` once per phase, passes `outputFormat` + Zod schema, captures every SDK event to `<cwd>/.harness/<slug>/sessions/NNNN_<uuid>.json`, returns the validated `structured_output`.
-- `src/harness/plan.ts` — plan.json schema, atomic I/O, mutation helpers.
+- `src/runner.ts` — CLI entry. Flags: `--assistant <name>`, `--task <slug>`, `--harness`, `--isolation <worktree|inline>`, `-v/--verbose`.
+- `src/harness/orchestrator.ts` — runs planner once, then loops `developer → validator` until the plan is complete or caps are hit. Handles isolation-mode branching (worktree vs inline), worktree lifecycle (create before phases, remove on done, preserve on failure).
+- `src/harness/phases/` — `planner.ts`, `developer.ts`, `validator.ts`. Each is a thin wrapper over `runPhase<T>()`. All take `primaryCwd` + `phaseCwd` (same in inline mode; different in worktree mode).
+- `src/harness/sessionRecorder.ts` — generic `runPhase<T>()`. Calls `query()` with `cwd: phaseCwd`, captures every SDK event to `<primaryCwd>/.harness/<slug>/sessions/NNNN_<uuid>.json`, returns the validated `structured_output`. Retries up to 3 times on transient API errors (overloaded, rate_limit).
+- `src/harness/plan.ts` — plan.json schema, atomic I/O, path helpers (all take `primaryCwd`), `worktreePathFor` helper.
 - `src/harness/verdict.ts` — Zod schemas for planner/developer/validator outputs and the `toJsonSchema()` helper.
-- `src/harness/config.ts` + `defaults.ts` — phase defaults and per-project `harness.json` loader (deep-merge; arrays REPLACE).
-- `src/harness/git.ts` — preconditions, branch creation, commit helpers.
+- `src/harness/config.ts` + `defaults.ts` — phase defaults and per-project `harness.json` loader (deep-merge; arrays REPLACE). Includes `isolation` config field.
+- `src/harness/git.ts` — preconditions, branch creation, commit helpers, and worktree primitives (`addWorktree`, `removeWorktree`, `assertWorktreePathAbsent`).
+- `src/harness/guardHooks.ts` — PreToolUse hooks enforcing invariants. Validator read-only on phase cwd; developer can't touch `plan.json` or run history-modifying git inside phase cwd. Escape hatch: writes/git ops against paths outside phase cwd (e.g., `/tmp/harness-e2e-*`) are allowed.
 
 ## Invariants
 

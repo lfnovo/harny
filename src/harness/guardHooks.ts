@@ -28,28 +28,32 @@ function allowPreToolUse(): HookJSONOutput {
   return { continue: true };
 }
 
-function validatorReadOnly(primaryCwd: string): HookCallback {
-  const primary = resolve(primaryCwd);
+function validatorReadOnly(phaseCwd: string): HookCallback {
+  const phase = resolve(phaseCwd);
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allowPreToolUse();
     const filePath = readStringField(input.tool_input, "file_path");
     if (filePath) {
-      const abs = resolve(primary, filePath);
-      if (!isUnderPrimary(abs, primary)) return allowPreToolUse();
+      const abs = resolve(phase, filePath);
+      if (!isUnderPrimary(abs, phase)) return allowPreToolUse();
     }
     return denyPreToolUse(
-      `Validator is read-only on the primary repo (${primary}). Tool "${input.tool_name}" at ${filePath ?? "<unknown path>"} is not permitted inside the primary. Writes to paths outside the primary (e.g., /tmp/harness-e2e-*) are allowed for empirical test setup. Report "fail" in your verdict instead of trying to fix primary code.`,
+      `Validator is read-only on the phase working dir (${phase}). Tool "${input.tool_name}" at ${filePath ?? "<unknown path>"} is not permitted inside the phase dir. Writes to paths outside (e.g., /tmp/harness-e2e-*) are allowed for empirical test setup. Report "fail" in your verdict instead of trying to fix code.`,
     );
   };
 }
 
-function developerPlanWriter(cwd: string, taskSlug: string): HookCallback {
-  const forbidden = resolve(planFilePath(cwd, taskSlug));
+function developerPlanWriter(
+  primaryCwd: string,
+  phaseCwd: string,
+  taskSlug: string,
+): HookCallback {
+  const forbidden = resolve(planFilePath(primaryCwd, taskSlug));
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allowPreToolUse();
     const filePath = readStringField(input.tool_input, "file_path");
     if (filePath == null) return allowPreToolUse();
-    const abs = resolve(cwd, filePath);
+    const abs = resolve(phaseCwd, filePath);
     if (abs !== forbidden) return allowPreToolUse();
     return denyPreToolUse(
       `The harness is the sole writer of plan.json. Do not edit ${forbidden}.`,
@@ -57,17 +61,17 @@ function developerPlanWriter(cwd: string, taskSlug: string): HookCallback {
   };
 }
 
-function developerGitCommitter(primaryCwd: string): HookCallback {
-  const primary = resolve(primaryCwd);
+function developerGitCommitter(phaseCwd: string): HookCallback {
+  const phase = resolve(phaseCwd);
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allowPreToolUse();
     if (input.tool_name !== "Bash") return allowPreToolUse();
     const command = readStringField(input.tool_input, "command");
     if (command == null) return allowPreToolUse();
     if (!FORBIDDEN_GIT_COMMAND.test(command)) return allowPreToolUse();
-    if (operatesOutsidePrimary(command, primary)) return allowPreToolUse();
+    if (operatesOutsidePrimary(command, phase)) return allowPreToolUse();
     return denyPreToolUse(
-      `The harness is the sole committer of the primary repo (${primary}). Do not run git history-modifying commands here (commit, push, reset, rebase, merge, revert, cherry-pick, tag, am, --amend). If you need to commit in a throwaway test repo, prefix with \`cd /tmp/<path>\` or use \`git -C /tmp/<path>\` — paths outside the primary repo are permitted. Propose a commit_message in your structured output instead for primary-repo commits.`,
+      `The harness is the sole committer of the working dir (${phase}). Do not run git history-modifying commands here (commit, push, reset, rebase, merge, revert, cherry-pick, tag, am, --amend). If you need to commit in a throwaway test repo, prefix with \`cd /tmp/<path>\` or use \`git -C /tmp/<path>\` — paths outside the working dir are permitted. Propose a commit_message in your structured output instead.`,
     );
   };
 }
@@ -104,7 +108,8 @@ function readStringField(toolInput: unknown, key: string): string | null {
 
 export function buildGuardHooks(args: {
   phase: PhaseName;
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   taskSlug: string;
 }): Partial<Record<"PreToolUse", HookCallbackMatcher[]>> {
   if (args.phase === "validator") {
@@ -112,7 +117,7 @@ export function buildGuardHooks(args: {
       PreToolUse: [
         {
           matcher: WRITE_TOOLS_MATCHER,
-          hooks: [validatorReadOnly(args.cwd)],
+          hooks: [validatorReadOnly(args.phaseCwd)],
         },
       ],
     };
@@ -122,9 +127,11 @@ export function buildGuardHooks(args: {
       PreToolUse: [
         {
           matcher: WRITE_TOOLS_MATCHER,
-          hooks: [developerPlanWriter(args.cwd, args.taskSlug)],
+          hooks: [
+            developerPlanWriter(args.primaryCwd, args.phaseCwd, args.taskSlug),
+          ],
         },
-        { matcher: "Bash", hooks: [developerGitCommitter(args.cwd)] },
+        { matcher: "Bash", hooks: [developerGitCommitter(args.phaseCwd)] },
       ],
     };
   }

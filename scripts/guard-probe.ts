@@ -192,7 +192,8 @@ const cases: TestCase[] = [
 async function runCase(c: TestCase): Promise<{ pass: boolean; msg: string }> {
   const hooks = buildGuardHooks({
     phase: c.phase,
-    cwd: CWD,
+    primaryCwd: CWD,
+    phaseCwd: CWD,
     taskSlug: TASK,
   });
   const matchers = hooks.PreToolUse ?? [];

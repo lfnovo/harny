@@ -4,7 +4,8 @@ import type { ResolvedPhaseConfig } from "../types.js";
 
 export async function runPlanner(args: {
   phaseConfig: ResolvedPhaseConfig;
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   taskSlug: string;
   userPrompt: string;
   verbose?: boolean;
@@ -17,7 +18,8 @@ Produce the implementation plan as described in your instructions.`;
   const result = await runPhase({
     phase: "planner",
     phaseConfig: args.phaseConfig,
-    cwd: args.cwd,
+    primaryCwd: args.primaryCwd,
+    phaseCwd: args.phaseCwd,
     taskSlug: args.taskSlug,
     harnessTaskId: null,
     prompt,

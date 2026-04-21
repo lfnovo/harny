@@ -1,18 +1,27 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Plan, PlanTask, PlanTaskHistoryEntry } from "./types.js";
+import type {
+  IsolationMode,
+  Plan,
+  PlanTask,
+  PlanTaskHistoryEntry,
+} from "./types.js";
 import type { PlannerVerdict } from "./verdict.js";
 
-export function planDir(cwd: string, taskSlug: string): string {
-  return join(cwd, ".harness", taskSlug);
+export function planDir(primaryCwd: string, taskSlug: string): string {
+  return join(primaryCwd, ".harness", taskSlug);
 }
 
-export function planFilePath(cwd: string, taskSlug: string): string {
-  return join(planDir(cwd, taskSlug), "plan.json");
+export function planFilePath(primaryCwd: string, taskSlug: string): string {
+  return join(planDir(primaryCwd, taskSlug), "plan.json");
 }
 
-export function sessionsDir(cwd: string, taskSlug: string): string {
-  return join(planDir(cwd, taskSlug), "sessions");
+export function sessionsDir(primaryCwd: string, taskSlug: string): string {
+  return join(planDir(primaryCwd, taskSlug), "sessions");
+}
+
+export function worktreePathFor(primaryCwd: string, taskSlug: string): string {
+  return join(primaryCwd, ".harness", "worktrees", taskSlug);
 }
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
@@ -36,7 +45,9 @@ export function createPlanSkeleton(args: {
   taskSlug: string;
   userPrompt: string;
   branch: string;
-  cwd: string;
+  primaryCwd: string;
+  isolation: IsolationMode;
+  worktreePath: string | null;
 }): Plan {
   const now = new Date().toISOString();
   return {
@@ -44,7 +55,9 @@ export function createPlanSkeleton(args: {
     task_slug: args.taskSlug,
     user_prompt: args.userPrompt,
     branch: args.branch,
-    cwd: args.cwd,
+    primary_cwd: args.primaryCwd,
+    isolation: args.isolation,
+    worktree_path: args.worktreePath,
     created_at: now,
     updated_at: now,
     status: "planning",

@@ -3,6 +3,7 @@ import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
 import { join, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runHarness } from "./harness/orchestrator.js";
+import type { IsolationMode } from "./harness/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = join(__dirname, "..");
@@ -38,17 +39,26 @@ async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
   await rename(tmp, path);
 }
 
+function parseIsolation(value: string): IsolationMode {
+  if (value === "worktree" || value === "inline") return value;
+  throw new Error(
+    `--isolation must be one of: worktree, inline (got "${value}")`,
+  );
+}
+
 function parseArgs(argv: string[]): {
   verbose: boolean;
   assistant: string | null;
   harness: boolean;
   task: string | null;
+  isolation: IsolationMode | null;
   prompt: string;
 } {
   let verbose = false;
   let assistant: string | null = null;
   let harness = false;
   let task: string | null = null;
+  let isolation: IsolationMode | null = null;
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -71,12 +81,26 @@ function parseArgs(argv: string[]): {
       i++;
     } else if (a.startsWith("--task=")) {
       task = a.slice("--task=".length);
+    } else if (a === "--isolation") {
+      const next = argv[i + 1];
+      if (!next) throw new Error("--isolation requires a value (worktree|inline)");
+      isolation = parseIsolation(next);
+      i++;
+    } else if (a.startsWith("--isolation=")) {
+      isolation = parseIsolation(a.slice("--isolation=".length));
     } else {
       rest.push(a);
     }
   }
 
-  return { verbose, assistant, harness, task, prompt: rest.join(" ").trim() };
+  return {
+    verbose,
+    assistant,
+    harness,
+    task,
+    isolation,
+    prompt: rest.join(" ").trim(),
+  };
 }
 
 async function loadAssistant(name: string): Promise<Assistant> {
@@ -140,6 +164,7 @@ async function main() {
     assistant: assistantName,
     harness,
     task,
+    isolation,
     prompt: promptArg,
   } = parseArgs(process.argv.slice(2));
 
@@ -155,6 +180,7 @@ async function main() {
       cwd: assistant.cwd,
       userPrompt: promptArg,
       taskSlug: task ?? undefined,
+      isolation: isolation ?? undefined,
       verbose,
     });
     console.log(

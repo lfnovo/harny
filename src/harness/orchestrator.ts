@@ -1,5 +1,3 @@
-import { writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { loadHarnessConfig } from "./config.js";
 import {
   applyPlannerVerdict,
@@ -9,43 +7,38 @@ import {
   markTaskDone,
   markTaskFailed,
   markTaskInProgress,
-  planDir,
   planFilePath,
   savePlan,
+  worktreePathFor,
 } from "./plan.js";
 import {
+  addWorktree,
   assertBranchAbsent,
   assertCleanTree,
   assertIsGitRepo,
+  assertWorktreePathAbsent,
   cleanUntracked,
   commitComposed,
   createBranch,
   headSha,
+  removeWorktree,
   resetHard,
 } from "./git.js";
 import { appendAudit } from "./audit.js";
 import { runPlanner } from "./phases/planner.js";
 import { runDeveloper } from "./phases/developer.js";
 import { runValidator } from "./phases/validator.js";
-import type { PlanTask, ResolvedHarnessConfig } from "./types.js";
+import type {
+  IsolationMode,
+  PlanTask,
+  ResolvedHarnessConfig,
+} from "./types.js";
 import type { DeveloperVerdict, ValidatorVerdict } from "./verdict.js";
 
 function defaultTaskSlug(): string {
   const now = new Date();
   const iso = now.toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
   return `run-${iso}`;
-}
-
-async function ensureHarnessGitignore(cwd: string, taskSlug: string) {
-  const dir = planDir(cwd, taskSlug);
-  await mkdir(dir, { recursive: true });
-  // Ignore everything inside the task dir except plan.json — sessions/ and
-  // audit.jsonl are noise for PRs.
-  await writeFile(
-    join(dir, ".gitignore"),
-    "sessions/\naudit.jsonl\n",
-    "utf8",
-  );
 }
 
 function composeCommitMessage(
@@ -65,7 +58,8 @@ type IterationOutcome =
   | { kind: "failed"; reason: string };
 
 async function decideAfterValidator(args: {
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   taskSlug: string;
   task: PlanTask;
   devVerdict: DeveloperVerdict;
@@ -73,8 +67,16 @@ async function decideAfterValidator(args: {
   valVerdict: ValidatorVerdict;
   config: ResolvedHarnessConfig;
 }): Promise<IterationOutcome> {
-  const { cwd, taskSlug, task, devVerdict, devSessionId, valVerdict, config } =
-    args;
+  const {
+    primaryCwd,
+    phaseCwd,
+    taskSlug,
+    task,
+    devVerdict,
+    devSessionId,
+    valVerdict,
+    config,
+  } = args;
 
   if (valVerdict.verdict === "pass") {
     const message = composeCommitMessage(
@@ -82,11 +84,9 @@ async function decideAfterValidator(args: {
       devVerdict.commit_message,
       valVerdict,
     );
-    const sha = await commitComposed(cwd, message);
+    const sha = await commitComposed(phaseCwd, message);
     if (!sha) {
-      // Nothing to commit — the dev didn't touch tracked state. Treat as
-      // pass anyway; the harness recorded the decision.
-      await appendAudit(cwd, taskSlug, {
+      await appendAudit(primaryCwd, taskSlug, {
         phase: "harness",
         event: "decision",
         task_id: task.id,
@@ -96,7 +96,7 @@ async function decideAfterValidator(args: {
       });
       return { kind: "commit", commitSha: "" };
     }
-    await appendAudit(cwd, taskSlug, {
+    await appendAudit(primaryCwd, taskSlug, {
       phase: "harness",
       event: "commit_executed",
       task_id: task.id,
@@ -133,33 +133,75 @@ export async function runHarness(args: {
   cwd: string;
   userPrompt: string;
   taskSlug?: string;
+  isolation?: IsolationMode;
   verbose?: boolean;
 }): Promise<{ status: "done" | "failed" | "exhausted"; planPath: string }> {
-  const cwd = args.cwd;
+  const primaryCwd = args.cwd;
   const taskSlug = args.taskSlug?.trim() || defaultTaskSlug();
   const branch = `harness/${taskSlug}`;
 
-  console.log(`[harness] cwd=${cwd}`);
+  const config = await loadHarnessConfig(primaryCwd);
+  const isolation = args.isolation ?? config.isolation;
+
+  console.log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
   console.log(`[harness] task=${taskSlug} branch=${branch}`);
 
-  await assertIsGitRepo(cwd);
-  await assertCleanTree(cwd);
-  await assertBranchAbsent(cwd, branch);
+  await assertIsGitRepo(primaryCwd);
+  await assertBranchAbsent(primaryCwd, branch);
 
-  const config = await loadHarnessConfig(cwd);
+  let phaseCwd: string;
+  let worktreePath: string | null = null;
+
+  if (isolation === "inline") {
+    // Inline: primary must be clean; create + checkout branch on primary;
+    // phases run in primary.
+    await assertCleanTree(primaryCwd);
+    await createBranch(primaryCwd, branch);
+    phaseCwd = primaryCwd;
+  } else {
+    // Worktree: primary stays where it was. Create branch + checkout in a
+    // dedicated worktree dir. Primary's cleanliness is irrelevant because
+    // the `.harness/<slug>/` state we write is gitignored by the tracked
+    // `.harness/.gitignore`.
+    worktreePath = worktreePathFor(primaryCwd, taskSlug);
+    await assertWorktreePathAbsent(worktreePath);
+    await addWorktree(primaryCwd, worktreePath, branch);
+    phaseCwd = worktreePath;
+    console.log(`[harness] worktree=${worktreePath}`);
+  }
+
   console.log(
     `[harness] caps: per-task=${config.maxIterationsPerTask} retries-before-reset=${config.maxRetriesBeforeReset} global=${config.maxIterationsGlobal}`,
   );
 
-  await createBranch(cwd, branch);
-  await ensureHarnessGitignore(cwd, taskSlug);
+  const cleanupWorktree = async (
+    outcome: "done" | "failed" | "exhausted" | "blocked_fatal",
+  ): Promise<void> => {
+    if (isolation !== "worktree" || !worktreePath) return;
+    if (outcome === "done") {
+      try {
+        await removeWorktree(primaryCwd, worktreePath, { force: true });
+        console.log(`[harness] worktree removed: ${worktreePath}`);
+      } catch (err) {
+        console.warn(
+          `[harness] worktree cleanup failed: ${(err as Error).message}`,
+        );
+      }
+    } else {
+      console.log(
+        `[harness] worktree preserved for debug: ${worktreePath} (branch: ${branch})`,
+      );
+    }
+  };
 
-  const planPath = planFilePath(cwd, taskSlug);
+  const planPath = planFilePath(primaryCwd, taskSlug);
   const plan = createPlanSkeleton({
     taskSlug,
     userPrompt: args.userPrompt,
     branch,
-    cwd,
+    primaryCwd,
+    isolation,
+    worktreePath,
   });
   await savePlan(planPath, plan);
 
@@ -167,25 +209,20 @@ export async function runHarness(args: {
   console.log(`[harness] phase=planner`);
   const plannerResult = await runPlanner({
     phaseConfig: config.planner,
-    cwd,
+    primaryCwd,
+    phaseCwd,
     taskSlug,
     userPrompt: args.userPrompt,
     verbose: args.verbose,
   });
   applyPlannerVerdict(plan, plannerResult.verdict, plannerResult.sessionId);
   await savePlan(planPath, plan);
-  await appendAudit(cwd, taskSlug, {
+  await appendAudit(primaryCwd, taskSlug, {
     phase: "planner",
     event: "completed",
     session_id: plannerResult.sessionId,
     task_count: plan.tasks.length,
   });
-
-  const planCommitMessage = `chore(harness): plan ${taskSlug}\n\n${plan.summary}`;
-  const planCommit = await commitComposed(cwd, planCommitMessage);
-  if (planCommit) {
-    console.log(`[harness] planner commit=${planCommit.slice(0, 8)}`);
-  }
 
   // --- Dev/validator loop --------------------------------------------------
   let pendingResume: { sessionId: string; validator: ValidatorVerdict } | null =
@@ -196,6 +233,7 @@ export async function runHarness(args: {
       plan.status = "done";
       await savePlan(planPath, plan);
       console.log(`[harness] all tasks done.`);
+      await cleanupWorktree("done");
       return { status: "done", planPath };
     }
 
@@ -203,6 +241,7 @@ export async function runHarness(args: {
       plan.status = "exhausted";
       await savePlan(planPath, plan);
       console.log(`[harness] global iteration cap reached.`);
+      await cleanupWorktree("exhausted");
       return { status: "exhausted", planPath };
     }
 
@@ -211,14 +250,13 @@ export async function runHarness(args: {
       plan.status = "failed";
       await savePlan(planPath, plan);
       console.log(`[harness] no pending tasks but plan not complete (failed).`);
+      await cleanupWorktree("failed");
       return { status: "failed", planPath };
     }
 
-    // If the retry is stale (different task), drop it.
     if (pendingResume && task.history.length === 0) pendingResume = null;
 
-    // Capture the branch head BEFORE the dev runs so reset can rewind tree.
-    const prePhaseSha = await headSha(cwd);
+    const prePhaseSha = await headSha(phaseCwd);
 
     plan.iterations_global += 1;
     markTaskInProgress(task);
@@ -232,7 +270,8 @@ export async function runHarness(args: {
 
     const devResult = await runDeveloper({
       phaseConfig: config.developer,
-      cwd,
+      primaryCwd,
+      phaseCwd,
       taskSlug,
       plan,
       task,
@@ -259,7 +298,7 @@ export async function runHarness(args: {
         : {}),
     });
     await savePlan(planPath, plan);
-    await appendAudit(cwd, taskSlug, {
+    await appendAudit(primaryCwd, taskSlug, {
       phase: "developer",
       event: "completed",
       session_id: devResult.sessionId,
@@ -277,13 +316,11 @@ export async function runHarness(args: {
 
     pendingResume = null;
 
-    // Blocked is fatal: it means the harness itself (prompt/tooling) is
-    // broken, or the plan is infeasible. Human triage required.
     if (devResult.verdict.status === "blocked") {
       markTaskFailed(task);
       plan.status = "failed";
       await savePlan(planPath, plan);
-      await appendAudit(cwd, taskSlug, {
+      await appendAudit(primaryCwd, taskSlug, {
         phase: "harness",
         event: "decision",
         task_id: task.id,
@@ -291,12 +328,12 @@ export async function runHarness(args: {
         action: "blocked_fatal",
         rationale: `developer reported blocked: ${devResult.verdict.blocked_reason}`,
       });
-      // Reset the tree so the branch only shows committed work.
-      await resetHard(cwd, prePhaseSha);
-      await cleanUntracked(cwd);
+      await resetHard(phaseCwd, prePhaseSha);
+      await cleanUntracked(phaseCwd);
       console.log(
         `[harness] developer reported blocked — plan marked failed. Reason: ${devResult.verdict.blocked_reason}`,
       );
+      await cleanupWorktree("blocked_fatal");
       return { status: "failed", planPath };
     }
 
@@ -304,7 +341,8 @@ export async function runHarness(args: {
     console.log(`[harness] phase=validator task=${task.id}`);
     const valResult = await runValidator({
       phaseConfig: config.validator,
-      cwd,
+      primaryCwd,
+      phaseCwd,
       taskSlug,
       plan,
       task,
@@ -324,7 +362,7 @@ export async function runHarness(args: {
         : {}),
     });
     await savePlan(planPath, plan);
-    await appendAudit(cwd, taskSlug, {
+    await appendAudit(primaryCwd, taskSlug, {
       phase: "validator",
       event: "completed",
       session_id: valResult.sessionId,
@@ -339,7 +377,8 @@ export async function runHarness(args: {
     });
 
     const outcome = await decideAfterValidator({
-      cwd,
+      primaryCwd,
+      phaseCwd,
       taskSlug,
       task,
       devVerdict: devResult.verdict,
@@ -356,7 +395,7 @@ export async function runHarness(args: {
         `[harness] task ${task.id} committed sha=${outcome.commitSha.slice(0, 8) || "(empty)"}`,
       );
     } else if (outcome.kind === "retry") {
-      await appendAudit(cwd, taskSlug, {
+      await appendAudit(primaryCwd, taskSlug, {
         phase: "harness",
         event: "decision",
         task_id: task.id,
@@ -370,11 +409,11 @@ export async function runHarness(args: {
       };
       console.log(`[harness] task ${task.id} will retry (resume dev session)`);
     } else if (outcome.kind === "reset") {
-      const before = await headSha(cwd);
-      await resetHard(cwd, prePhaseSha);
-      await cleanUntracked(cwd);
-      const after = await headSha(cwd);
-      await appendAudit(cwd, taskSlug, {
+      const before = await headSha(phaseCwd);
+      await resetHard(phaseCwd, prePhaseSha);
+      await cleanUntracked(phaseCwd);
+      const after = await headSha(phaseCwd);
+      await appendAudit(primaryCwd, taskSlug, {
         phase: "harness",
         event: "decision",
         task_id: task.id,
@@ -385,7 +424,7 @@ export async function runHarness(args: {
             ? "validator recommended reset"
             : `maxRetriesBeforeReset=${config.maxRetriesBeforeReset} reached`,
       });
-      await appendAudit(cwd, taskSlug, {
+      await appendAudit(primaryCwd, taskSlug, {
         phase: "harness",
         event: "reset_executed",
         task_id: task.id,
@@ -393,14 +432,15 @@ export async function runHarness(args: {
         head_before: before,
         head_after: after,
       });
-      console.log(`[harness] task ${task.id} tree reset to ${after.slice(0, 8)}`);
+      console.log(
+        `[harness] task ${task.id} tree reset to ${after.slice(0, 8)}`,
+      );
     } else {
-      // failed
       markTaskFailed(task);
-      await resetHard(cwd, prePhaseSha);
-      await cleanUntracked(cwd);
+      await resetHard(phaseCwd, prePhaseSha);
+      await cleanUntracked(phaseCwd);
       await savePlan(planPath, plan);
-      await appendAudit(cwd, taskSlug, {
+      await appendAudit(primaryCwd, taskSlug, {
         phase: "harness",
         event: "decision",
         task_id: task.id,
@@ -411,6 +451,8 @@ export async function runHarness(args: {
       console.log(
         `[harness] task ${task.id} failed (${outcome.reason}); tree reset`,
       );
+      await cleanupWorktree("failed");
+      return { status: "failed", planPath };
     }
   }
 }

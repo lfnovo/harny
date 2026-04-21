@@ -2,6 +2,8 @@ import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 
 export type PhaseName = "planner" | "developer" | "validator";
 
+export type IsolationMode = "worktree" | "inline";
+
 export type PhaseConfig = {
   prompt?: string;
   allowedTools?: string[];
@@ -25,6 +27,7 @@ export type HarnessConfigFile = {
   maxIterationsPerTask?: number;
   maxIterationsGlobal?: number;
   maxRetriesBeforeReset?: number;
+  isolation?: IsolationMode;
 };
 
 export type ResolvedPhaseConfig = Required<
@@ -41,6 +44,7 @@ export type ResolvedHarnessConfig = {
   maxIterationsPerTask: number;
   maxIterationsGlobal: number;
   maxRetriesBeforeReset: number;
+  isolation: IsolationMode;
 };
 
 export type TaskStatus = "pending" | "in_progress" | "done" | "failed";
@@ -88,7 +92,9 @@ export type Plan = {
   task_slug: string;
   user_prompt: string;
   branch: string;
-  cwd: string;
+  primary_cwd: string;
+  isolation: IsolationMode;
+  worktree_path: string | null;
   created_at: string;
   updated_at: string;
   status: PlanRunStatus;

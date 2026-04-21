@@ -45,8 +45,8 @@ export const PersistedProblemSchema = ProblemSchema.extend({
 
 export type PersistedProblem = z.infer<typeof PersistedProblemSchema>;
 
-export function problemsDir(cwd: string, taskSlug: string): string {
-  return resolve(cwd, ".harness", taskSlug, "problems");
+export function problemsDir(primaryCwd: string, taskSlug: string): string {
+  return resolve(primaryCwd, ".harness", taskSlug, "problems");
 }
 
 function generateId(): string {
@@ -56,7 +56,7 @@ function generateId(): string {
 }
 
 export async function writeProblems(args: {
-  cwd: string;
+  primaryCwd: string;
   taskSlug: string;
   phase: string;
   sessionId: string;
@@ -64,7 +64,7 @@ export async function writeProblems(args: {
   problems: Problem[];
 }): Promise<string[]> {
   if (args.problems.length === 0) return [];
-  const dir = problemsDir(args.cwd, args.taskSlug);
+  const dir = problemsDir(args.primaryCwd, args.taskSlug);
   await mkdir(dir, { recursive: true });
   const now = new Date().toISOString();
   const written: string[] = [];

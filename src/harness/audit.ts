@@ -58,17 +58,17 @@ export type AuditEntry =
       message: string;
     };
 
-export function auditPath(cwd: string, taskSlug: string): string {
-  return join(planDir(cwd, taskSlug), "audit.jsonl");
+export function auditPath(primaryCwd: string, taskSlug: string): string {
+  return join(planDir(primaryCwd, taskSlug), "audit.jsonl");
 }
 
 export async function appendAudit(
-  cwd: string,
+  primaryCwd: string,
   taskSlug: string,
   entry: AuditEntry,
 ): Promise<void> {
-  const path = auditPath(cwd, taskSlug);
-  await mkdir(planDir(cwd, taskSlug), { recursive: true });
+  const path = auditPath(primaryCwd, taskSlug);
+  await mkdir(planDir(primaryCwd, taskSlug), { recursive: true });
   const line =
     JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n";
   await appendFile(path, line, "utf8");

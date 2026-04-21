@@ -1,4 +1,5 @@
 {
+  "isolation": "worktree",
   "maxIterationsPerTask": 3,
   "maxIterationsGlobal": 30,
   "maxRetriesBeforeReset": 1,

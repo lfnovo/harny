@@ -81,7 +81,8 @@ function buildFreshPrompt(plan: Plan, task: PlanTask): string {
 
 export async function runDeveloper(args: {
   phaseConfig: ResolvedPhaseConfig;
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   taskSlug: string;
   plan: Plan;
   task: PlanTask;
@@ -98,7 +99,8 @@ export async function runDeveloper(args: {
   const result = await runPhase({
     phase: "developer",
     phaseConfig: args.phaseConfig,
-    cwd: args.cwd,
+    primaryCwd: args.primaryCwd,
+    phaseCwd: args.phaseCwd,
     taskSlug: args.taskSlug,
     harnessTaskId: args.task.id,
     prompt,
@@ -121,7 +123,7 @@ export async function runDeveloper(args: {
   }
   if (verdict.problems && verdict.problems.length > 0) {
     await writeProblems({
-      cwd: args.cwd,
+      primaryCwd: args.primaryCwd,
       taskSlug: args.taskSlug,
       phase: "developer",
       sessionId: result.sessionId,

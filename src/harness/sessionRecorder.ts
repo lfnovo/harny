@@ -49,7 +49,8 @@ type SessionRecord = {
   task_slug: string;
   harness_task_id: string | null;
   session_id: string | null;
-  cwd: string;
+  primary_cwd: string;
+  phase_cwd: string;
   prompt: string;
   started_at: string;
   ended_at: string | null;
@@ -76,7 +77,8 @@ function sleep(ms: number): Promise<void> {
 export async function runPhase<T>(args: {
   phase: PhaseName;
   phaseConfig: ResolvedPhaseConfig;
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   additionalDirectories?: string[];
   taskSlug: string;
   harnessTaskId: string | null;
@@ -109,7 +111,8 @@ export async function runPhase<T>(args: {
 async function runPhaseAttempt<T>(args: {
   phase: PhaseName;
   phaseConfig: ResolvedPhaseConfig;
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   additionalDirectories?: string[];
   taskSlug: string;
   harnessTaskId: string | null;
@@ -121,7 +124,8 @@ async function runPhaseAttempt<T>(args: {
   const {
     phase,
     phaseConfig,
-    cwd,
+    primaryCwd,
+    phaseCwd,
     additionalDirectories = [],
     taskSlug,
     harnessTaskId,
@@ -131,7 +135,7 @@ async function runPhaseAttempt<T>(args: {
     verbose,
   } = args;
 
-  const dir = sessionsDir(cwd, taskSlug);
+  const dir = sessionsDir(primaryCwd, taskSlug);
   await mkdir(dir, { recursive: true });
   const ordinal = await nextOrdinalPrefix(dir);
 
@@ -141,7 +145,8 @@ async function runPhaseAttempt<T>(args: {
     task_slug: taskSlug,
     harness_task_id: harnessTaskId,
     session_id: null,
-    cwd,
+    primary_cwd: primaryCwd,
+    phase_cwd: phaseCwd,
     prompt,
     started_at: new Date().toISOString(),
     ended_at: null,
@@ -159,13 +164,18 @@ async function runPhaseAttempt<T>(args: {
   if (resumeSessionId)
     console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
 
-  const guardHooks = buildGuardHooks({ phase, cwd, taskSlug });
+  const guardHooks = buildGuardHooks({
+    phase,
+    primaryCwd,
+    phaseCwd,
+    taskSlug,
+  });
 
   try {
     for await (const message of query({
       prompt,
       options: {
-        cwd,
+        cwd: phaseCwd,
         ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
         allowedTools: phaseConfig.allowedTools,
         permissionMode: phaseConfig.permissionMode,

@@ -14,7 +14,8 @@ function describeTaskForValidation(task: PlanTask): string {
 
 export async function runValidator(args: {
   phaseConfig: ResolvedPhaseConfig;
-  cwd: string;
+  primaryCwd: string;
+  phaseCwd: string;
   taskSlug: string;
   plan: Plan;
   task: PlanTask;
@@ -34,7 +35,8 @@ export async function runValidator(args: {
   const result = await runPhase({
     phase: "validator",
     phaseConfig: args.phaseConfig,
-    cwd: args.cwd,
+    primaryCwd: args.primaryCwd,
+    phaseCwd: args.phaseCwd,
     taskSlug: args.taskSlug,
     harnessTaskId: args.task.id,
     prompt,
@@ -53,7 +55,7 @@ export async function runValidator(args: {
   }
   if (verdict.problems && verdict.problems.length > 0) {
     await writeProblems({
-      cwd: args.cwd,
+      primaryCwd: args.primaryCwd,
       taskSlug: args.taskSlug,
       phase: "validator",
       sessionId: result.sessionId,

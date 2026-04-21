@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { stat } from "node:fs/promises";
 
 function runGit(
   cwd: string,
@@ -101,4 +102,48 @@ export async function commitComposed(
   if (stdout.trim().length === 0) return null;
   await git(cwd, ["commit", "-m", message]);
   return (await git(cwd, ["rev-parse", "HEAD"])).trim();
+}
+
+export async function assertWorktreePathAbsent(
+  worktreePath: string,
+): Promise<void> {
+  try {
+    await stat(worktreePath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw err;
+  }
+  throw new Error(
+    `Worktree path already exists: ${worktreePath}. Clean it up or pick a different task slug.`,
+  );
+}
+
+export async function addWorktree(
+  primaryCwd: string,
+  worktreePath: string,
+  branch: string,
+): Promise<void> {
+  await git(primaryCwd, ["worktree", "add", "-b", branch, worktreePath]);
+}
+
+export async function removeWorktree(
+  primaryCwd: string,
+  worktreePath: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
+  const args = ["worktree", "remove"];
+  if (opts.force) args.push("--force");
+  args.push(worktreePath);
+  try {
+    await git(primaryCwd, args);
+  } catch (err) {
+    const msg = (err as Error).message ?? "";
+    if (
+      msg.includes("is not a working tree") ||
+      msg.includes("No such file or directory")
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
