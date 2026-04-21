@@ -1,19 +1,102 @@
 import { z } from "zod";
 import { defineWorkflow } from "../workflow.js";
-import { TriageVerdictSchema } from "../verdict.js";
-import {
-  createTriagePlanTask,
-  applyTriageVerdict,
-  markTaskInProgress,
-} from "../plan.js";
+import { ProblemSchema } from "../problem.js";
+import { markTaskInProgress } from "../plan.js";
+import type {
+  Plan,
+  PlanTask,
+  ResolvedPhaseConfig,
+} from "../types.js";
 
-const TRIAGE_TOOLS = ["Bash", "Read", "WebFetch", "Grep", "Glob"];
+// --- Verdict schema ---------------------------------------------------------
+
+const PROBLEMS_FIELD_DESCRIPTION =
+  "OPTIONAL. Problems encountered during this attempt that would benefit FUTURE runs of the harness if fixed at the project level. Categories: environment, design, understanding, tooling. Severity: low/medium/high. Omit if nothing noteworthy.";
+
+export const TriageVerdictSchema = z
+  .object({
+    task_id: z.string(),
+    action: z.enum(["comment", "label", "close", "assign", "none"]),
+    target_url: z.string(),
+    payload: z.object({
+      body: z.string().optional(),
+      labels: z.array(z.string()).optional(),
+      assignees: z.array(z.string()).optional(),
+    }),
+    reasoning: z.string(),
+    problems: z.array(ProblemSchema).optional().describe(PROBLEMS_FIELD_DESCRIPTION),
+  })
+  .strict();
+
+export type TriageVerdict = z.infer<typeof TriageVerdictSchema>;
+
+// --- Plan helpers (issue-triage specific) -----------------------------------
+
+function createTriagePlanTask(url: string): PlanTask {
+  return {
+    id: "triage-1",
+    title: "Triage issue",
+    description: `Triage GitHub issue: ${url}`,
+    acceptance: [
+      "Decide an action (comment, label, close, assign, or none) for the issue based on its content.",
+    ],
+    status: "pending",
+    attempts: 0,
+    commit_sha: null,
+    history: [],
+  };
+}
+
+function applyTriageVerdict(
+  plan: Plan,
+  task: PlanTask,
+  verdict: TriageVerdict,
+  sessionId: string,
+): void {
+  task.output = {
+    action: verdict.action,
+    target_url: verdict.target_url,
+    payload: verdict.payload,
+    reasoning: verdict.reasoning,
+    ...(verdict.problems ? { problems: verdict.problems } : {}),
+  };
+  task.history.push({
+    role: "triage",
+    session_id: sessionId,
+    at: new Date().toISOString(),
+    action: verdict.action,
+    reasoning: verdict.reasoning,
+  });
+  task.status = "done";
+  plan.status = "done";
+}
+
+// --- Default phase config ---------------------------------------------------
+
+const TRIAGE_PROMPT = `You are an issue-triage agent in the harness. Your job is to read a GitHub issue and recommend a single appropriate action — you DO NOT execute the action.
+
+Tools available: Bash (for \`gh\`), Read, WebFetch, Grep, Glob. You cannot Edit or Write — this is a read-only decision phase.
+
+Report your verdict as structured data: action (comment | label | close | assign | none), target_url, payload (action-specific), and reasoning.`;
+
+export const DEFAULT_TRIAGE: ResolvedPhaseConfig = {
+  prompt: TRIAGE_PROMPT,
+  allowedTools: ["Bash", "Read", "WebFetch", "Grep", "Glob"],
+  permissionMode: "bypassPermissions",
+  maxTurns: 50,
+  effort: "high",
+  model: "sonnet",
+  mcpServers: {},
+};
+
+// --- Workflow ---------------------------------------------------------------
 
 export const issueTriage = defineWorkflow({
   id: "issue-triage",
   needsBranch: false,
   needsWorktree: false,
   inputSchema: z.object({ url: z.string() }),
+  phaseDefaults: { triage: DEFAULT_TRIAGE },
   run: async (ctx) => {
     const { url } = ctx.input as { url: string };
 
@@ -34,7 +117,7 @@ export const issueTriage = defineWorkflow({
       prompt,
       outputSchema: TriageVerdictSchema,
       harnessTaskId: task.id,
-      allowedTools: TRIAGE_TOOLS,
+      guards: { noGitHistory: true },
     });
 
     if (result.status === "error" || !result.structuredOutput) {

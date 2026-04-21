@@ -1,26 +1,32 @@
-import { defineWorkflow, type WorkflowContext } from "../workflow.js";
-import { runPlanner } from "../phases/planner.js";
-import { runDeveloper } from "../phases/developer.js";
-import { runValidator } from "../phases/validator.js";
+import { defineWorkflow, type WorkflowContext } from "../../workflow.js";
+import { runPlanner } from "./phases/planner.js";
+import { runDeveloper } from "./phases/developer.js";
+import { runValidator } from "./phases/validator.js";
 import {
-  applyPlannerVerdict,
   findNextPendingTask,
   isPlanComplete,
   markTaskDone,
   markTaskFailed,
   markTaskInProgress,
-} from "../plan.js";
-import type { PlanTask } from "../types.js";
-import type { DeveloperVerdict, ValidatorVerdict } from "../verdict.js";
+} from "../../plan.js";
+import { applyPlannerVerdict } from "./plan.js";
+import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from "./defaults.js";
+import type { PlanTask } from "../../types.js";
+import type { DeveloperVerdict, ValidatorVerdict } from "./verdicts.js";
 
 export const featureDev = defineWorkflow({
   id: "feature-dev",
   needsBranch: true,
   needsWorktree: true,
+  phaseDefaults: {
+    planner: DEFAULT_PLANNER,
+    developer: DEFAULT_DEVELOPER,
+    validator: DEFAULT_VALIDATOR,
+  },
   run: async (ctx) => {
     ctx.log(`[harness] phase=planner`);
     const plannerResult = await runPlanner({
-      phaseConfig: ctx.config.planner,
+      phaseConfig: ctx.config.phases.planner!,
       primaryCwd: ctx.primaryCwd,
       phaseCwd: ctx.phaseCwd,
       taskSlug: ctx.taskSlug,
@@ -126,7 +132,7 @@ async function runDevLoop(
     );
 
     const devResult = await runDeveloper({
-      phaseConfig: ctx.config.developer,
+      phaseConfig: ctx.config.phases.developer!,
       primaryCwd: ctx.primaryCwd,
       phaseCwd: ctx.phaseCwd,
       taskSlug: ctx.taskSlug,
@@ -179,7 +185,7 @@ async function runDevLoop(
 
     ctx.log(`[harness] phase=validator task=${task.id}`);
     const valResult = await runValidator({
-      phaseConfig: ctx.config.validator,
+      phaseConfig: ctx.config.phases.validator!,
       primaryCwd: ctx.primaryCwd,
       phaseCwd: ctx.phaseCwd,
       taskSlug: ctx.taskSlug,

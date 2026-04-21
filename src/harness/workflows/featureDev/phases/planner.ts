@@ -1,6 +1,6 @@
-import { runPhase } from "../sessionRecorder.js";
-import { PlannerVerdictSchema, type PlannerVerdict } from "../verdict.js";
-import type { LogMode, ResolvedPhaseConfig } from "../types.js";
+import { runPhase } from "../../../sessionRecorder.js";
+import { PlannerVerdictSchema, type PlannerVerdict } from "../verdicts.js";
+import type { LogMode, ResolvedPhaseConfig } from "../../../types.js";
 
 export async function runPlanner(args: {
   phaseConfig: ResolvedPhaseConfig;
@@ -25,6 +25,7 @@ Produce the implementation plan as described in your instructions.`;
     prompt,
     outputSchema: PlannerVerdictSchema,
     logMode: args.logMode,
+    guards: { readOnly: true },
   });
 
   if (result.status !== "completed" || !result.structuredOutput) {

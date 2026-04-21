@@ -1,8 +1,11 @@
-import { buildGuardHooks } from "../src/harness/guardHooks.js";
+import { buildGuardHooks, type PhaseGuards } from "../src/harness/guardHooks.js";
 import type {
   HookCallback,
   PreToolUseHookInput,
 } from "@anthropic-ai/claude-agent-sdk";
+
+const DEVELOPER_GUARDS: PhaseGuards = { noPlanWrites: true, noGitHistory: true };
+const VALIDATOR_GUARDS: PhaseGuards = { readOnly: true };
 
 type TestCase = {
   name: string;
@@ -190,8 +193,9 @@ const cases: TestCase[] = [
 ];
 
 async function runCase(c: TestCase): Promise<{ pass: boolean; msg: string }> {
+  const guards = c.phase === "validator" ? VALIDATOR_GUARDS : DEVELOPER_GUARDS;
   const hooks = buildGuardHooks({
-    phase: c.phase,
+    guards,
     primaryCwd: CWD,
     phaseCwd: CWD,
     taskSlug: TASK,

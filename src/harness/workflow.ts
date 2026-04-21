@@ -1,7 +1,13 @@
 import { z } from "zod";
 import type { Plan } from "./types.js";
 import type { AuditEntry } from "./audit.js";
-import type { LogMode, PhaseName, ResolvedHarnessConfig } from "./types.js";
+import type { PhaseGuards } from "./guardHooks.js";
+import type {
+  LogMode,
+  PhaseName,
+  ResolvedHarnessConfig,
+  ResolvedPhaseConfig,
+} from "./types.js";
 
 export type WorkflowPhaseResult<T> = {
   sessionId: string;
@@ -34,6 +40,7 @@ export type WorkflowContext = {
     outputSchema: z.ZodType<T>;
     harnessTaskId?: string | null;
     allowedTools?: string[];
+    guards?: PhaseGuards;
   }) => Promise<WorkflowPhaseResult<T>>;
 };
 
@@ -42,6 +49,12 @@ export type Workflow<TInput = unknown> = {
   needsBranch: boolean;
   needsWorktree: boolean;
   inputSchema?: z.ZodType<TInput>;
+  /**
+   * Per-phase config defaults this workflow expects. Keys are phase names
+   * (e.g. "planner", "triage"). The orchestrator merges these with any
+   * overrides from the project's harness.json into ctx.config.phases.
+   */
+  phaseDefaults: Record<string, ResolvedPhaseConfig>;
   run: (ctx: WorkflowContext) => Promise<{ status: "done" | "failed" | "exhausted" }>;
 };
 

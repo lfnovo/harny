@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ProblemSchema } from "./problem.js";
+import { ProblemSchema } from "../../problem.js";
 
 const PROBLEMS_FIELD_DESCRIPTION =
   "OPTIONAL. Problems encountered during this attempt that would benefit FUTURE runs of the harness if fixed at the project level (not fixed within this task). Examples: missing CLAUDE.md coverage of a critical area, missing dev dependency, ambiguous acceptance criterion, agent tool you wished you had. Leave empty/omit if nothing noteworthy.";
@@ -68,33 +68,6 @@ export const ValidatorVerdictSchema = z
   })
   .strict();
 
-export const TriageVerdictSchema = z
-  .object({
-    task_id: z.string(),
-    action: z.enum(["comment", "label", "close", "assign", "none"]),
-    target_url: z.string(),
-    payload: z.object({
-      body: z.string().optional(),
-      labels: z.array(z.string()).optional(),
-      assignees: z.array(z.string()).optional(),
-    }),
-    reasoning: z.string(),
-    problems: z
-      .array(ProblemSchema)
-      .optional()
-      .describe(PROBLEMS_FIELD_DESCRIPTION),
-  })
-  .strict();
-
 export type PlannerVerdict = z.infer<typeof PlannerVerdictSchema>;
 export type DeveloperVerdict = z.infer<typeof DeveloperVerdictSchema>;
 export type ValidatorVerdict = z.infer<typeof ValidatorVerdictSchema>;
-export type TriageVerdict = z.infer<typeof TriageVerdictSchema>;
-
-export function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
-  // The claude-code binary silently ignores the schema when the top-level has
-  // a "$schema" key, which Zod emits by default. Strip it.
-  const { $schema, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
-  void $schema;
-  return rest;
-}

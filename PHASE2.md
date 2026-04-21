@@ -12,7 +12,7 @@ Complementa (não substitui): `CLAUDE.md` (invariantes, gotchas, preferências) 
 |---|---|---|
 | 0. Quick wins (guards + problems) | **DONE** | Tier 0 + várias evoluções de infra durante dogfood. Ver "Evoluções pós-Tier-0". |
 | 1a. Isolamento por worktree | **DONE** | Construído off-harness após 5 attempts de dogfood. `765afa7`. |
-| 1b. Workflow abstraction | **DONE** | Self-build via harness, 2 commits, 0 retries. `a5e2445` + `e552e82`. |
+| 1b. Workflow abstraction | **DONE** | Self-build via harness, 2 commits, 0 retries. `a5e2445` + `e552e82`. Boundary cleanup (A1+A2+A3) follow-up landed manually post-review. |
 | 2. Run registry + pause/resume | PENDING | Próximo a puxar. |
 | 3. HITL (perguntas + approvals) | PENDING | |
 | 4. Multi-invocação (HTTP + webhooks + cron) | PENDING | |
@@ -491,6 +491,16 @@ Phase 1 entregou o loop single-workflow (planner → dev → validator) via CLI.
 - ~~**Issue-triage input**~~: **resolvido — `{ url: string }`, agente fetcha via `gh issue view`.**
 - ~~**Output entre fases**~~: **resolvido — context object (`WorkflowContext.updatePlan(mutator)`).**
 - ~~**Loop predicate**~~: **resolvido — closure inline (TS).**
+
+### Resolvidas no Tier 1b cleanup (pós-review A1+A2+A3)
+
+Boundary review identificou 3 categorias de leak entre core e workflows; corrigidas em refactor manual de 13 steps:
+
+- **A1 (closed unions abertos)**: `PhaseName`, `PlanTaskHistoryEntry`, `AuditEntry` agora são open shapes. Workflows declaram seus tipos history/audit localmente.
+- **A2 (workflow-specific movido pro workflow)**: verdict schemas, prompts, defaults, phase wrappers, helpers de plan — tudo que era feature-dev migrado pra `workflows/featureDev/{verdicts,defaults,plan,phases/*}.ts`. Tudo que era issue-triage inlined em `workflows/issueTriage.ts`. `verdict.ts` virou `jsonSchema.ts` (só `toJsonSchema()`).
+- **A3 (capabilities desacopladas)**: `Workflow.phaseDefaults` + `ResolvedHarnessConfig.phases` map. `loadHarnessConfig(cwd, workflow)` workflow-aware. `ctx.runPhase` auto-resolve via `config.phases[phase]`. `Plan.planner_session_id` → `Plan.metadata`. `buildGuardHooks` parametrizado por `PhaseGuards` em vez de literal de phase.
+
+Resultado: workflow novo (bug-fix, docs) é só uma pasta `workflows/<name>/`, zero edits em core.
 
 ---
 

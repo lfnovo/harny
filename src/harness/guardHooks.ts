@@ -5,7 +5,20 @@ import type {
   HookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { planFilePath } from "./plan.js";
-import type { PhaseName } from "./types.js";
+
+/**
+ * Composable guard policy. A workflow declares which invariants apply per
+ * phase; the orchestrator wires up the matching hooks. Each flag adds one
+ * deny rule. Defaults (all flags false) install no hooks.
+ */
+export type PhaseGuards = {
+  /** Deny Write/Edit/MultiEdit/NotebookEdit on paths INSIDE the phase cwd. */
+  readOnly?: boolean;
+  /** Deny writes to .harness/<slug>/plan.json (sole-writer invariant). */
+  noPlanWrites?: boolean;
+  /** Deny Bash commands that mutate git history inside the phase cwd. */
+  noGitHistory?: boolean;
+};
 
 const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"] as const;
 const WRITE_TOOLS_MATCHER = WRITE_TOOLS.join("|");
@@ -107,33 +120,29 @@ function readStringField(toolInput: unknown, key: string): string | null {
 }
 
 export function buildGuardHooks(args: {
-  phase: PhaseName;
+  guards: PhaseGuards;
   primaryCwd: string;
   phaseCwd: string;
   taskSlug: string;
 }): Partial<Record<"PreToolUse", HookCallbackMatcher[]>> {
-  if (args.phase === "validator") {
-    return {
-      PreToolUse: [
-        {
-          matcher: WRITE_TOOLS_MATCHER,
-          hooks: [validatorReadOnly(args.phaseCwd)],
-        },
-      ],
-    };
+  const writeMatchers: HookCallback[] = [];
+  if (args.guards.readOnly) writeMatchers.push(validatorReadOnly(args.phaseCwd));
+  if (args.guards.noPlanWrites) {
+    writeMatchers.push(
+      developerPlanWriter(args.primaryCwd, args.phaseCwd, args.taskSlug),
+    );
   }
-  if (args.phase === "developer") {
-    return {
-      PreToolUse: [
-        {
-          matcher: WRITE_TOOLS_MATCHER,
-          hooks: [
-            developerPlanWriter(args.primaryCwd, args.phaseCwd, args.taskSlug),
-          ],
-        },
-        { matcher: "Bash", hooks: [developerGitCommitter(args.phaseCwd)] },
-      ],
-    };
+
+  const preToolUse: HookCallbackMatcher[] = [];
+  if (writeMatchers.length > 0) {
+    preToolUse.push({ matcher: WRITE_TOOLS_MATCHER, hooks: writeMatchers });
   }
-  return {};
+  if (args.guards.noGitHistory) {
+    preToolUse.push({
+      matcher: "Bash",
+      hooks: [developerGitCommitter(args.phaseCwd)],
+    });
+  }
+
+  return preToolUse.length > 0 ? { PreToolUse: preToolUse } : {};
 }

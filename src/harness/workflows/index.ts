@@ -1,5 +1,5 @@
 import type { Workflow } from "../workflow.js";
-import { featureDev } from "./featureDev.js";
+import { featureDev } from "./featureDev/index.js";
 import { issueTriage } from "./issueTriage.js";
 
 const registry = new Map<string, Workflow>([

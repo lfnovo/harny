@@ -46,7 +46,7 @@ export async function runHarness(args: {
   const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
 
   const workflow = getWorkflow(args.workflowId ?? "feature-dev");
-  const config = await loadHarnessConfig(primaryCwd);
+  const config = await loadHarnessConfig(primaryCwd, workflow);
   const isolation = args.isolation ?? config.isolation;
 
   log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
@@ -117,8 +117,14 @@ export async function runHarness(args: {
       outputSchema: import("zod").ZodType<T>;
       harnessTaskId?: string | null;
       allowedTools?: string[];
+      guards?: import("./guardHooks.js").PhaseGuards;
     }): Promise<WorkflowPhaseResult<T>> => {
-      const baseConfig = config.developer;
+      const baseConfig = config.phases[phaseArgs.phase];
+      if (!baseConfig) {
+        throw new Error(
+          `Workflow "${workflow.id}" tried to run phase "${phaseArgs.phase}" but no config exists for it. Declare it in the workflow's phaseDefaults or in harness.json's phases map.`,
+        );
+      }
       const phaseConfig = phaseArgs.allowedTools
         ? { ...baseConfig, allowedTools: phaseArgs.allowedTools }
         : baseConfig;
@@ -132,6 +138,7 @@ export async function runHarness(args: {
         prompt: phaseArgs.prompt,
         outputSchema: phaseArgs.outputSchema,
         logMode,
+        guards: phaseArgs.guards,
       });
       return {
         sessionId: result.sessionId,

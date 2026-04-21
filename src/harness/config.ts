@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { DEFAULT_HARNESS_CONFIG } from "./defaults.js";
+import { GENERIC_HARNESS_DEFAULTS } from "./defaults.js";
 import type {
   HarnessConfigFile,
   PhaseConfig,
   ResolvedHarnessConfig,
   ResolvedPhaseConfig,
 } from "./types.js";
+import type { Workflow } from "./workflow.js";
 
 function mergePhase(
   base: ResolvedPhaseConfig,
@@ -28,37 +29,47 @@ function mergePhase(
 
 export async function loadHarnessConfig(
   cwd: string,
+  workflow: Workflow,
 ): Promise<ResolvedHarnessConfig> {
   const path = join(cwd, "harness.json");
-  let raw: string;
+  let parsed: HarnessConfigFile = {};
   try {
-    raw = await readFile(path, "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return DEFAULT_HARNESS_CONFIG;
+    const raw = await readFile(path, "utf8");
+    try {
+      parsed = JSON.parse(raw) as HarnessConfigFile;
+    } catch (err) {
+      throw new Error(`Invalid JSON in ${path}: ${(err as Error).message}`);
     }
-    throw err;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
   }
 
-  let parsed: HarnessConfigFile;
-  try {
-    parsed = JSON.parse(raw) as HarnessConfigFile;
-  } catch (err) {
-    throw new Error(`Invalid JSON in ${path}: ${(err as Error).message}`);
+  // Merge per-phase: start from workflow's phaseDefaults, overlay file overrides.
+  const phases: Record<string, ResolvedPhaseConfig> = {};
+  for (const [name, defaultConfig] of Object.entries(workflow.phaseDefaults)) {
+    phases[name] = mergePhase(defaultConfig, parsed.phases?.[name]);
+  }
+  // Allow file overrides for phases the workflow didn't declare (rare, but
+  // keeps the config file open for future custom phases).
+  if (parsed.phases) {
+    for (const [name, override] of Object.entries(parsed.phases)) {
+      if (!(name in phases)) {
+        // Without a default to merge into, we cannot construct a valid
+        // ResolvedPhaseConfig — skip and let the workflow fail at runPhase.
+        void override;
+      }
+    }
   }
 
   return {
-    planner: mergePhase(DEFAULT_HARNESS_CONFIG.planner, parsed.planner),
-    developer: mergePhase(DEFAULT_HARNESS_CONFIG.developer, parsed.developer),
-    validator: mergePhase(DEFAULT_HARNESS_CONFIG.validator, parsed.validator),
+    phases,
     maxIterationsPerTask:
-      parsed.maxIterationsPerTask ??
-      DEFAULT_HARNESS_CONFIG.maxIterationsPerTask,
+      parsed.maxIterationsPerTask ?? GENERIC_HARNESS_DEFAULTS.maxIterationsPerTask,
     maxIterationsGlobal:
-      parsed.maxIterationsGlobal ?? DEFAULT_HARNESS_CONFIG.maxIterationsGlobal,
+      parsed.maxIterationsGlobal ?? GENERIC_HARNESS_DEFAULTS.maxIterationsGlobal,
     maxRetriesBeforeReset:
       parsed.maxRetriesBeforeReset ??
-      DEFAULT_HARNESS_CONFIG.maxRetriesBeforeReset,
-    isolation: parsed.isolation ?? DEFAULT_HARNESS_CONFIG.isolation,
+      GENERIC_HARNESS_DEFAULTS.maxRetriesBeforeReset,
+    isolation: parsed.isolation ?? GENERIC_HARNESS_DEFAULTS.isolation,
   };
 }

@@ -2,7 +2,11 @@ import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 
 export type LogMode = "compact" | "verbose" | "quiet";
 
-export type PhaseName = "planner" | "developer" | "validator" | "triage";
+/**
+ * Open shape — workflows declare any phase name they like. Kept as a named
+ * alias for documentation/discoverability; not a closed union.
+ */
+export type PhaseName = string;
 
 export type IsolationMode = "worktree" | "inline";
 
@@ -23,9 +27,12 @@ export type PhaseConfig = {
 };
 
 export type HarnessConfigFile = {
-  planner?: PhaseConfig;
-  developer?: PhaseConfig;
-  validator?: PhaseConfig;
+  /**
+   * Per-phase config overrides. Keys are phase names (e.g. "planner",
+   * "developer", "validator", "triage"). Each entry deep-merges with the
+   * defaults declared by the workflow's `phaseDefaults`.
+   */
+  phases?: Record<string, PhaseConfig>;
   maxIterationsPerTask?: number;
   maxIterationsGlobal?: number;
   maxRetriesBeforeReset?: number;
@@ -40,9 +47,8 @@ export type ResolvedPhaseConfig = Required<
 };
 
 export type ResolvedHarnessConfig = {
-  planner: ResolvedPhaseConfig;
-  developer: ResolvedPhaseConfig;
-  validator: ResolvedPhaseConfig;
+  /** Resolved per-phase configs after merging workflow defaults + file overrides. */
+  phases: Record<string, ResolvedPhaseConfig>;
   maxIterationsPerTask: number;
   maxIterationsGlobal: number;
   maxRetriesBeforeReset: number;
@@ -51,32 +57,16 @@ export type ResolvedHarnessConfig = {
 
 export type TaskStatus = "pending" | "in_progress" | "done" | "failed";
 
-export type PlanTaskHistoryEntry =
-  | {
-      role: "developer";
-      session_id: string;
-      at: string;
-      status: "done" | "blocked";
-      summary: string;
-      commit_message?: string;
-      blocked_reason?: string;
-    }
-  | {
-      role: "validator";
-      session_id: string;
-      at: string;
-      verdict: "pass" | "fail";
-      reasons: string[];
-      evidence: string;
-      recommend_reset?: boolean;
-    }
-  | {
-      role: "triage";
-      session_id: string;
-      at: string;
-      action: string;
-      reasoning: string;
-    };
+/**
+ * Open shape — workflows define their own typed history entries locally and
+ * cast on the way in. Core only requires the discriminator + common fields.
+ */
+export type PlanTaskHistoryEntry = {
+  [key: string]: unknown;
+  role: string;
+  session_id: string;
+  at: string;
+};
 
 export type PlanTask = {
   id: string;
@@ -109,7 +99,12 @@ export type Plan = {
   updated_at: string;
   status: PlanRunStatus;
   summary: string;
-  planner_session_id: string | null;
   iterations_global: number;
   tasks: PlanTask[];
+  /**
+   * Per-workflow extension bag. Workflows write their own keys here for
+   * state that doesn't belong in core Plan fields (e.g. feature-dev writes
+   * `planner_session_id`).
+   */
+  metadata: Record<string, unknown>;
 };

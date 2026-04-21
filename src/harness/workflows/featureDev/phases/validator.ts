@@ -1,7 +1,7 @@
-import { runPhase } from "../sessionRecorder.js";
-import { ValidatorVerdictSchema, type ValidatorVerdict } from "../verdict.js";
-import { writeProblems } from "../problem.js";
-import type { LogMode, Plan, PlanTask, ResolvedPhaseConfig } from "../types.js";
+import { runPhase } from "../../../sessionRecorder.js";
+import { ValidatorVerdictSchema, type ValidatorVerdict } from "../verdicts.js";
+import { writeProblems } from "../../../problem.js";
+import type { LogMode, Plan, PlanTask, ResolvedPhaseConfig } from "../../../types.js";
 
 function describeTaskForValidation(task: PlanTask): string {
   return [
@@ -42,6 +42,7 @@ export async function runValidator(args: {
     prompt,
     outputSchema: ValidatorVerdictSchema,
     logMode: args.logMode,
+    guards: { readOnly: true },
   });
 
   if (result.status !== "completed" || !result.structuredOutput) {

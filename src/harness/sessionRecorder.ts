@@ -3,8 +3,8 @@ import { mkdir, readdir, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { sessionsDir } from "./plan.js";
-import { toJsonSchema } from "./verdict.js";
-import { buildGuardHooks } from "./guardHooks.js";
+import { toJsonSchema } from "./jsonSchema.js";
+import { buildGuardHooks, type PhaseGuards } from "./guardHooks.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig } from "./types.js";
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
@@ -86,6 +86,7 @@ export async function runPhase<T>(args: {
   outputSchema: z.ZodType<T>;
   resumeSessionId?: string | null;
   logMode?: LogMode;
+  guards?: PhaseGuards;
 }): Promise<PhaseRunResult<T>> {
   for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
     const result = await runPhaseAttempt(args);
@@ -122,6 +123,7 @@ async function runPhaseAttempt<T>(args: {
   outputSchema: z.ZodType<T>;
   resumeSessionId?: string | null;
   logMode?: LogMode;
+  guards?: PhaseGuards;
 }): Promise<PhaseRunResult<T>> {
   const {
     phase,
@@ -135,6 +137,7 @@ async function runPhaseAttempt<T>(args: {
     outputSchema,
     resumeSessionId,
     logMode,
+    guards = {},
   } = args;
 
   const dir = sessionsDir(primaryCwd, taskSlug);
@@ -169,7 +172,7 @@ async function runPhaseAttempt<T>(args: {
   }
 
   const guardHooks = buildGuardHooks({
-    phase,
+    guards,
     primaryCwd,
     phaseCwd,
     taskSlug,
