@@ -1,8 +1,6 @@
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { mkdir, readdir, writeFile, rename } from "node:fs/promises";
-import { join } from "node:path";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { sessionsDir } from "./state/plan.js";
+import { setupPhoenix, withPhaseContext } from "./observability/phoenix.js";
 // The bundled `claude-code` binary silently ignores schemas with a top-level
 // `$schema` key (which Zod emits by default). Strip it before passing in.
 function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
@@ -17,33 +15,6 @@ import {
   type AskUserQuestionInput,
 } from "./askUser.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from "./types.js";
-
-async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
-  const tmp = `${path}.tmp`;
-  await writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  await rename(tmp, path);
-}
-
-/**
- * Returns the next 4-digit ordinal prefix for a fresh session file by looking
- * at the highest prefix already present in the sessions directory.
- */
-async function nextOrdinalPrefix(dir: string): Promise<string> {
-  let max = 0;
-  try {
-    const entries = await readdir(dir);
-    for (const name of entries) {
-      const m = name.match(/^(\d{4})_/);
-      if (m) {
-        const n = parseInt(m[1]!, 10);
-        if (n > max) max = n;
-      }
-    }
-  } catch {
-    // Directory may not exist yet; caller mkdir's before writing.
-  }
-  return String(max + 1).padStart(4, "0");
-}
 
 export type PhaseRunResult<T> = {
   sessionId: string;
@@ -60,9 +31,15 @@ export type PhaseRunResult<T> = {
   };
 };
 
+/**
+ * In-memory record of one phase's session. We don't persist this anymore —
+ * the SDK already writes the full transcript to ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
+ * (and Phoenix mirrors it via OpenInference instrumentation, when enabled).
+ * Kept in-memory only to extract structured_output and bookkeeping for the
+ * orchestrator's StateStore writes.
+ */
 type SessionRecord = {
   phase: PhaseName;
-  ordinal: string;
   task_slug: string;
   harness_task_id: string | null;
   session_id: string | null;
@@ -105,6 +82,8 @@ export async function runPhase<T>(args: {
   logMode?: LogMode;
   guards?: PhaseGuards;
   mode?: RunMode;
+  workflowId: string;
+  runId: string;
 }): Promise<PhaseRunResult<T>> {
   for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
     const result = await runPhaseAttempt(args);
@@ -145,6 +124,8 @@ async function runPhaseAttempt<T>(args: {
   logMode?: LogMode;
   guards?: PhaseGuards;
   mode?: RunMode;
+  workflowId: string;
+  runId: string;
 }): Promise<PhaseRunResult<T>> {
   const {
     phase,
@@ -160,15 +141,15 @@ async function runPhaseAttempt<T>(args: {
     logMode,
     guards = {},
     mode = "interactive",
+    workflowId,
+    runId,
   } = args;
 
-  const dir = sessionsDir(primaryCwd, taskSlug);
-  await mkdir(dir, { recursive: true });
-  const ordinal = await nextOrdinalPrefix(dir);
+  const phoenix = setupPhoenix({ workflowId, runId, taskSlug });
+  const query = phoenix.query;
 
   const record: SessionRecord = {
     phase,
-    ordinal,
     task_slug: taskSlug,
     harness_task_id: harnessTaskId,
     session_id: null,
@@ -182,7 +163,6 @@ async function runPhaseAttempt<T>(args: {
     events: [],
   };
 
-  let currentPath: string | null = null;
   let structuredRaw: unknown = null;
   let resultSubtype: string | null = null;
   let parkState: { askUserInput: AskUserQuestionInput; toolUseId: string | null } | null = null;
@@ -195,7 +175,7 @@ async function runPhaseAttempt<T>(args: {
   };
 
   if (logMode !== "quiet") {
-    console.log(`[harness:${phase}] starting ordinal=${ordinal}`);
+    console.log(`[harness:${phase}] starting`);
     if (harnessTaskId) console.log(`[harness:${phase}] task=${harnessTaskId}`);
     if (resumeSessionId)
       console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
@@ -217,10 +197,17 @@ async function runPhaseAttempt<T>(args: {
       ? phaseConfig.allowedTools.filter((t) => t !== "AskUserQuestion")
       : phaseConfig.allowedTools;
 
-  try {
-    for await (const message of query({
-      prompt,
-      options: {
+  // Attach phase name to the OTel context so the rename processor relabels
+  // the SDK's "ClaudeAgent.query" span to "harness.<phase>". No extra wrapping
+  // span — keeps the trace tree flat: run → harness.<phase> → tool spans.
+  await withPhaseContext(
+    phoenix,
+    phase,
+    async () => {
+      try {
+        for await (const message of query({
+          prompt,
+          options: {
         cwd: phaseCwd,
         ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
         allowedTools: effectiveAllowedTools,
@@ -290,7 +277,6 @@ async function runPhaseAttempt<T>(args: {
         message.subtype === "init"
       ) {
         record.session_id = message.session_id;
-        currentPath = join(dir, `${ordinal}_${message.session_id}.json`);
         if (logMode !== "quiet") {
           console.log(`[harness:${phase}] session=${message.session_id}`);
         }
@@ -307,31 +293,29 @@ async function runPhaseAttempt<T>(args: {
         }
       }
 
-      if (currentPath) await writeJsonAtomic(currentPath, record);
       if (logMode === "verbose") {
         console.log(`[harness:${phase}] event: ${message.type}`);
         console.dir(message, { depth: null, colors: true });
       }
     }
 
-    record.status = "completed";
-  } catch (err) {
-    if (parkState) {
-      // Expected: SDK throws after canUseTool returns deny+interrupt:true.
-      // Mark the session record as completed (not an error — the park is intentional).
-      record.status = "completed";
-      record.error = null;
-    } else {
-      record.status = "error";
-      record.error = err instanceof Error ? err.stack ?? err.message : String(err);
-      console.error(`[harness:${phase}] error:`, err);
-    }
-  } finally {
-    record.ended_at = new Date().toISOString();
-    const finalPath =
-      currentPath ?? join(dir, `${ordinal}_no-session-${Date.now()}.json`);
-    await writeJsonAtomic(finalPath, record);
-  }
+        record.status = "completed";
+      } catch (err) {
+        if (parkState) {
+          // Expected: SDK throws after canUseTool returns deny+interrupt:true.
+          // Mark as completed — the park is intentional.
+          record.status = "completed";
+          record.error = null;
+        } else {
+          record.status = "error";
+          record.error = err instanceof Error ? err.stack ?? err.message : String(err);
+          console.error(`[harness:${phase}] error:`, err);
+        }
+      } finally {
+        record.ended_at = new Date().toISOString();
+      }
+    },
+  );
 
   if (parkState && record.session_id) {
     logBlock("output (paused)", "parked for async review");

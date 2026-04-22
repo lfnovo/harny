@@ -1,4 +1,5 @@
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { setupPhoenix, withRunSpan } from "./harness/observability/phoenix.js";
 import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname, isAbsolute, resolve } from "node:path";
@@ -6,7 +7,8 @@ import { fileURLToPath } from "node:url";
 import { runHarness, resumeHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
 import { getWorkflow } from "./harness/workflows/index.js";
-import { getRegistry } from "./harness/state/registry.js";
+import { listAllRuns, findRun } from "./harness/state/filesystem.js";
+import type { State, PendingQuestion } from "./harness/state/schema.js";
 import {
   resolveAnswer,
   runAskUserQuestionTTY,
@@ -76,7 +78,8 @@ type RegistryCmd =
       text: string | null;
       /** Parsed JSON answer map (object mode). */
       json?: Record<string, string>;
-    };
+    }
+  | { kind: "ui"; port?: number; noOpen?: boolean };
 
 function parseArgs(argv: string[]): {
   logMode: LogMode;
@@ -179,6 +182,19 @@ function parseArgs(argv: string[]): {
       registryCmd = { kind: "ls", status, cwd, workflow: wf };
     } else if (sub === "show" && rest[2]) {
       registryCmd = { kind: "show", runId: rest[2] };
+    } else if (sub === "ui") {
+      let port: number | undefined;
+      let noOpen = false;
+      for (let i = 2; i < rest.length; i++) {
+        if (rest[i] === "--port" && rest[i + 1]) {
+          port = Number(rest[++i]);
+        } else if (rest[i]?.startsWith("--port=")) {
+          port = Number(rest[i]!.slice("--port=".length));
+        } else if (rest[i] === "--no-open") {
+          noOpen = true;
+        }
+      }
+      registryCmd = { kind: "ui", ...(port ? { port } : {}), ...(noOpen ? { noOpen } : {}) };
     } else if (sub === "answer" && rest[2]) {
       // Forms:
       //   harness answer <runId>                   → interactive (walk parked questions)
@@ -292,6 +308,34 @@ async function loadAssistant(name: string): Promise<Assistant> {
   };
 }
 
+/**
+ * Read every cwd registered in ~/.harness/assistants.json (primary + extras).
+ * Used by registry-replacement subcommands (ls/show/answer) and resumeHarness
+ * to discover where a run lives without an indexed DB.
+ */
+async function loadAllAssistantCwds(): Promise<string[]> {
+  let raw: string;
+  try {
+    raw = await readFile(ASSISTANTS_FILE, "utf8");
+  } catch {
+    return [];
+  }
+  let parsed: AssistantsFile;
+  try {
+    parsed = JSON.parse(raw) as AssistantsFile;
+  } catch {
+    return [];
+  }
+  const out = new Set<string>();
+  for (const a of parsed.assistants ?? []) {
+    if (a.cwd && isAbsolute(a.cwd)) out.add(a.cwd);
+    for (const d of a.additionalDirectories ?? []) {
+      if (isAbsolute(d)) out.add(d);
+    }
+  }
+  return Array.from(out);
+}
+
 async function main() {
   const {
     logMode,
@@ -308,13 +352,37 @@ async function main() {
   } = parseArgs(process.argv.slice(2));
 
   if (registryCmd !== null) {
-    const registry = getRegistry();
+    if (registryCmd.kind === "ui") {
+      const { startViewer, openBrowser } = await import("./viewer/server.js");
+      const { url, stop } = await startViewer({ port: registryCmd.port });
+      console.log(`[harness ui] serving at ${url}`);
+      console.log(`[harness ui] press Ctrl-C to stop`);
+      if (!registryCmd.noOpen) openBrowser(url);
+      const shutdown = () => {
+        console.log("\n[harness ui] stopping…");
+        stop();
+        process.exit(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
+      // Keep the event loop alive.
+      await new Promise<void>(() => {});
+      return;
+    }
+
+    const searchCwds = await loadAllAssistantCwds();
+
     if (registryCmd.kind === "ls") {
-      const runs = registry.listRuns({
-        status: registryCmd.status,
-        cwd: registryCmd.cwd,
-        workflow_id: registryCmd.workflow,
-      });
+      let runs = await listAllRuns(searchCwds);
+      if (registryCmd.status) {
+        runs = runs.filter((r) => r.lifecycle.status === registryCmd.status);
+      }
+      if (registryCmd.cwd) {
+        runs = runs.filter((r) => r.environment.cwd === registryCmd.cwd);
+      }
+      if (registryCmd.workflow) {
+        runs = runs.filter((r) => r.origin.workflow === registryCmd.workflow);
+      }
       if (runs.length === 0) {
         console.log("No runs found.");
         return;
@@ -324,103 +392,97 @@ async function main() {
       console.log("-".repeat(header.length));
       for (const r of runs) {
         console.log([
-          r.id.slice(0, 8).padEnd(10),
-          (r.workflow_id ?? "").padEnd(14),
-          (r.status ?? "").padEnd(14),
-          (r.started_at ?? "").padEnd(25),
-          r.branch ?? "",
+          r.run_id.slice(0, 8).padEnd(10),
+          r.origin.workflow.padEnd(14),
+          r.lifecycle.status.padEnd(14),
+          r.origin.started_at.padEnd(25),
+          r.environment.branch,
         ].join(" | "));
       }
       return;
     }
 
     if (registryCmd.kind === "show") {
-      const run = registry.getRun(registryCmd.runId);
+      const run = await findRun(searchCwds, registryCmd.runId);
       if (!run) {
         console.error(`Run not found: ${registryCmd.runId}`);
         process.exit(1);
       }
-      console.log(`Run:       ${run.id}`);
-      console.log(`Workflow:  ${run.workflow_id}`);
-      console.log(`Status:    ${run.status}`);
-      console.log(`CWD:       ${run.cwd}`);
-      console.log(`Branch:    ${run.branch}`);
-      console.log(`TaskSlug:  ${run.task_slug}`);
-      console.log(`Started:   ${run.started_at}`);
-      if (run.ended_at) console.log(`Ended:     ${run.ended_at} (${run.ended_reason})`);
-      if (run.worktree_path) console.log(`Worktree:  ${run.worktree_path}`);
+      console.log(`Run:       ${run.run_id}`);
+      console.log(`Workflow:  ${run.origin.workflow}`);
+      console.log(`Status:    ${run.lifecycle.status}`);
+      console.log(`CWD:       ${run.environment.cwd}`);
+      console.log(`Branch:    ${run.environment.branch}`);
+      console.log(`TaskSlug:  ${run.origin.task_slug}`);
+      console.log(`Started:   ${run.origin.started_at}`);
+      if (run.lifecycle.ended_at)
+        console.log(`Ended:     ${run.lifecycle.ended_at} (${run.lifecycle.ended_reason})`);
+      if (run.environment.worktree_path) console.log(`Worktree:  ${run.environment.worktree_path}`);
 
-      if (run.pending_question_id) {
-        const q = registry.getQuestion(run.pending_question_id);
-        if (q) {
-          if (q.kind === "ask_user_question_batch" && q.options_json) {
-            const questions = JSON.parse(q.options_json) as AskUserQuestionItem[];
-            console.log(
-              `\nPending AskUserQuestion batch (${q.id.slice(0, 8)}, ${questions.length} question${questions.length === 1 ? "" : "s"}):`,
-            );
-            questions.forEach((qq, qi) => {
-              const head = qq.header ? `[${qq.header}] ` : "";
-              console.log(`  Q${qi + 1}: ${head}${qq.question}`);
-              qq.options.forEach((o, oi) => {
-                const desc = o.description ? ` — ${o.description}` : "";
-                console.log(`      ${oi + 1}. ${o.label}${desc}`);
-              });
-              if (qq.multiSelect) console.log(`      (multiSelect)`);
+      const pq = run.pending_question;
+      if (pq) {
+        if (pq.kind === "ask_user_question_batch" && pq.options) {
+          const questions = pq.options as AskUserQuestionItem[];
+          console.log(
+            `\nPending AskUserQuestion batch (${pq.id.slice(0, 8)}, ${questions.length} question${questions.length === 1 ? "" : "s"}):`,
+          );
+          questions.forEach((qq, qi) => {
+            const head = qq.header ? `[${qq.header}] ` : "";
+            console.log(`  Q${qi + 1}: ${head}${qq.question}`);
+            qq.options.forEach((o, oi) => {
+              const desc = o.description ? ` — ${o.description}` : "";
+              console.log(`      ${oi + 1}. ${o.label}${desc}`);
             });
-            const sample: Record<string, string> = {};
-            questions.forEach((qq) => {
-              sample[qq.question] = qq.options[0]?.label ?? "";
-            });
-            console.log(
-              `\nTo resume: harness answer ${run.id} --json '${JSON.stringify(sample)}'`,
-            );
-            console.log(`           (or interactive: harness answer ${run.id})`);
-          } else {
-            console.log(`\nPending question (${q.id.slice(0, 8)}):`);
-            console.log(`  ${q.prompt}`);
-            if (q.options_json) {
-              const opts = JSON.parse(q.options_json) as string[];
-              opts.forEach((o, i) => console.log(`    ${i + 1}. ${o}`));
-            }
-            console.log(`\nTo resume: harness answer ${run.id} "<your answer>"`);
+            if (qq.multiSelect) console.log(`      (multiSelect)`);
+          });
+          const sample: Record<string, string> = {};
+          questions.forEach((qq) => {
+            sample[qq.question] = qq.options[0]?.label ?? "";
+          });
+          console.log(
+            `\nTo resume: harness answer ${run.run_id} --json '${JSON.stringify(sample)}'`,
+          );
+          console.log(`           (or interactive: harness answer ${run.run_id})`);
+        } else {
+          console.log(`\nPending question (${pq.id.slice(0, 8)}):`);
+          console.log(`  ${pq.prompt}`);
+          if (pq.options) {
+            const opts = pq.options as string[];
+            opts.forEach((o, i) => console.log(`    ${i + 1}. ${o}`));
           }
+          console.log(`\nTo resume: harness answer ${run.run_id} "<your answer>"`);
         }
       }
 
-      const events = registry.getEvents(run.id, 20);
-      if (events.length > 0) {
-        console.log(`\nLast ${events.length} events (newest first):`);
-        for (const e of events) {
-          console.log(`  [${e.at}] ${e.phase} / ${e.event_type}`);
+      const recent = run.history.slice(-20);
+      if (recent.length > 0) {
+        console.log(`\nLast ${recent.length} events:`);
+        for (const e of recent) {
+          console.log(`  [${e.at}] ${e.phase} / ${e.event}`);
         }
       }
       return;
     }
 
     if (registryCmd.kind === "answer") {
-      const run = registry.getRun(registryCmd.runId);
+      const run = await findRun(searchCwds, registryCmd.runId);
       if (!run) {
         console.error(`Run not found: ${registryCmd.runId}`);
         process.exit(1);
       }
-      const q = run.pending_question_id
-        ? registry.getQuestion(run.pending_question_id)
-        : null;
+      const pq: PendingQuestion | null = run.pending_question;
 
       // Dispatch: SDK batch park vs legacy single-question park.
-      if (q && q.kind === "ask_user_question_batch") {
-        const questions = JSON.parse(q.options_json ?? "[]") as AskUserQuestionItem[];
+      if (pq && pq.kind === "ask_user_question_batch") {
+        const questions = (pq.options ?? []) as AskUserQuestionItem[];
         let answersMap: Record<string, string>;
 
         if (registryCmd.json) {
-          // Validate each provided answer against its question's options.
           const validated: Record<string, string> = {};
           for (const question of questions) {
             const raw = registryCmd.json[question.question];
             if (raw === undefined) {
-              console.error(
-                `Missing answer for question: "${question.question}"`,
-              );
+              console.error(`Missing answer for question: "${question.question}"`);
               process.exit(1);
             }
             const labels = question.options.map((o) => o.label);
@@ -438,7 +500,6 @@ async function main() {
           );
           process.exit(1);
         } else {
-          // Interactive: walk each question via the existing TTY helper.
           const input: AskUserQuestionInput = { questions };
           const result = await runAskUserQuestionTTY(input);
           if (result.behavior !== "allow") {
@@ -449,7 +510,9 @@ async function main() {
         }
 
         console.log(`[harness] resuming run ${registryCmd.runId}...`);
-        const result = await resumeHarness(registryCmd.runId, answersMap);
+        const result = await resumeHarness(registryCmd.runId, answersMap, {
+          searchCwds,
+        });
         console.log(`[harness] finished status=${result.status}`);
         return;
       }
@@ -462,10 +525,8 @@ async function main() {
         process.exit(1);
       }
       let answerText: string = registryCmd.text;
-      if (q) {
-        const opts = q.options_json
-          ? (JSON.parse(q.options_json) as string[])
-          : null;
+      if (pq) {
+        const opts = (pq.options ?? null) as string[] | null;
         const resolved = resolveAnswer(opts, registryCmd.text);
         if (!resolved.ok) {
           console.error(resolved.error);
@@ -477,7 +538,9 @@ async function main() {
         }
       }
       console.log(`[harness] resuming run ${registryCmd.runId}...`);
-      const result = await resumeHarness(registryCmd.runId, answerText);
+      const result = await resumeHarness(registryCmd.runId, answerText, {
+        searchCwds,
+      });
       console.log(`[harness] finished status=${result.status}`);
       return;
     }
@@ -594,52 +657,68 @@ async function main() {
     }
   }
 
+  // Phoenix instrumentation for the legacy single-query path. No-op when
+  // HARNESS_PHOENIX_URL is unset; otherwise emits one trace per query under
+  // the project derived from the assistant's cwd basename.
+  const phoenix = setupPhoenix({
+    workflowId: "single-query",
+    cwd: assistant?.cwd,
+  });
+  const query = phoenix.query;
+
   try {
-    for await (const message of query({
-      prompt,
-      options: {
-        allowedTools: [
-          "Skill",
-          "Read",
-          "Edit",
-          "Glob",
-          "Bash",
-          "Grep",
-          "WebSearch",
-          "WebFetch",
-          "ToolSearch",
-        ],
-        permissionMode: "auto",
-        maxTurns: 30,
-        effort: "high",
-        settingSources: ["project", "user"],
-        ...(assistant ? { cwd: assistant.cwd } : {}),
-        ...(assistant?.additionalDirectories?.length
-          ? { additionalDirectories: assistant.additionalDirectories }
-          : {}),
-      },
-    })) {
-      record.events.push(message);
+    await withRunSpan(
+      phoenix,
+      "single-query",
+      { "harness.workflow": "single-query" },
+      async () => {
+        for await (const message of query({
+          prompt,
+          options: {
+            allowedTools: [
+              "Skill",
+              "Read",
+              "Edit",
+              "Glob",
+              "Bash",
+              "Grep",
+              "WebSearch",
+              "WebFetch",
+              "ToolSearch",
+            ],
+            permissionMode: "auto",
+            maxTurns: 30,
+            effort: "high",
+            settingSources: ["project", "user"],
+            ...(assistant ? { cwd: assistant.cwd } : {}),
+            ...(assistant?.additionalDirectories?.length
+              ? { additionalDirectories: assistant.additionalDirectories }
+              : {}),
+          },
+        })) {
+          record.events.push(message);
 
-      if (
-        record.session_id == null &&
-        message.type === "system" &&
-        message.subtype === "init"
-      ) {
-        record.session_id = message.session_id;
-        currentPath = join(SESSIONS_DIR, `${record.session_id}.json`);
-        if (logMode === "verbose") {
-          console.log(`[harness] session_id: ${record.session_id}`);
-          console.log(`[harness] file: ${currentPath}`);
+          if (
+            record.session_id == null &&
+            message.type === "system" &&
+            message.subtype === "init"
+          ) {
+            record.session_id = message.session_id;
+            currentPath = join(SESSIONS_DIR, `${record.session_id}.json`);
+            if (logMode === "verbose") {
+              console.log(`[harness] session_id: ${record.session_id}`);
+              console.log(`[harness] file: ${currentPath}`);
+            }
+          }
+
+          if (currentPath) await writeJsonAtomic(currentPath, record);
+          if (logMode === "verbose") {
+            console.log(`[harness] event: ${message.type}`);
+            console.dir(message, { depth: null, colors: true });
+          }
         }
-      }
-
-      if (currentPath) await writeJsonAtomic(currentPath, record);
-      if (logMode === "verbose") {
-        console.log(`[harness] event: ${message.type}`);
-        console.dir(message, { depth: null, colors: true });
-      }
-    }
+      },
+    );
 
     record.status = "completed";
   } catch (err) {

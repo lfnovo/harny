@@ -6,22 +6,24 @@ Complementa (não substitui): `CLAUDE.md` (invariantes, gotchas, preferências) 
 
 ---
 
-## Status (atualizado 2026-04-21)
+## Status (atualizado 2026-04-22)
 
 | Tier | Status | Notas |
 |---|---|---|
 | 0. Quick wins (guards + problems) | **DONE** | Tier 0 + várias evoluções de infra durante dogfood. Ver "Evoluções pós-Tier-0". |
 | 1a. Isolamento por worktree | **DONE** | Construído off-harness após 5 attempts de dogfood. `765afa7`. |
 | 1b. Workflow abstraction | **DONE** | Self-build via harness, 2 commits, 0 retries. `a5e2445` + `e552e82`. Boundary cleanup (A1+A2+A3) follow-up landed manually post-review. |
-| 2. Run registry + pause/resume | **DONE** | Self-build via dogfood, 1 reset cycle. `f9ba0d3`. |
-| 3. HITL (perguntas + approvals) | **PARCIAL** | Tier 3a (CLI askUser polish) `1d64cb0` + AskUserQuestion via canUseTool `2dc24bb` + Tier 3b (RunMode interactive\|silent\|async, async park/resume para AskUserQuestion) — manual. Tool approvals (`canUseTool` policy + matchers) ainda pendentes. |
-| 4. Multi-invocação (HTTP + webhooks + cron) | PENDING | |
+| 2. Run registry + pause/resume | **DONE → SUPERSEDED** | Original SQLite registry entregue em `f9ba0d3`. **Substituído pelo MVP state.json refactor** (CHANGELOG `[Unreleased]`) — registry SQLite removido em favor de `state.json` per-task. |
+| 3. HITL (perguntas + approvals) | **PARCIAL** | Tier 3a (CLI askUser polish) `1d64cb0` + AskUserQuestion via canUseTool `2dc24bb` + Tier 3b (RunMode interactive\|silent\|async, async park/resume) — manual. Tool approvals (`canUseTool` policy + matchers) ainda pendentes. |
+| 3.5. Bun migration | **DONE** | npm/tsx → Bun ≥ 1.3 (registry portado de `better-sqlite3` para `bun:sqlite`, depois removido na MVP). |
+| 4. Multi-invocação (HTTP + webhooks + cron) | DEFERIDO | Plano completo em `TIER4_PLAN.md` (superseded). Volta quando multi-host for necessidade real. |
 | 5. TODO tracking + display | **PARCIAL** | Logger compact/verbose/quiet entregue (`daa8c4c`). TodoWrite capture ainda pendente. |
-| 6. Web UI | PENDING | |
+| 6. Web UI | **PARCIAL (MVP)** | `harness ui` entregue — viewer read-only single-page (Bun.serve + vanilla JS + Tailwind CDN, sem build step). Lista runs cross-assistant + plan tasks + phases timeline + commits + deep-link Phoenix. UI para new-run/answer ainda pendente. |
 | 7. Composição (sub-agents, user hooks, cost) | PENDING | |
 | 8. Isolamento remoto (dev machine) | PENDING | Interface já existe desde Tier 1a. |
 | 9. Mais templates de workflow | **EM ANDAMENTO** | `docs` workflow entregue (`c224bd6`) — primeiro template novo via dogfood, validou abstração com zero core edits. `bug-fix` ainda pendente. |
 | 10. `/improve` skill | DEFERIDO (Post-Phase 2) | Schema captura desde Tier 0. |
+| **MVP — observability + state simplification** | **DONE (2026-04-22)** | Sub-fase 0: drop SQLite, single `state.json` per-task. Sub-fase 1: opt-in Phoenix observability via Arize OpenInference (`HARNESS_PHOENIX_URL`). Sub-fase 2: `harness ui` viewer. Ver CHANGELOG `[Unreleased]` pra detalhes. |
 
 ---
 

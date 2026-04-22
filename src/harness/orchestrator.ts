@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { hostname, userInfo } from "node:os";
 import { createInterface } from "node:readline";
 import { loadHarnessConfig } from "./config.js";
 import { runPhase as runPhaseSession } from "./sessionRecorder.js";
@@ -22,9 +23,11 @@ import {
   removeWorktree,
   resetHard,
 } from "./git.js";
-import { appendAudit } from "./state/audit.js";
 import { resolveAnswer, SilentModeError, PausedForUserInputError } from "./askUser.js";
-import { getRegistry } from "./state/registry.js";
+import { FilesystemStateStore, findRun } from "./state/filesystem.js";
+import type { State } from "./state/schema.js";
+import type { StateStore } from "./state/store.js";
+import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
 import { getWorkflow } from "./workflows/index.js";
 import type { IsolationMode, LogMode, PhaseName, ResolvedHarnessConfig, RunMode } from "./types.js";
 import type { WorkflowContext, WorkflowPhaseResult } from "./workflow.js";
@@ -50,12 +53,28 @@ function buildCtx(args: {
   plan: import("./types.js").Plan;
   workflow: Workflow;
   branch: string;
+  store: StateStore;
 }): WorkflowContext {
-  const { runId, taskSlug, userPrompt, primaryCwd, phaseCwd, input, logMode, planPath, plan, workflow } = args;
+  const {
+    runId,
+    taskSlug,
+    userPrompt,
+    primaryCwd,
+    phaseCwd,
+    input,
+    logMode,
+    planPath,
+    plan,
+    workflow,
+    store,
+  } = args;
   const config = args.config;
-  const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
-  const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
-  const registry = getRegistry();
+  const log = (msg: string) => {
+    if (logMode !== "quiet") console.log(msg);
+  };
+  const warn = (msg: string) => {
+    if (logMode !== "quiet") console.warn(msg);
+  };
 
   const ctx: WorkflowContext = {
     taskSlug,
@@ -75,16 +94,16 @@ function buildCtx(args: {
       await savePlan(planPath, plan);
     },
     audit: async (entry) => {
-      await appendAudit(primaryCwd, taskSlug, entry);
-      if ((entry as Record<string, unknown>).phase === "harness") {
-        registry.insertEvent({
-          run_id: runId,
-          phase: "harness",
-          event_type: String((entry as Record<string, unknown>).event ?? "decision"),
-          payload_json: JSON.stringify(entry),
-          at: new Date().toISOString(),
-        });
-      }
+      // history[] mirrors the old audit.jsonl semantics; kept as the only
+      // append-only log per run (Sub-fase 0 design — single state.json file).
+      const phase = String((entry as Record<string, unknown>).phase ?? "harness");
+      const event = String((entry as Record<string, unknown>).event ?? "decision");
+      await store.appendHistory({
+        ...entry,
+        at: new Date().toISOString(),
+        phase,
+        event,
+      });
     },
     currentSha: () => headSha(phaseCwd),
     commit: (message) => commitComposed(phaseCwd, message),
@@ -109,16 +128,30 @@ function buildCtx(args: {
         ? { ...baseConfig, allowedTools: phaseArgs.allowedTools }
         : baseConfig;
 
-      registry.insertEvent({
-        run_id: runId,
+      // Compute attempt number from existing phases of the same name.
+      const stateBefore = await store.getState();
+      const sameName = stateBefore?.phases.filter((p) => p.name === phaseArgs.phase) ?? [];
+      const attempt = sameName.length + 1;
+      const startedAt = new Date().toISOString();
+
+      await store.appendPhase({
+        name: phaseArgs.phase,
+        attempt,
+        started_at: startedAt,
+        ended_at: null,
+        status: "running",
+        verdict: null,
+        session_id: null,
+      });
+      await store.updateLifecycle({ current_phase: phaseArgs.phase });
+      await store.appendHistory({
+        at: startedAt,
         phase: phaseArgs.phase,
-        event_type: "phase_start",
-        payload_json: JSON.stringify({ harnessTaskId: phaseArgs.harnessTaskId ?? null }),
-        at: new Date().toISOString(),
+        event: "phase_start",
+        attempt,
+        harnessTaskId: phaseArgs.harnessTaskId ?? null,
       });
 
-      let phaseStatus: "completed" | "error" | "paused_for_user_input" = "error";
-      let phaseError: string | null = null;
       try {
         const result = await runPhaseSession({
           phase: phaseArgs.phase,
@@ -133,34 +166,44 @@ function buildCtx(args: {
           logMode,
           guards: phaseArgs.guards,
           mode: config.mode,
+          workflowId: workflow.id,
+          runId,
         });
-        phaseStatus = result.status;
-        phaseError = result.error;
 
-        registry.insertEvent({
-          run_id: runId,
-          phase: phaseArgs.phase,
-          event_type: "phase_end",
-          payload_json: JSON.stringify({ status: result.status, error: result.error ?? null }),
+        const phaseStatus =
+          result.status === "completed"
+            ? ("completed" as const)
+            : result.status === "paused_for_user_input"
+              ? ("parked" as const)
+              : ("failed" as const);
+        await store.updatePhase(phaseArgs.phase, attempt, {
+          ended_at: new Date().toISOString(),
+          status: phaseStatus,
+          session_id: result.sessionId,
+        });
+        await store.appendHistory({
           at: new Date().toISOString(),
+          phase: phaseArgs.phase,
+          event: "phase_end",
+          attempt,
+          status: result.status,
+          error: result.error ?? null,
         });
 
         if (result.status === "paused_for_user_input" && result.parked) {
           // Persist the parked AskUserQuestion batch + throw so the orchestrator
           // outer catch maps it to status=waiting_human and exits cleanly.
           const questionId = randomUUID();
-          registry.insertQuestion({
+          await store.setPendingQuestion({
             id: questionId,
-            run_id: runId,
             kind: "ask_user_question_batch",
             prompt: result.parked.askUserInput.questions[0]?.question ?? "(batch)",
-            options_json: JSON.stringify(result.parked.askUserInput.questions),
+            options: result.parked.askUserInput.questions,
             asked_at: new Date().toISOString(),
             phase_session_id: result.sessionId,
             tool_use_id: result.parked.toolUseId,
             phase_name: phaseArgs.phase,
           });
-          registry.updateRun(runId, { pending_question_id: questionId });
           throw new PausedForUserInputError({
             questionId,
             phaseSessionId: result.sessionId,
@@ -176,14 +219,28 @@ function buildCtx(args: {
           error: result.error,
         };
       } catch (err) {
-        phaseError = (err as Error).message;
-        registry.insertEvent({
-          run_id: runId,
-          phase: phaseArgs.phase,
-          event_type: "phase_end",
-          payload_json: JSON.stringify({ status: "error", error: phaseError }),
-          at: new Date().toISOString(),
-        });
+        // If updatePhase already ran above, this is a re-throw path; if the
+        // session itself blew up before that, mark phase as failed here too.
+        if (!(err instanceof PausedForUserInputError)) {
+          const stateNow = await store.getState();
+          const stillRunning = stateNow?.phases.find(
+            (p) => p.name === phaseArgs.phase && p.attempt === attempt && p.status === "running",
+          );
+          if (stillRunning) {
+            await store.updatePhase(phaseArgs.phase, attempt, {
+              ended_at: new Date().toISOString(),
+              status: "failed",
+            });
+          }
+          await store.appendHistory({
+            at: new Date().toISOString(),
+            phase: phaseArgs.phase,
+            event: "phase_end",
+            attempt,
+            status: "error",
+            error: (err as Error).message,
+          });
+        }
         throw err;
       }
     },
@@ -227,16 +284,18 @@ function buildCtx(args: {
         return { answered: true, answer };
       }
 
+      // async mode: park the question.
       const questionId = randomUUID();
-      registry.insertQuestion({
+      await store.setPendingQuestion({
         id: questionId,
-        run_id: runId,
         kind: "user_input",
         prompt: askArgs.prompt,
-        options_json: askArgs.options ? JSON.stringify(askArgs.options) : null,
+        options: askArgs.options ?? null,
         asked_at: new Date().toISOString(),
+        phase_session_id: null,
+        tool_use_id: null,
+        phase_name: null,
       });
-      registry.updateRun(runId, { pending_question_id: questionId });
       return { answered: false, runId, questionId };
     },
   };
@@ -262,7 +321,6 @@ export async function runHarness(args: {
   const workflow = getWorkflow(args.workflowId ?? "feature-dev");
   const config = await loadHarnessConfig(primaryCwd, workflow, args.mode);
   const isolation = args.isolation ?? config.isolation;
-  const registry = getRegistry();
 
   log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
   log(`[harness] workflow=${workflow.id} task=${taskSlug}`);
@@ -271,6 +329,29 @@ export async function runHarness(args: {
   log(`[harness] user prompt <<<`);
 
   await assertIsGitRepo(primaryCwd);
+
+  // Idempotent rerun guard: if state.json already exists at this slug, refuse
+  // gracefully so we don't clobber an in-progress or completed run.
+  const probeStore = new FilesystemStateStore(primaryCwd, taskSlug);
+  const existing = await probeStore.getState();
+  if (existing) {
+    if (existing.lifecycle.status === "done" || existing.lifecycle.status === "failed") {
+      log(
+        `[harness] run already complete (status=${existing.lifecycle.status}, ended_at=${existing.lifecycle.ended_at ?? "?"}). Use \`harness clean ${taskSlug}\` then rerun.`,
+      );
+      return { status: existing.lifecycle.status, planPath: planFilePath(primaryCwd, taskSlug), branch: existing.environment.branch };
+    }
+    if (existing.lifecycle.status === "running") {
+      throw new Error(
+        `Run ${taskSlug} appears to still be running (pid=${existing.lifecycle.pid}). If it's actually dead, \`harness clean ${taskSlug}\` and retry.`,
+      );
+    }
+    if (existing.lifecycle.status === "waiting_human") {
+      throw new Error(
+        `Run ${taskSlug} is parked waiting for input. Use \`harness answer ${existing.run_id}\` (or interactive) to continue, or \`harness clean ${taskSlug}\` to discard.`,
+      );
+    }
+  }
 
   let phaseCwd = primaryCwd;
   let worktreePath: string | null = null;
@@ -311,17 +392,41 @@ export async function runHarness(args: {
   plan.run_id = runId;
   await savePlan(planPath, plan);
 
-  registry.insertRun({
-    id: runId,
-    workflow_id: workflow.id,
-    cwd: primaryCwd,
-    status: "running",
-    started_at: new Date().toISOString(),
-    task_slug: taskSlug,
-    branch,
-    isolation,
-    worktree_path: worktreePath,
-  });
+  const store = new FilesystemStateStore(primaryCwd, taskSlug);
+  const startedAt = new Date().toISOString();
+  const initialState: State = {
+    schema_version: 1,
+    run_id: runId,
+    origin: {
+      prompt: args.userPrompt,
+      workflow: workflow.id,
+      task_slug: taskSlug,
+      started_at: startedAt,
+      host: hostname(),
+      user: userInfo().username,
+    },
+    environment: {
+      cwd: primaryCwd,
+      branch,
+      isolation,
+      worktree_path: worktreePath,
+      mode: config.mode,
+    },
+    lifecycle: {
+      status: "running",
+      current_phase: null,
+      ended_at: null,
+      ended_reason: null,
+      pid: process.pid,
+    },
+    phases: [],
+    history: [
+      { at: startedAt, phase: "harness", event: "run_started" },
+    ],
+    pending_question: null,
+    workflow_state: {},
+  };
+  await store.createRun(initialState);
 
   const ctx = buildCtx({
     runId,
@@ -337,6 +442,7 @@ export async function runHarness(args: {
     plan,
     workflow,
     branch,
+    store,
   });
 
   const handleCleanupWorktree = async (
@@ -355,31 +461,64 @@ export async function runHarness(args: {
     }
   };
 
-  let result: { status: "done" | "failed" | "exhausted" | "waiting_human" };
+  // Set up Phoenix once for this process. Project name = basename(cwd).
+  // Wrap the entire workflow run in a single OTel span so all phases inherit
+  // one trace_id — Phoenix shows ONE trace per harness invocation, with the
+  // task slug as its name.
+  const phoenix = setupPhoenix({
+    workflowId: workflow.id,
+    runId,
+    taskSlug,
+    cwd: primaryCwd,
+  });
+
+  type RunOutcome = { status: "done" | "failed" | "exhausted" | "waiting_human" };
+  let result: RunOutcome;
   try {
-    result = await workflow.run(ctx);
+    result = await withRunSpan(
+      phoenix,
+      taskSlug,
+      {
+        "harness.workflow": workflow.id,
+        "harness.run_id": runId,
+        "harness.task_slug": taskSlug,
+        "harness.cwd": primaryCwd,
+      },
+      async (traceId): Promise<RunOutcome> => {
+        if (traceId && phoenix.projectName) {
+          await store.setPhoenix({ project: phoenix.projectName, trace_id: traceId });
+        }
+        try {
+          return await workflow.run(ctx);
+        } catch (err) {
+          if (err instanceof PausedForUserInputError) {
+            // ctx.runPhase already wrote pending_question + appended history.
+            log(
+              `[harness] run parked (waiting_human, AskUserQuestion) runId=${runId} question=${err.questionId}`,
+            );
+            return { status: "waiting_human" };
+          }
+          throw err;
+        }
+      },
+    );
   } catch (err) {
-    if (err instanceof PausedForUserInputError) {
-      // ctx.runPhase already inserted pending_question + updateRun; just exit clean.
-      registry.updateRun(runId, { status: "waiting_human" });
-      log(`[harness] run parked (waiting_human, AskUserQuestion) runId=${runId} question=${err.questionId}`);
-      return { status: "waiting_human", planPath, branch };
-    }
     throw err;
   }
 
   if (result.status === "waiting_human") {
-    registry.updateRun(runId, { status: "waiting_human" });
+    await store.updateLifecycle({ status: "waiting_human" });
     log(`[harness] run parked (waiting_human) runId=${runId}`);
     return { status: "waiting_human", planPath, branch };
   }
 
   await handleCleanupWorktree(result.status);
 
-  registry.updateRun(runId, {
+  await store.updateLifecycle({
     status: result.status === "done" ? "done" : "failed",
     ended_at: new Date().toISOString(),
     ended_reason: result.status,
+    current_phase: null,
   });
 
   return { status: result.status, planPath, branch };
@@ -388,85 +527,138 @@ export async function runHarness(args: {
 export async function resumeHarness(
   runId: string,
   answer: string | Record<string, string>,
+  opts: { searchCwds: string[] },
 ): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }> {
-  const registry = getRegistry();
-  const run = registry.getRun(runId);
-  if (!run) throw new Error(`Run not found: ${runId}`);
-  if (run.status !== "waiting_human") {
-    throw new Error(`Run ${runId} is not in waiting_human status (current: ${run.status})`);
+  const found = await findRun(opts.searchCwds, runId);
+  if (!found) {
+    throw new Error(
+      `Run not found: ${runId}. Searched cwds: ${opts.searchCwds.join(", ")}`,
+    );
+  }
+  if (found.lifecycle.status !== "waiting_human") {
+    throw new Error(
+      `Run ${runId} is not in waiting_human status (current: ${found.lifecycle.status})`,
+    );
   }
 
-  const primaryCwd = run.cwd;
-  const taskSlug = run.task_slug;
-
+  const primaryCwd = found.environment.cwd;
+  const taskSlug = found.origin.task_slug;
   const planPath = planFilePath(primaryCwd, taskSlug);
   const plan = await loadPlan(planPath);
 
-  const workflow = getWorkflow(run.workflow_id);
+  const workflow = getWorkflow(found.origin.workflow);
   if (!workflow.resumeFromAnswer) {
-    throw new Error(`Workflow "${run.workflow_id}" does not implement resumeFromAnswer`);
+    throw new Error(`Workflow "${found.origin.workflow}" does not implement resumeFromAnswer`);
   }
 
   const config = await loadHarnessConfig(primaryCwd, workflow);
-  const phaseCwd = run.worktree_path ?? primaryCwd;
+  const phaseCwd = found.environment.worktree_path ?? primaryCwd;
   const logMode: LogMode = "compact";
 
-  // Load the parked question to know whether this is a code-side ctx.askUser
-  // resume or an SDK AskUserQuestion batch resume.
+  const store = new FilesystemStateStore(primaryCwd, taskSlug);
+
+  // Build resumeMeta from the parked question (only for SDK batch parks).
   let resumeMeta: { phaseName: string; phaseSessionId: string; toolUseId: string | null } | undefined;
-  if (run.pending_question_id) {
-    const q = registry.getQuestion(run.pending_question_id);
-    if (q && q.kind === "ask_user_question_batch" && q.phase_session_id && q.phase_name) {
-      resumeMeta = {
-        phaseName: q.phase_name,
-        phaseSessionId: q.phase_session_id,
-        toolUseId: q.tool_use_id,
-      };
-    }
-    registry.answerQuestion(run.pending_question_id, JSON.stringify(answer));
+  const pq = found.pending_question;
+  if (pq && pq.kind === "ask_user_question_batch" && pq.phase_session_id && pq.phase_name) {
+    resumeMeta = {
+      phaseName: pq.phase_name,
+      phaseSessionId: pq.phase_session_id,
+      toolUseId: pq.tool_use_id,
+    };
   }
-  registry.updateRun(runId, { status: "running", pending_question_id: null });
+
+  // Record the answer in history, clear pending, mark running.
+  await store.appendHistory({
+    at: new Date().toISOString(),
+    phase: pq?.phase_name ?? "harness",
+    event: "answered",
+    question_id: pq?.id ?? null,
+    answer,
+  });
+  await store.setPendingQuestion(null);
+  await store.updateLifecycle({ status: "running" });
 
   const ctx = buildCtx({
-    runId,
+    runId: found.run_id,
     taskSlug,
     userPrompt: plan.user_prompt,
     primaryCwd,
     phaseCwd,
-    worktreePath: run.worktree_path,
+    worktreePath: found.environment.worktree_path,
     input: typeof answer === "string" ? { intent: answer } : { answers: answer },
     config,
     logMode,
     planPath,
     plan,
     workflow,
-    branch: run.branch,
+    branch: found.environment.branch,
+    store,
   });
 
   if (resumeMeta) {
     ctx.resumeMeta = resumeMeta;
   }
 
-  const result = await workflow.resumeFromAnswer(ctx, answer);
+  // Set up Phoenix for the resume process; gets a NEW trace (resume runs in a
+  // separate process, can't continue the original trace). Original trace stays
+  // queryable in Phoenix by harness.run_id resource attribute.
+  const phoenix = setupPhoenix({
+    workflowId: workflow.id,
+    runId: found.run_id,
+    taskSlug,
+    cwd: primaryCwd,
+  });
+
+  type RunOutcome = { status: "done" | "failed" | "exhausted" | "waiting_human" };
+  let result: RunOutcome;
+  try {
+    result = await withRunSpan(
+      phoenix,
+      `${taskSlug} (resume)`,
+      {
+        "harness.workflow": workflow.id,
+        "harness.run_id": found.run_id,
+        "harness.task_slug": taskSlug,
+        "harness.cwd": primaryCwd,
+        "harness.resume": "true",
+      },
+      async (traceId): Promise<RunOutcome> => {
+        if (traceId && phoenix.projectName) {
+          await store.setPhoenix({ project: phoenix.projectName, trace_id: traceId });
+        }
+        try {
+          return await workflow.resumeFromAnswer!(ctx, answer);
+        } catch (err) {
+          if (err instanceof PausedForUserInputError) {
+            return { status: "waiting_human" };
+          }
+          throw err;
+        }
+      },
+    );
+  } catch (err) {
+    throw err;
+  }
 
   if (result.status === "waiting_human") {
-    registry.updateRun(runId, { status: "waiting_human" });
+    await store.updateLifecycle({ status: "waiting_human" });
     return { status: "waiting_human" };
   }
 
-  if (result.status === "done" && run.worktree_path) {
+  if (result.status === "done" && found.environment.worktree_path) {
     try {
-      await removeWorktree(primaryCwd, run.worktree_path, { force: true });
+      await removeWorktree(primaryCwd, found.environment.worktree_path, { force: true });
     } catch {
       // best effort
     }
   }
 
-  registry.updateRun(runId, {
+  await store.updateLifecycle({
     status: result.status === "done" ? "done" : "failed",
     ended_at: new Date().toISOString(),
     ended_reason: result.status,
-    pending_question_id: null,
+    current_phase: null,
   });
 
   return { status: result.status };

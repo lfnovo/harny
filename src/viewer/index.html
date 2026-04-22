@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>harness viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div id="app" class="max-w-6xl mx-auto p-6">
+    <p class="text-slate-500">loading…</p>
+  </div>
+
+  <script>
+    // Tiny vanilla SPA — hash-based routing.
+    const app = document.getElementById('app');
+
+    const STATUS_COLORS = {
+      running: 'bg-blue-100 text-blue-800 ring-blue-200',
+      waiting_human: 'bg-amber-100 text-amber-800 ring-amber-200',
+      done: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
+      failed: 'bg-rose-100 text-rose-800 ring-rose-200',
+    };
+    const PHASE_STATUS_COLORS = {
+      running: 'bg-blue-100 text-blue-800',
+      completed: 'bg-emerald-100 text-emerald-800',
+      failed: 'bg-rose-100 text-rose-800',
+      parked: 'bg-amber-100 text-amber-800',
+    };
+    const TASK_STATUS_COLORS = {
+      pending: 'bg-slate-100 text-slate-700',
+      in_progress: 'bg-blue-100 text-blue-800',
+      done: 'bg-emerald-100 text-emerald-800',
+      failed: 'bg-rose-100 text-rose-800',
+    };
+
+    function badge(text, classes) {
+      return `<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${classes}">${text}</span>`;
+    }
+    function statusBadge(status) {
+      return badge(status, STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800 ring-slate-200');
+    }
+    function phaseBadge(status) {
+      return badge(status, PHASE_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800');
+    }
+    function taskBadge(status) {
+      return badge(status, TASK_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-700');
+    }
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const date = d.toISOString().split('T')[0];
+      const time = d.toTimeString().slice(0, 8);
+      return `${date} ${time}`;
+    }
+    function durationMs(a, b) {
+      if (!a || !b) return null;
+      return new Date(b).getTime() - new Date(a).getTime();
+    }
+    function fmtDuration(ms) {
+      if (ms == null) return '—';
+      if (ms < 1000) return `${ms}ms`;
+      if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+      return `${Math.floor(ms / 60000)}m${Math.floor((ms % 60000) / 1000)}s`;
+    }
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      })[c]);
+    }
+
+    async function fetchJSON(path) {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(`${path}: ${res.status}`);
+      return res.json();
+    }
+
+    // --- Routes --------------------------------------------------------------
+
+    let pollHandle = null;
+    function stopPoll() {
+      if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+    }
+
+    async function renderRunList() {
+      stopPoll();
+      const draw = async () => {
+        try {
+          const { runs } = await fetchJSON('/api/runs');
+          if (runs.length === 0) {
+            app.innerHTML = '<h1 class="text-2xl font-semibold mb-2">harness runs</h1><p class="text-slate-500">No runs yet. Start one with <code class="bg-slate-200 px-1 rounded">bun run run -- --harness ...</code></p>';
+            return;
+          }
+          const rows = runs.map(r => {
+            const dur = fmtDuration(durationMs(r.started_at, r.ended_at ?? new Date().toISOString()));
+            const retryCls = r.retries === 0 ? 'text-emerald-700' : r.retries <= 2 ? 'text-amber-700' : 'text-rose-700';
+            return `
+              <tr class="hover:bg-slate-100 cursor-pointer" onclick="location.hash='#/runs/${r.cwd_hash}/${encodeURIComponent(r.task_slug)}'">
+                <td class="px-3 py-2 text-xs text-slate-500">${escapeHtml(r.short_id)}</td>
+                <td class="px-3 py-2 text-xs">${escapeHtml(fmtTime(r.started_at))}</td>
+                <td class="px-3 py-2 text-xs">${escapeHtml(r.workflow)}</td>
+                <td class="px-3 py-2 text-sm font-medium">${escapeHtml(r.task_slug)}</td>
+                <td class="px-3 py-2">${statusBadge(r.status)}</td>
+                <td class="px-3 py-2 text-xs text-slate-600">${escapeHtml(r.current_phase ?? '—')}</td>
+                <td class="px-3 py-2 text-xs ${retryCls}">${r.retries}</td>
+                <td class="px-3 py-2 text-xs text-slate-500">${dur}</td>
+                <td class="px-3 py-2 text-xs text-slate-400 truncate max-w-xs" title="${escapeHtml(r.cwd)}">${escapeHtml(r.cwd)}</td>
+              </tr>
+            `;
+          }).join('');
+          app.innerHTML = `
+            <h1 class="text-2xl font-semibold mb-1">harness runs</h1>
+            <p class="text-sm text-slate-500 mb-4">${runs.length} run${runs.length === 1 ? '' : 's'} across all assistants. Auto-refreshes every 3s.</p>
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+              <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                  <tr class="text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    <th class="px-3 py-2">Run</th>
+                    <th class="px-3 py-2">Started</th>
+                    <th class="px-3 py-2">Workflow</th>
+                    <th class="px-3 py-2">Slug</th>
+                    <th class="px-3 py-2">Status</th>
+                    <th class="px-3 py-2">Phase</th>
+                    <th class="px-3 py-2">Retries</th>
+                    <th class="px-3 py-2">Duration</th>
+                    <th class="px-3 py-2">CWD</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">${rows}</tbody>
+              </table>
+            </div>
+          `;
+        } catch (e) {
+          app.innerHTML = `<p class="text-rose-700">Error: ${escapeHtml(e.message)}</p>`;
+        }
+      };
+      await draw();
+      pollHandle = setInterval(draw, 3000);
+    }
+
+    async function renderRunDetail(cwdHash, slug) {
+      stopPoll();
+      const draw = async () => {
+        try {
+          const [{ state, plan }, { commits, error: gitErr }] = await Promise.all([
+            fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}`),
+            fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/git-log`),
+          ]);
+
+          // The detail API pre-bakes phoenix.url server-side (Phoenix has no
+          // CORS so the browser can't resolve project name → GraphQL id).
+          // ONE trace per run — link goes in the header.
+          const phasesRows = state.phases.map(p => {
+            const dur = fmtDuration(durationMs(p.started_at, p.ended_at));
+            return `
+              <tr>
+                <td class="px-3 py-2 text-sm font-medium">${escapeHtml(p.name)}</td>
+                <td class="px-3 py-2 text-xs text-slate-500">#${p.attempt}</td>
+                <td class="px-3 py-2">${phaseBadge(p.status)}</td>
+                <td class="px-3 py-2 text-xs">${dur}</td>
+                <td class="px-3 py-2 text-xs text-slate-500 font-mono">${escapeHtml(p.session_id?.slice(0, 8) ?? '—')}</td>
+              </tr>
+            `;
+          }).join('');
+
+          // Plan section — workflows that produce a plan.json (feature-dev) get
+          // a per-task table here. Workflows without plan.json (e.g. docs) skip.
+          let planHtml = '';
+          if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0) {
+            const tasksDone = plan.tasks.filter(t => t.status === 'done').length;
+            const tasksFailed = plan.tasks.filter(t => t.status === 'failed').length;
+            const planSummary = plan.summary ? `<p class="text-xs text-slate-600 mb-3">${escapeHtml(plan.summary)}</p>` : '';
+            const taskRows = plan.tasks.map(t => {
+              const desc = t.description && t.description !== t.title
+                ? `<div class="text-xs text-slate-500 mt-0.5">${escapeHtml(t.description)}</div>`
+                : '';
+              const acceptance = (t.acceptance ?? []).length
+                ? `<details class="mt-1"><summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-700">${t.acceptance.length} acceptance criteria</summary><ul class="mt-1 ml-4 list-disc text-xs text-slate-500 space-y-0.5">${t.acceptance.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></details>`
+                : '';
+              const sha = t.commit_sha ? `<span class="font-mono text-xs text-slate-500" title="${escapeHtml(t.commit_sha)}">${escapeHtml(t.commit_sha.slice(0,8))}</span>` : '<span class="text-xs text-slate-400">—</span>';
+              const attemptsCls = t.attempts <= 1 ? 'text-emerald-700' : t.attempts <= 2 ? 'text-amber-700' : 'text-rose-700';
+              return `
+                <tr>
+                  <td class="px-3 py-2 text-xs font-mono text-slate-500 align-top">${escapeHtml(t.id)}</td>
+                  <td class="px-3 py-2 align-top">
+                    <div class="text-sm font-medium">${escapeHtml(t.title)}</div>
+                    ${desc}
+                    ${acceptance}
+                  </td>
+                  <td class="px-3 py-2 align-top">${taskBadge(t.status)}</td>
+                  <td class="px-3 py-2 text-xs ${attemptsCls} align-top">${t.attempts}</td>
+                  <td class="px-3 py-2 align-top">${sha}</td>
+                </tr>
+              `;
+            }).join('');
+            planHtml = `
+              <div class="flex items-baseline justify-between mb-2">
+                <h2 class="text-sm font-semibold text-slate-700">Plan tasks</h2>
+                <span class="text-xs text-slate-500">${tasksDone}/${plan.tasks.length} done${tasksFailed ? ` · <span class="text-rose-600">${tasksFailed} failed</span>` : ''} · ${plan.iterations_global} global iter${plan.iterations_global === 1 ? '' : 's'}</span>
+              </div>
+              ${planSummary}
+              <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
+                <table class="min-w-full divide-y divide-slate-200">
+                  <thead class="bg-slate-50 text-left text-xs uppercase text-slate-700">
+                    <tr><th class="px-3 py-2">ID</th><th class="px-3 py-2">Title / acceptance</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Attempts</th><th class="px-3 py-2">Commit</th></tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200">${taskRows}</tbody>
+                </table>
+              </div>
+            `;
+          }
+
+          let phoenixHeaderLink = '';
+          if (state.phoenix && state.phoenix.url) {
+            phoenixHeaderLink = `<a href="${state.phoenix.url}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">Open trace in Phoenix ↗</a>`;
+          } else if (state.phoenix) {
+            phoenixHeaderLink = `<span class="text-xs text-slate-400" title="Project not yet visible in Phoenix — try again in a few seconds">trace pending</span>`;
+          } else {
+            phoenixHeaderLink = `<span class="text-xs text-slate-400">no Phoenix trace (HARNESS_PHOENIX_URL not set when run started)</span>`;
+          }
+
+          const commitsHtml = (gitErr || commits.length === 0)
+            ? `<p class="text-xs text-slate-400">${escapeHtml(gitErr ?? 'No commits yet on this branch.')}</p>`
+            : `<ul class="space-y-1">${commits.map(c => `
+                <li class="text-sm">
+                  <span class="font-mono text-xs text-slate-500">${escapeHtml(c.sha)}</span>
+                  <span class="text-xs text-slate-400 ml-2">${escapeHtml(fmtTime(c.date))}</span>
+                  <div class="text-sm">${escapeHtml(c.subject)}</div>
+                </li>
+              `).join('')}</ul>`;
+
+          let pendingHtml = '';
+          if (state.pending_question) {
+            const pq = state.pending_question;
+            const opts = (pq.options ?? []);
+            const optsHtml = opts.length
+              ? `<pre class="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 overflow-auto">${escapeHtml(JSON.stringify(opts, null, 2))}</pre>`
+              : '';
+            pendingHtml = `
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center gap-2 mb-2">
+                  <h2 class="text-sm font-semibold text-amber-900">Waiting for human input</h2>
+                  ${badge(pq.kind, 'bg-amber-100 text-amber-800 ring-amber-200')}
+                </div>
+                <p class="text-sm text-amber-900">${escapeHtml(pq.prompt)}</p>
+                ${optsHtml}
+                <p class="mt-3 text-xs text-amber-700">Answer in your terminal: <code class="bg-amber-100 px-1 rounded">harness answer ${escapeHtml(state.run_id.slice(0,8))}</code></p>
+              </div>
+            `;
+          }
+
+          const recentHistory = state.history.slice(-12).reverse();
+
+          app.innerHTML = `
+            <a href="#/" class="text-sm text-indigo-600 hover:underline">← all runs</a>
+            <div class="flex items-center justify-between mt-2 mb-1 flex-wrap gap-2">
+              <h1 class="text-2xl font-semibold">${escapeHtml(state.origin.task_slug)}</h1>
+              ${phoenixHeaderLink}
+            </div>
+            <p class="text-sm text-slate-500 mb-4">${escapeHtml(state.origin.workflow)} · ${statusBadge(state.lifecycle.status)} · <span class="font-mono text-xs">${escapeHtml(state.run_id)}</span></p>
+
+            ${pendingHtml}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <h2 class="text-sm font-semibold mb-2 text-slate-700">Origin</h2>
+                <dl class="text-xs space-y-1">
+                  <div><dt class="inline text-slate-500">prompt:</dt> <dd class="inline">${escapeHtml(state.origin.prompt)}</dd></div>
+                  <div><dt class="inline text-slate-500">started:</dt> <dd class="inline">${escapeHtml(fmtTime(state.origin.started_at))}</dd></div>
+                  <div><dt class="inline text-slate-500">by:</dt> <dd class="inline">${escapeHtml(state.origin.user)}@${escapeHtml(state.origin.host)}</dd></div>
+                </dl>
+              </div>
+              <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <h2 class="text-sm font-semibold mb-2 text-slate-700">Environment</h2>
+                <dl class="text-xs space-y-1">
+                  <div><dt class="inline text-slate-500">cwd:</dt> <dd class="inline font-mono">${escapeHtml(state.environment.cwd)}</dd></div>
+                  <div><dt class="inline text-slate-500">branch:</dt> <dd class="inline font-mono">${escapeHtml(state.environment.branch)}</dd></div>
+                  <div><dt class="inline text-slate-500">isolation:</dt> <dd class="inline">${escapeHtml(state.environment.isolation)}</dd></div>
+                  <div><dt class="inline text-slate-500">mode:</dt> <dd class="inline">${escapeHtml(state.environment.mode)}</dd></div>
+                  ${state.lifecycle.ended_at ? `<div><dt class="inline text-slate-500">ended:</dt> <dd class="inline">${escapeHtml(fmtTime(state.lifecycle.ended_at))} (${escapeHtml(state.lifecycle.ended_reason ?? '')})</dd></div>` : ''}
+                </dl>
+              </div>
+            </div>
+
+            ${planHtml}
+
+            <h2 class="text-sm font-semibold mb-2 text-slate-700">Phases</h2>
+            <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
+              <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-700">
+                  <tr><th class="px-3 py-2">Name</th><th class="px-3 py-2">Attempt</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Duration</th><th class="px-3 py-2">Session</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">${phasesRows || '<tr><td colspan="5" class="px-3 py-2 text-xs text-slate-400">No phases yet.</td></tr>'}</tbody>
+              </table>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <h2 class="text-sm font-semibold mb-3 text-slate-700">Commits on ${escapeHtml(state.environment.branch)}</h2>
+                ${commitsHtml}
+              </div>
+              <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <h2 class="text-sm font-semibold mb-3 text-slate-700">Recent events</h2>
+                <ul class="space-y-1">
+                  ${recentHistory.map(e => `<li class="text-xs"><span class="text-slate-400">${escapeHtml(fmtTime(e.at))}</span> · <span class="text-slate-600">${escapeHtml(e.phase)}</span> · <span class="font-medium">${escapeHtml(e.event)}</span></li>`).join('')}
+                </ul>
+              </div>
+            </div>
+          `;
+        } catch (e) {
+          app.innerHTML = `<a href="#/" class="text-sm text-indigo-600 hover:underline">← all runs</a><p class="mt-4 text-rose-700">Error: ${escapeHtml(e.message)}</p>`;
+        }
+      };
+      await draw();
+      pollHandle = setInterval(draw, 3000);
+    }
+
+    function route() {
+      const hash = location.hash || '#/';
+      const detailMatch = hash.match(/^#\/runs\/([^/]+)\/(.+)$/);
+      if (detailMatch) {
+        renderRunDetail(detailMatch[1], decodeURIComponent(detailMatch[2]));
+      } else {
+        renderRunList();
+      }
+    }
+
+    window.addEventListener('hashchange', route);
+    route();
+  </script>
+</body>
+</html>
