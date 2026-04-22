@@ -512,6 +512,28 @@ validator: {
 
 Domain failures (e.g., `verdict.status === "blocked"`) come through `onDone` and are guard-routed by the author explicitly.
 
+### 8.4 Dispatcher convention
+
+Every engine dispatcher must export two surfaces:
+
+1. **A plain async function** `fn(opts, signal: AbortSignal)` — the canonical implementation and the testing surface for probes.
+2. **A thin `fromPromise(fn)` actor wrapper** — the XState integration adapter.
+
+Example (`commandActor`):
+```ts
+// Plain async — canonical implementation, probe surface
+export async function runCommand(opts: CommandOpts, signal: AbortSignal): Promise<CommandResult> { ... }
+
+// fromPromise wrapper — XState adapter only
+export const commandActor = fromPromise<CommandResult, CommandOpts>(
+  ({ input, signal }) => runCommand(input, signal)
+);
+```
+
+**Rationale:** XState's `fromPromise` routes abort and timeout rejections through `observer.error()`. Plain `.subscribe(nextCb)` subscribers never receive these — the rejection is invisible at the subscriber level. As a result, probes that need to exercise abort/timeout paths **must call the plain async function directly** with an `AbortController`, not via `createActor(commandActor) + .stop()`. Without this convention, abort and timeout failures are effectively untestable from outside XState.
+
+This convention applies to all dispatchers: `commandActor`, `agentActor`, `humanReviewActor`, and any future dispatcher added to `src/harness/engine/dispatchers/`. Each dispatcher file carries a one-line top-of-file comment referencing this section.
+
 ---
 
 ## 9. Engine runtime + persistence

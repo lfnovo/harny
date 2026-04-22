@@ -1,4 +1,5 @@
 // engine-design.md §8, §4.4, §9.1.1
+// Convention per §8.4: exports runCommand (plain async) + commandActor (fromPromise wrapper). See §8.4 for rationale.
 
 import { fromPromise } from 'xstate';
 import type { CommandActorOptions } from '../types.js';
