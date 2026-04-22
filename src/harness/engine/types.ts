@@ -32,6 +32,7 @@ export interface HumanReviewOption {
 
 // §7.2 — answer returned from a humanReview checkpoint
 export interface HumanReviewOutput {
+  kind?: 'text' | 'option';
   value: string;
   text?: string;
 }
@@ -96,4 +97,15 @@ export interface HumanReviewActorOptions {
   message: string | ((args: { context: HarnessContext }) => string);
   options?: HumanReviewOption[];
   previousAnswer?: HumanReviewOutput;
+}
+
+// §8.4 — DI-friendly options for runHumanReview / humanReviewActor
+export interface HumanReviewRunOptions {
+  message: string;
+  options?: HumanReviewOption[];
+  askProvider: (req: {
+    message: string;
+    options?: HumanReviewOption[];
+    signal: AbortSignal;
+  }) => Promise<HumanReviewOutput>;
 }

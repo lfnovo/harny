@@ -1,12 +1,34 @@
-// engine-design.md §7, §8
+// engine-design.md §7, §8, §8.4
 
 import { fromPromise } from 'xstate';
-import type { HumanReviewActorOptions } from '../types.js';
+import type { HumanReviewOutput, HumanReviewRunOptions } from '../types.js';
 
-// Wraps the harny parking mechanism as an XState fromPromise actor.
-// interactive: TTY readline. silent: throws SilentModeError. async: persists pending_question
-// + XState snapshot and exits with status waiting_human (§7.3).
-// When previousAnswer is provided (resume path), resolves immediately (§7, §9.3).
-export function humanReviewActor(options: HumanReviewActorOptions): ReturnType<typeof fromPromise> {
-  throw new Error('not implemented');
+export async function runHumanReview(
+  opts: HumanReviewRunOptions,
+  signal: AbortSignal,
+): Promise<HumanReviewOutput> {
+  if (signal.aborted) {
+    throw new Error('humanReview aborted');
+  }
+
+  let abortReject!: (err: Error) => void;
+  const abortPromise = new Promise<never>((_, reject) => {
+    abortReject = reject;
+  });
+
+  const abortHandler = () => abortReject(new Error('humanReview aborted'));
+  signal.addEventListener('abort', abortHandler);
+
+  try {
+    return await Promise.race([
+      opts.askProvider({ message: opts.message, options: opts.options, signal }),
+      abortPromise,
+    ]);
+  } finally {
+    signal.removeEventListener('abort', abortHandler);
+  }
 }
+
+export const humanReviewActor = fromPromise<HumanReviewOutput, HumanReviewRunOptions>(
+  ({ input, signal }) => runHumanReview(input, signal),
+);
