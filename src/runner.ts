@@ -4,7 +4,7 @@ import { join, isAbsolute, basename } from "node:path";
 import { runHarness, resumeHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
 import { getWorkflow } from "./harness/workflows/index.js";
-import { listAllRuns, findRun } from "./harness/state/filesystem.js";
+import { listAllRuns, findRun, statePathFor } from "./harness/state/filesystem.js";
 import type { PendingQuestion } from "./harness/state/schema.js";
 import {
   resolveAnswer,
@@ -45,7 +45,7 @@ function parseMode(value: string): RunMode {
 
 type RegistryCmd =
   | { kind: "ls"; status?: string; cwd?: string; workflow?: string }
-  | { kind: "show"; runId: string }
+  | { kind: "show"; runId: string; tail?: boolean }
   | {
       kind: "answer";
       runId: string;
@@ -154,7 +154,11 @@ function parseArgs(argv: string[]): {
     }
     registryCmd = { kind: "ls", status, cwd, workflow: wf };
   } else if (sub === "show" && rest[1]) {
-    registryCmd = { kind: "show", runId: rest[1]! };
+    let tail = false;
+    for (let i = 2; i < rest.length; i++) {
+      if (rest[i] === "--tail") tail = true;
+    }
+    registryCmd = { kind: "show", runId: rest[1]!, ...(tail ? { tail: true } : {}) };
   } else if (sub === "ui") {
     let port: number | undefined;
     let noOpen = false;
@@ -398,6 +402,14 @@ async function main() {
         console.error(`Run not found: ${registryCmd.runId}`);
         process.exit(1);
       }
+
+      if (registryCmd.tail) {
+        const sfp = statePathFor(run.environment.cwd, run.origin.task_slug);
+        const { tailRun } = await import("./harness/transcripts/tail.js");
+        await tailRun(sfp);
+        return;
+      }
+
       console.log(`Run:       ${run.run_id}`);
       console.log(`Workflow:  ${run.origin.workflow}`);
       console.log(`Status:    ${run.lifecycle.status}`);
