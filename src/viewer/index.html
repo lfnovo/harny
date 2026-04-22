@@ -92,7 +92,7 @@
         try {
           const { runs } = await fetchJSON('/api/runs');
           if (runs.length === 0) {
-            app.innerHTML = '<h1 class="text-2xl font-semibold mb-2">harny runs</h1><p class="text-slate-500">No runs yet. Start one with <code class="bg-slate-200 px-1 rounded">bunx harny "&lt;prompt&gt;"</code></p>';
+            app.innerHTML = '<h1 class="text-2xl font-semibold mb-2">harny runs</h1><p class="text-slate-500">No runs yet. Start one with <code class="bg-slate-200 px-1 rounded">bunx @lfnovo/harny "&lt;prompt&gt;"</code></p>';
             return;
           }
           const rows = runs.map(r => {

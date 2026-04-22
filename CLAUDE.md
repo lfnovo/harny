@@ -2,7 +2,7 @@
 
 TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "harness engineering" pattern: a planner → developer → validator loop orchestrated externally, with file-based handoff through `plan.json`.
 
-Published as `harny` on npm; runs via `bunx harny` against the current working directory by default.
+Published as `@lfnovo/harny` on npm (the unscoped `harny` name was blocked by npm's anti-typosquatting filter for similarity to `yarn`/`vary`); runs via `bunx @lfnovo/harny` against the current working directory by default. Global install via `bun add -g @lfnovo/harny` exposes the binary as just `harny`.
 
 ## Key paths
 
@@ -80,7 +80,7 @@ Set `HARNY_PHOENIX_URL` (e.g. `http://127.0.0.1:6006`) before running. Per-run s
 - **Runtime: Bun ≥ 1.3** (enforced by `engines.bun` in `package.json`). The project runs TypeScript natively — no `tsx`, no build step.
 - `bun run typecheck` after any code change.
 - Local dev entry: `bun run harny -- "<prompt>"` (script in `package.json`) or `bun bin/harny.ts "<prompt>"`.
-- Published entry: `bunx harny "<prompt>"` (defaults to `process.cwd()`, workflow `feature-dev`).
+- Published entry: `bunx @lfnovo/harny "<prompt>"` (defaults to `process.cwd()`, workflow `feature-dev`). Or `bun add -g @lfnovo/harny` then `harny "<prompt>"`.
 - E2E smoke tests live in throwaway `/tmp/harny-e2e-*` dirs: `git init`, `cd` in, run `bun /path/to/harny/bin/harny.ts "<prompt>"`, inspect `.harny/<slug>/state.json`.
 - State inspection: `harny ls [--status waiting_human]`, `harny show <runId>` (prefix ≥8 chars), `harny answer <runId> [...]`, `harny clean <slug>`.
 - **Visual inspection**: `harny ui` boots a viewer on `http://127.0.0.1:4123` showing all runs across registered assistants + the current cwd, with auto-refresh, plan tasks, phases timeline, and Phoenix deep-links when enabled. Lives until Ctrl-C.

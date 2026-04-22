@@ -6,16 +6,21 @@ A TypeScript task launcher built on the [Claude Agent SDK](https://github.com/an
 
 ```sh
 # Run feature-dev workflow against the current directory.
-bunx harny "build me a calculator CLI in calc.py"
+bunx @lfnovo/harny "build me a calculator CLI in calc.py"
 
 # Show all runs in this directory + any registered assistants.
-bunx harny ls
+bunx @lfnovo/harny ls
 
 # Open the visual viewer.
-bunx harny ui
+bunx @lfnovo/harny ui
 ```
 
-`harny` requires [Bun](https://bun.sh) >= 1.3 on the machine that runs it. The first `bunx` invocation installs the package; subsequent ones run instantly.
+`harny` requires [Bun](https://bun.sh) >= 1.3 on the machine that runs it. The first `bunx` invocation installs the package; subsequent ones run instantly. For frequent use, install globally and the binary becomes just `harny`:
+
+```sh
+bun add -g @lfnovo/harny
+harny "<prompt>"
+```
 
 ## What it does
 
@@ -30,8 +35,8 @@ On `pass`, harny commits with a composed message. On `fail`, the developer's ses
 You can also run the `docs` workflow (writer -> reviewer) or `issue-triage` (one-shot decision on a GitHub issue):
 
 ```sh
-bunx harny --workflow docs --input intent.json "document the CLI"
-bunx harny --workflow issue-triage --input issue.json "triage this issue"
+bunx @lfnovo/harny --workflow docs --input intent.json "document the CLI"
+bunx @lfnovo/harny --workflow issue-triage --input issue.json "triage this issue"
 ```
 
 ## CLI
@@ -60,7 +65,7 @@ Set `HARNY_PHOENIX_URL` to mirror SDK transcripts and tool calls into a local [P
 ```sh
 docker run -d -p 6006:6006 arizephoenix/phoenix:latest
 export HARNY_PHOENIX_URL=http://127.0.0.1:6006
-bunx harny "build me a calculator"
+bunx @lfnovo/harny "build me a calculator"
 ```
 
 The viewer surfaces a deep-link to the run's Phoenix trace when this is enabled.

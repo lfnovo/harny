@@ -1,5 +1,5 @@
 {
-  "name": "harny",
+  "name": "@lfnovo/harny",
   "version": "0.1.0",
   "description": "TypeScript task launcher built on the Claude Agent SDK. Implements the harness-engineering pattern: planner -> developer -> validator loop orchestrated externally with file-based handoff through plan.json.",
   "license": "MIT",
@@ -26,7 +26,7 @@
     "bun": ">=1.3.0"
   },
   "bin": {
-    "harny": "./bin/harny.ts"
+    "harny": "bin/harny.ts"
   },
   "files": [
     "src",
