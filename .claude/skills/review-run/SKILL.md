@@ -108,9 +108,18 @@ Output structure:
 <one-line prompt seeds, e.g. "fix dedup of task=N trailer in commit composer">
 ```
 
-### Step 7 — Append to LEARNINGS.md
+### Step 7 — Persist the review to the run dir
 
-After the architect (user) confirms the review, append the LEARNINGS.md-formatted entries. Don't auto-append — wait for human nod.
+Write the full review markdown (the document emitted in step 6) to `<cwd>/.harny/<slug>/review.md`. This is automatic — do NOT wait for confirmation. Reasons:
+
+- Review co-locates with the run it analyzes; future review-runs and the meta-agent find it without indirection.
+- Survives compaction and context loss — the architect can re-read at any time without re-running the skill.
+- If a re-review is run later (e.g., after more context emerges), overwrite the file but prepend a `<!-- re-reviewed YYYY-MM-DD -->` marker.
+- The file goes into the run directory, which is gitignored at the project level (`.harny/<slug>/.gitignore` = `*` + `!.gitignore`). It is per-clone, not committed.
+
+### Step 8 — Append to LEARNINGS.md
+
+After the architect (user) confirms the review, append the LEARNINGS.md-formatted entries. Don't auto-append — wait for human nod. (LEARNINGS.md IS committed to the repo; review.md is not.)
 
 ## Notes
 
