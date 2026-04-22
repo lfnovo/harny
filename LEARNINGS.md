@@ -6,6 +6,16 @@ For agent-emitted issues, see `state.json:problems[]` per run instead.
 
 ---
 
+## Run #4 — `land-learnings` (2026-04-22)
+
+### L6 — architect must merge after every run, or branches diverge silently
+
+- **Pattern observed:** Run #4 was branched from `main` while runs #1-3 lived on dangling branches (`harny/engine-scaffolding`, `harny/command-actor`, `harny/tail-show`) that had never been merged. The dev correctly created a one-line comment `command.ts` because main had no `command.ts` to comment on — but that file would have regressed the real implementation when merged. Architect (Claude) only noticed during the validator's "untracked file" anomaly note; would have been an invisible regression otherwise.
+- **Counterfactual:** Yes — any architect (human or AI) running successive harness invocations on the same repo will face this. Worktrees only isolate the working tree, not the branch graph. The orchestrator branches from whatever HEAD the primary worktree is on at invocation time.
+- **Action:** Adopt **policy (a) — merge cumulative after each run**. Codified in RELEASE.md as a new rule. Concretely: after every passing run, `git checkout main && git merge --no-ff harny/<slug>` before invoking the next. Exception: when stacking by intent (e.g., a fix-up run on top of a half-done feature), explicitly checkout the prior branch first and document why. Branches are preserved (RELEASE.md Rule 2) but main is the integration point.
+
+---
+
 ## Run #2 — `command-actor` (2026-04-22)
 
 ### L3 — XState `fromPromise` swallows subscriber-level errors on abort

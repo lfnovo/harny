@@ -79,7 +79,19 @@ When `.harny/` gets too cluttered (10+ runs), revisit — but default is preserv
 
 Multi-task plans are fine if validator gates each task individually. But each `harny "..."` invocation should produce a coherent commit chain that represents one focused change. Don't try to bundle "engine scaffolding + first agentActor + first probe" into one prompt — that's three runs.
 
-### Rule 4: This doc evolves
+### Rule 4: Merge to main after every passing run
+
+After every harness run that ships a passing commit, the architect runs `git checkout main && git merge --no-ff harny/<slug>` before invoking the next run. Reasons:
+
+- Worktrees isolate the working tree but NOT the branch graph. Successive runs branched from `main` "forget" the prior runs and silently regress files that were modified on dangling branches.
+- The validator's "no other files modified" check is per-worktree, not cross-branch — it cannot catch a regression that exists only relative to a sibling branch.
+- Cumulative merge keeps `main` as the source of truth, so the next run branches from a state that includes everything before it.
+
+Exception: stacking by intent (e.g., a follow-up fix on top of a half-done feature). In that case, explicitly `git checkout harny/<prior-slug>` before invoking and document why in the prompt or commit message.
+
+Branches are still preserved (Rule 2) — they form the run history. Merging doesn't delete them.
+
+### Rule 5: This doc evolves
 
 `RELEASE.md` is not a contract. It's a working agreement that we update as we learn. If a rule isn't serving us after 5 runs, we change it explicitly here — not silently.
 
