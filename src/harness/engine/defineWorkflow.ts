@@ -9,5 +9,25 @@ export function defineWorkflow<TMachine extends AnyStateMachine>(def: {
   needsWorktree?: boolean;
   machine: TMachine;
 }): WorkflowDefinition<TMachine> {
-  throw new Error('not implemented');
+  if (typeof def.id !== 'string' || def.id.trim().length === 0) {
+    throw new Error('defineWorkflow: id must be a non-empty string');
+  }
+
+  const m = def.machine as unknown as Record<string, unknown>;
+  if (
+    typeof m?.config !== 'object' ||
+    m?.config === null ||
+    typeof m?.getInitialSnapshot !== 'function'
+  ) {
+    throw new Error(
+      'defineWorkflow: machine must be an XState v5 StateMachine (missing config or getInitialSnapshot)',
+    );
+  }
+
+  return Object.freeze({
+    id: def.id,
+    needsBranch: def.needsBranch,
+    needsWorktree: def.needsWorktree,
+    machine: def.machine,
+  }) as WorkflowDefinition<TMachine>;
 }
