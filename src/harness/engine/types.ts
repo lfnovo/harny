@@ -71,6 +71,8 @@ export interface AgentActorOptions {
 // §4.4, §9.1.1 — options for the commandActor dispatcher
 export interface CommandActorOptions {
   cmd: string[];
+  cwd?: string;
+  timeout_ms?: number;
   advisory?: boolean;
   idempotent?: boolean;
   context?: ActorContext;
