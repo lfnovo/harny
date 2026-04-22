@@ -14,6 +14,7 @@ import {
   addWorktree,
   assertBranchAbsent,
   assertCleanTree,
+  assertHasInitialCommit,
   assertIsGitRepo,
   assertWorktreePathAbsent,
   cleanUntracked,
@@ -329,6 +330,7 @@ export async function runHarness(args: {
   log(`[harny] user prompt <<<`);
 
   await assertIsGitRepo(primaryCwd);
+  await assertHasInitialCommit(primaryCwd);
 
   // Idempotent rerun guard: if state.json already exists at this slug, refuse
   // gracefully so we don't clobber an in-progress or completed run.

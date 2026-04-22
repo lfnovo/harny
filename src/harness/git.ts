@@ -35,6 +35,15 @@ export async function assertIsGitRepo(cwd: string): Promise<void> {
   }
 }
 
+export async function assertHasInitialCommit(cwd: string): Promise<void> {
+  const { code } = await runGit(cwd, ["rev-parse", "--verify", "--quiet", "HEAD"]);
+  if (code !== 0) {
+    throw new Error(
+      `Repo at ${cwd} has no commits yet. harny needs at least one commit so it can capture pre-phase SHAs and reset between attempts. Quick fix: git commit --allow-empty -m "initial"`,
+    );
+  }
+}
+
 export async function assertCleanTree(cwd: string): Promise<void> {
   const { stdout } = await runGit(cwd, ["status", "--porcelain"]);
   if (stdout.trim().length > 0) {

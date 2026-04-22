@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-04-22
+
+### Changed
+- **Generic feature-dev prompts.** `src/harness/workflows/featureDev/defaults.ts` no longer carries harny-self-development guardrails. The developer prompt drops the "Idempotency check for invocation-surface changes" bullet (about new flags / new modes / precondition checks / state on disk) and the "Keep CLAUDE.md in sync with public API changes" bullet (which referenced `WorkflowContext`, `Workflow`, `src/harness/workflow.ts`, `src/harness/state/`). The validator prompt drops the "When the system you are validating IS the harness itself" preamble, harny-specific examples (`bun bin/harny.ts --new-flag bogus`, `/tmp/harny-e2e-*`, `harny/<slug>` branch / `.harny/<slug>/` slug-collision warning, `bun bin/harny.ts clean <slug>`), and the "harness is often self-building" rationale. The generalizable principle (one comprehensive run per task, skip expensive runs when ACs can be verified directly, artifact-based evidence exception) is preserved in plain wording. New runs in arbitrary projects now get prompts that don't leak harny internals.
+- **harny-self-development overrides moved to repo-root `harny.json`.** A tracked `harny.json` at the project root supplies the harny-specific developer + validator prompts (full text, since `mergePhase` replaces — no append composition yet). This is the only project that needs these guardrails; other projects inherit the clean generic prompts.
+
+### Fixed
+- **Empty-repo failure** — `bunx @lfnovo/harny "..."` in a freshly-`git init`'d repo no longer crashes mid-run with `git rev-parse HEAD failed (exit 128): fatal: ambiguous argument 'HEAD': unknown revision`. Modern git's `worktree add -b ...` accepts unborn-HEAD repos and creates a worktree on an unborn branch, which then exploded when feature-dev tried to capture `prePhaseSha` before the developer phase. The orchestrator now calls `assertHasInitialCommit(primaryCwd)` right after `assertIsGitRepo`, failing fast with: `Repo at <cwd> has no commits yet. harny needs at least one commit so it can capture pre-phase SHAs and reset between attempts. Quick fix: git commit --allow-empty -m "initial"`.
+
 ## [0.1.0] — 2026-04-22
 
 **First npm publish as `@lfnovo/harny`.** Installable via `bunx @lfnovo/harny` or `bun add -g @lfnovo/harny`. The unscoped name `harny` was blocked by npm's anti-typosquatting filter; the scoped name is the standard workaround. The bin entry is `harny`, so a global install exposes the command as plain `harny`. This release packages everything under [Unreleased] up to this point — the rebrand from `harness` → `harny`, the MVP refactor (state.json + Phoenix + viewer), Tier 3b run modes, and all prior work documented under the [0.1.0-preview] entry below.
