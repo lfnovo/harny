@@ -6,4 +6,5 @@ sessions/
 .env.local
 *.log
 assistants.json
-.claude/
+.claude/*
+!.claude/skills/

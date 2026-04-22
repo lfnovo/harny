@@ -37,6 +37,7 @@ For every single harness invocation:
 4. **Wait.** Each run takes 5-15 min (planner + dev + validator + retries). That's OK.
 5. **Analyze outcome together.** Read state.json, plan.json, transcripts. What worked? What surprised us?
 6. **Discuss improvements.** Was the prompt too vague? Did the planner over-decompose? Did the validator miss something? Note observations.
+6.5. **Extract at least one infra-improvement candidate.** Apply the **counterfactual test**: would a fresh dev tomorrow, reading only CLAUDE.md + the codebase, succeed without the hint we added in the prompt? If **no**, the gap belongs somewhere durable — CLAUDE.md "Gotchas", a code comment near the trap, an `engine-design.md` section, or a probe template — **not in the prompt**. The prompt is a crutch; we want harny to be the reason for success, not our nudges. Log to `LEARNINGS.md` (architect-emitted observations, distinct from `state.json:problems[]` which is agent-emitted).
 7. **Plan the next run.** Apply learnings.
 
 **No batch planning.** We do not write the next 5 prompts in advance. The next prompt is shaped by what we learned from the last one.
