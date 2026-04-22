@@ -8,6 +8,24 @@ For agent-emitted issues, see `state.json:problems[]` per run instead.
 
 ## Run #2 — `command-actor` (2026-04-22)
 
+### L3 — XState `fromPromise` swallows subscriber-level errors on abort
+
+- **Pattern observed:** When an abort fires on a `fromPromise` actor, the internal observer calls `.error()`, which plain `.subscribe(nextCb)` subscribers never see — the rejection is invisible. Dev gastou ~2min grepping xstate internals to discover this. Discovered in run `command-actor` during the timeout scenario fail.
+- **Counterfactual:** Yes — every future dispatcher (agent, humanReview, planActor, validatorActor, etc.) faces the exact same testability question. Fresh dev would re-discover it.
+- **Action:** Convention for engine dispatchers: every dispatcher exports both (a) a plain `async fn(opts, signal)` (canonical implementation, the probe surface) and (b) a thin `fromPromise(fn)` actor wrapper (XState adapter only). Probes exercise the async fn directly with an `AbortController` rather than `createActor` + `stop()`. Lands in `engine-design.md §8` as a contract; one-line top-of-file comment in each dispatcher referencing it.
+
+### L4 — Worktrees start without `node_modules`
+
+- **Pattern observed:** Newly-created harny worktrees don't share `node_modules` with the primary repo. Dev's first `bun run typecheck` failed with `Cannot find module 'xstate'`. Recovered with `bun install`. Lost ~2min. Logged as agent-emitted Problem in `state.json:problems[]`.
+- **Counterfactual:** Yes — any phase that imports runtime deps or runs typecheck on a fresh worktree hits this.
+- **Action:** Start with a CLAUDE.md "Gotchas" bullet ("Worktrees start without node_modules. Phases that run typecheck or import runtime deps must `bun install` first."). Revisit with an orchestrator change (auto `bun install` on cold-start worktree) if it recurs.
+
+### L5 — macOS lacks `timeout(1)`
+
+- **Pattern observed:** Architect prescribed `timeout 20 bun ...` in run #2's prompt. Both dev and validator hit `command not found: timeout` on macOS (no coreutils by default). Both recovered by invoking bun directly. The probe's internal 3s-per-scenario `Promise.race` was the actual safety net. Confirmed again in run #3 (`tail-show`) — validator explicitly noted *"`timeout` binary not in PATH on macOS zsh; used direct bun invocation"*.
+- **Counterfactual:** Yes — any prompt that prescribes outer `timeout N` will fail the same way on stock macOS.
+- **Action:** (a) CLAUDE.md "Gotchas" bullet ("macOS has no `timeout(1)`. Prefer in-script `Promise.race` hard deadlines."). (b) Architect rule: stop prescribing `timeout N` in prompts. The internal probe deadline is the real safety net.
+
 ### L1 — subprocess cleanup pattern
 
 - **Pattern observed:** First attempt hung indefinitely. Three orphan `bun scripts/probes/...` zsh processes accumulated in 16+ minutes because the dev wrote AbortSignal/timeout handlers that returned before the child process actually died (`proc.kill()` fired, but the parent settled before `proc.exited` resolved). The probe also had no outer deadline, so a hang in any single scenario hung the whole probe — and the SDK Bash tool didn't enforce its 2min default.
