@@ -86,6 +86,18 @@ Set `HARNY_PHOENIX_URL` (e.g. `http://127.0.0.1:6006`) before running. Per-run s
 - **Visual inspection**: `harny ui` boots a viewer on `http://127.0.0.1:4123` showing all runs across registered assistants + the current cwd, with auto-refresh, plan tasks, phases timeline, and Phoenix deep-links when enabled. Lives until Ctrl-C.
 - **Optional Phoenix**: `docker run -d -p 6006:6006 arizephoenix/phoenix:latest` then `export HARNY_PHOENIX_URL=http://127.0.0.1:6006`.
 
+## Releasing
+
+Tag-driven via `.github/workflows/publish.yml` (trigger: push of `v*` tag). The action checks that `package.json:version` matches the tag, runs `bun run typecheck`, and `npm publish --access public` with `NPM_TOKEN` from repo secrets (granular npm token, Bypass 2FA enabled, scoped to `@lfnovo/harny`). Workflow:
+
+```sh
+# bump package.json version, update CHANGELOG.md (move [Unreleased] under new version header)
+git commit -am "chore(release): v0.1.1"
+git tag v0.1.1 && git push origin main v0.1.1
+```
+
+The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wasn't set yet. All subsequent releases go through CI.
+
 ## Gotchas
 
 - The `claude-code` binary embedded by the SDK uses `jsonSchema` internally; `outputFormat.schema` is translated at the SDK layer. If structured outputs are missing, check the schema for the `$schema` top-level key first.

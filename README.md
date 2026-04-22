@@ -1,5 +1,8 @@
 # harny
 
+[![npm](https://img.shields.io/npm/v/@lfnovo/harny?label=npm%3A%20%40lfnovo%2Fharny)](https://www.npmjs.com/package/@lfnovo/harny)
+[![license](https://img.shields.io/npm/l/@lfnovo/harny)](./CHANGELOG.md)
+
 A TypeScript task launcher built on the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript). Implements Anthropic's "harness engineering" pattern: a planner -> developer -> validator loop orchestrated externally, with file-based handoff through `plan.json`. Workflows are configurable, observability is opt-in (Phoenix), and runs are inspectable via a built-in viewer.
 
 ## Quickstart
@@ -106,6 +109,20 @@ bun bin/harny.ts ui                   # viewer against local runs
 ```
 
 Internals live under `src/harness/` (workflows, orchestrator, state, observability) and `src/viewer/`. See `CLAUDE.md` for an exhaustive map and the invariants the codebase upholds.
+
+## Releasing
+
+Publishes are tag-driven via `.github/workflows/publish.yml`:
+
+```sh
+# 1. bump version in package.json (e.g. 0.1.0 -> 0.1.1)
+# 2. update CHANGELOG.md (move [Unreleased] entries under a new [0.1.1] section)
+git commit -am "chore(release): v0.1.1"
+git tag v0.1.1
+git push origin main v0.1.1
+```
+
+The action validates that `package.json:version` matches the tag, runs `bun run typecheck`, and publishes via `npm publish --access public` using the `NPM_TOKEN` repo secret (a granular npm token with `Bypass 2FA` enabled, scoped to `@lfnovo/harny`).
 
 ## License
 

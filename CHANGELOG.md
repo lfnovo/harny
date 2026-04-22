@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-04-22
+
+**First npm publish as `@lfnovo/harny`.** Installable via `bunx @lfnovo/harny` or `bun add -g @lfnovo/harny`. The unscoped name `harny` was blocked by npm's anti-typosquatting filter; the scoped name is the standard workaround. The bin entry is `harny`, so a global install exposes the command as plain `harny`. This release packages everything under [Unreleased] up to this point — the rebrand from `harness` → `harny`, the MVP refactor (state.json + Phoenix + viewer), Tier 3b run modes, and all prior work documented under the [0.1.0-preview] entry below.
+
 ### Changed
 - **Renamed `harness` → `harny`.** Package now publishes as `@lfnovo/harny` on npm (the unscoped `harny` name was blocked by npm's anti-typosquatting filter as too similar to `yarn`/`vary`; scoped publish is the standard workaround) and is invoked via `bunx @lfnovo/harny` (or `harny` after `bun add -g @lfnovo/harny`). All runtime paths, env vars, configs, log prefixes, branch names, and span/attribute prefixes renamed: `~/.harness/` → `~/.harny/`, `<cwd>/.harness/<slug>/` → `<cwd>/.harny/<slug>/`, `harness.json` → `harny.json`, `HARNESS_PHOENIX_URL` → `HARNY_PHOENIX_URL`, `HARNESS_UI_PORT` → `HARNY_UI_PORT`, `[harness]`/`[harness:<phase>]` log prefixes → `[harny]`/`[harny:<phase>]`, branch convention `harness/<slug>` → `harny/<slug>`, Phoenix span name `harness.<phase>` → `harny.<phase>`, resource attributes `harness.workflow|run_id|task_slug|cwd` → `harny.workflow|run_id|task_slug|cwd`, Phoenix project name fallback `"harness"` → `"harny"`, OTel tracer name `"harness"` → `"harny"`. The conceptual term "harness engineering" (the orchestration pattern itself) is preserved in narrative documentation; only branded surface area changed. Existing run state.json files from prior runs continue to be readable but reference the old `harness/<slug>` branches; new runs use `harny/<slug>`. `~/.harness/assistants.json` is NOT auto-migrated — copy it manually to `~/.harny/assistants.json` to preserve registered assistants.
 - **`--harness` flag removed; harness mode is the only mode.** The CLI no longer has a separate "single-query" path. Single-query mode (direct SDK `query()` without orchestration) was extracted into `scripts/probes/single-query.ts` as a personal probe, isolated from the published package. Default workflow when `--workflow` is omitted is `feature-dev`.
@@ -70,7 +74,9 @@ All notable changes to this project are documented here. The format loosely foll
 - `.gitignore` pattern `node_modules/` (with trailing slash) only matched directories — symlinks named `node_modules` slipped through and got tracked when an agent created one inside its worktree to make `npm` work there. Tightened to `node_modules` (no trailing slash) catches files, dirs, and symlinks. The accidental tracked symlink was also dropped (`74ca765`).
 - Planner `maxTurns: 10` was too low for non-trivial codebases — bumped twice during dogfood, ultimately settling at 50.
 
-## [0.1.0] — 2026-04-20
+## [0.1.0-preview] — 2026-04-20
+
+**Pre-publish baseline** — never published to npm; this version number was reused for the eventual first publish on 2026-04-22 (see [0.1.0] above). Captured here for history.
 
 ### Added
 - CLI launcher (`src/runner.ts`) built on `@anthropic-ai/claude-agent-sdk`. Streams every SDK event into a per-session JSON file.
