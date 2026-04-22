@@ -63,10 +63,23 @@ export interface HarnessContext {
 
 // §9.1.1 — options for the agentActor dispatcher
 export interface AgentActorOptions {
-  phase: string;
+  phaseName: string;
   prompt: string;
+  schema: object;
+  allowedTools: string[];
+  resumeSessionId?: string;
+  runPhase: (args: {
+    phaseName: string;
+    prompt: string;
+    schema: object;
+    allowedTools: string[];
+    resumeSessionId?: string;
+    signal: AbortSignal;
+  }) => Promise<{ output: unknown; session_id: string }>;
   context?: ActorContext;
 }
+
+export type AgentRunOptions = AgentActorOptions;
 
 // §4.4, §9.1.1 — options for the commandActor dispatcher
 export interface CommandActorOptions {
