@@ -33,7 +33,7 @@ export async function cleanRun(
 ): Promise<void> {
   const worktreePath = worktreePathFor(primaryCwd, slug);
   const stateDir = planDir(primaryCwd, slug);
-  const branch = `harness/${slug}`;
+  const branch = `harny/${slug}`;
 
   if (verbose) console.log(`[clean] removing worktree: ${worktreePath}`);
   await removeWorktree(primaryCwd, worktreePath, { force: true });

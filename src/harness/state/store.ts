@@ -19,7 +19,7 @@ export interface StateStore {
 
   /**
    * Initialize a new run. Throws if state.json already exists at this path —
-   * runs are append-only; rerunning a slug requires `harness clean` first.
+   * runs are append-only; rerunning a slug requires `harny clean` first.
    */
   createRun(initial: State): Promise<void>;
 

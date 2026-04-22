@@ -8,7 +8,7 @@ import type {
 } from "../types.js";
 
 export function planDir(primaryCwd: string, taskSlug: string): string {
-  return join(primaryCwd, ".harness", taskSlug);
+  return join(primaryCwd, ".harny", taskSlug);
 }
 
 export function planFilePath(primaryCwd: string, taskSlug: string): string {
@@ -20,7 +20,7 @@ export function sessionsDir(primaryCwd: string, taskSlug: string): string {
 }
 
 export function worktreePathFor(primaryCwd: string, taskSlug: string): string {
-  return join(primaryCwd, ".harness", "worktrees", taskSlug);
+  return join(primaryCwd, ".harny", "worktrees", taskSlug);
 }
 
 async function writeJsonAtomic(path: string, data: unknown): Promise<void> {

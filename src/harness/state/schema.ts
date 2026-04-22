@@ -71,7 +71,7 @@ export const StateSchema = z.object({
   /** Top-level Phoenix link — single trace per harness run, all phases live
    *  inside it as child spans. Absent when Phoenix observability isn't
    *  enabled. On resume, may be overwritten with the resume invocation's
-   *  trace; the original trace remains queryable in Phoenix by harness.run_id. */
+   *  trace; the original trace remains queryable in Phoenix by harny.run_id. */
   phoenix: PhoenixRefSchema.optional(),
 });
 

@@ -46,7 +46,7 @@ export const PersistedProblemSchema = ProblemSchema.extend({
 export type PersistedProblem = z.infer<typeof PersistedProblemSchema>;
 
 export function problemsDir(primaryCwd: string, taskSlug: string): string {
-  return resolve(primaryCwd, ".harness", taskSlug, "problems");
+  return resolve(primaryCwd, ".harny", taskSlug, "problems");
 }
 
 function generateId(): string {

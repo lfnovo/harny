@@ -18,7 +18,7 @@ async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
 }
 
 export function statePathFor(cwd: string, taskSlug: string): string {
-  return join(cwd, ".harness", taskSlug, "state.json");
+  return join(cwd, ".harny", taskSlug, "state.json");
 }
 
 export class FilesystemStateStore implements StateStore {
@@ -117,21 +117,21 @@ export class FilesystemStateStore implements StateStore {
   }
 }
 
-// --- Cross-run discovery (used by `harness ls`, `harness show`, viewer) ----
+// --- Cross-run discovery (used by `harny ls`, `harny show`, viewer) --------
 
 /**
  * Scan a single cwd for all run state.json files. Skips reserved subdirs
- * (`.harness/worktrees/`, dotfiles) and any malformed state.json.
+ * (`.harny/worktrees/`, dotfiles) and any malformed state.json.
  */
 export async function listRunsInCwd(cwd: string): Promise<State[]> {
-  const harnessDir = join(cwd, ".harness");
-  if (!existsSync(harnessDir)) return [];
-  const entries = await readdir(harnessDir, { withFileTypes: true });
+  const harnyDir = join(cwd, ".harny");
+  if (!existsSync(harnyDir)) return [];
+  const entries = await readdir(harnyDir, { withFileTypes: true });
   const states: State[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     if (entry.name.startsWith(".") || entry.name === "worktrees") continue;
-    const statePath = join(harnessDir, entry.name, "state.json");
+    const statePath = join(harnyDir, entry.name, "state.json");
     if (!existsSync(statePath)) continue;
     try {
       const raw = await readFile(statePath, "utf8");

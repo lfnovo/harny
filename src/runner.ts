@@ -1,14 +1,11 @@
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { setupPhoenix, withRunSpan } from "./harness/observability/phoenix.js";
-import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, dirname, isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, isAbsolute, basename } from "node:path";
 import { runHarness, resumeHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
 import { getWorkflow } from "./harness/workflows/index.js";
 import { listAllRuns, findRun } from "./harness/state/filesystem.js";
-import type { State, PendingQuestion } from "./harness/state/schema.js";
+import type { PendingQuestion } from "./harness/state/schema.js";
 import {
   resolveAnswer,
   runAskUserQuestionTTY,
@@ -17,12 +14,9 @@ import {
 } from "./harness/askUser.js";
 import type { IsolationMode, LogMode, RunMode } from "./harness/types.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT_DIR = join(__dirname, "..");
-const SESSIONS_DIR = join(ROOT_DIR, "sessions");
-// User-global config: list of named workspaces. Lives in ~/.harness/ so it's
-// independent of which harness clone you're using and survives worktree creation.
-const ASSISTANTS_FILE = join(homedir(), ".harness", "assistants.json");
+// User-global config: list of named workspaces. Lives in ~/.harny/ so it's
+// independent of which harny clone you're using and survives worktree creation.
+const ASSISTANTS_FILE = join(homedir(), ".harny", "assistants.json");
 
 type Assistant = {
   name: string;
@@ -33,25 +27,6 @@ type Assistant = {
 type AssistantsFile = {
   assistants: Assistant[];
 };
-
-type SessionRecord = {
-  session_id: string | null;
-  assistant: string | null;
-  cwd: string | null;
-  additional_directories: string[];
-  prompt: string;
-  started_at: string;
-  ended_at: string | null;
-  status: "running" | "completed" | "error";
-  error: string | null;
-  events: SDKMessage[];
-};
-
-async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
-  const tmp = `${path}.tmp`;
-  await writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  await rename(tmp, path);
-}
 
 function parseIsolation(value: string): IsolationMode {
   if (value === "worktree" || value === "inline") return value;
@@ -84,7 +59,6 @@ type RegistryCmd =
 function parseArgs(argv: string[]): {
   logMode: LogMode;
   assistant: string | null;
-  harness: boolean;
   workflow: string | null;
   cleanSlug: string | null;
   registryCmd: RegistryCmd | null;
@@ -97,7 +71,6 @@ function parseArgs(argv: string[]): {
   let verbose = false;
   let quiet = false;
   let assistant: string | null = null;
-  let harness = false;
   let workflow: string | null = null;
   let task: string | null = null;
   let isolation: IsolationMode | null = null;
@@ -111,8 +84,6 @@ function parseArgs(argv: string[]): {
       verbose = true;
     } else if (a === "--quiet") {
       quiet = true;
-    } else if (a === "--harness") {
-      harness = true;
     } else if (a === "--workflow") {
       const next = argv[i + 1];
       if (!next) throw new Error("--workflow requires a name");
@@ -163,77 +134,77 @@ function parseArgs(argv: string[]): {
   let cleanSlug: string | null = null;
   let registryCmd: RegistryCmd | null = null;
 
-  if (rest[0] === "harness") {
-    const sub = rest[1];
-    if (sub === "clean" && rest[2]) {
-      cleanSlug = rest[2];
-    } else if (sub === "ls") {
-      let status: string | undefined;
-      let cwd: string | undefined;
-      let wf: string | undefined;
-      for (let i = 2; i < rest.length; i++) {
-        if (rest[i] === "--status" && rest[i + 1]) { status = rest[++i]; }
-        else if (rest[i]?.startsWith("--status=")) { status = rest[i]!.slice("--status=".length); }
-        else if (rest[i] === "--cwd" && rest[i + 1]) { cwd = rest[++i]; }
-        else if (rest[i]?.startsWith("--cwd=")) { cwd = rest[i]!.slice("--cwd=".length); }
-        else if (rest[i] === "--workflow" && rest[i + 1]) { wf = rest[++i]; }
-        else if (rest[i]?.startsWith("--workflow=")) { wf = rest[i]!.slice("--workflow=".length); }
-      }
-      registryCmd = { kind: "ls", status, cwd, workflow: wf };
-    } else if (sub === "show" && rest[2]) {
-      registryCmd = { kind: "show", runId: rest[2] };
-    } else if (sub === "ui") {
-      let port: number | undefined;
-      let noOpen = false;
-      for (let i = 2; i < rest.length; i++) {
-        if (rest[i] === "--port" && rest[i + 1]) {
-          port = Number(rest[++i]);
-        } else if (rest[i]?.startsWith("--port=")) {
-          port = Number(rest[i]!.slice("--port=".length));
-        } else if (rest[i] === "--no-open") {
-          noOpen = true;
-        }
-      }
-      registryCmd = { kind: "ui", ...(port ? { port } : {}), ...(noOpen ? { noOpen } : {}) };
-    } else if (sub === "answer" && rest[2]) {
-      // Forms:
-      //   harness answer <runId>                   → interactive (walk parked questions)
-      //   harness answer <runId> <text>            → single string
-      //   harness answer <runId> --json '{"q":"a"}' → multi-answer batch
-      let json: Record<string, string> | undefined;
-      const tail: string[] = [];
-      for (let i = 3; i < rest.length; i++) {
-        if (rest[i] === "--json" && rest[i + 1]) {
-          try {
-            json = JSON.parse(rest[++i]!) as Record<string, string>;
-          } catch (err) {
-            throw new Error(`--json requires valid JSON object: ${(err as Error).message}`);
-          }
-        } else if (rest[i]?.startsWith("--json=")) {
-          try {
-            json = JSON.parse(rest[i]!.slice("--json=".length)) as Record<string, string>;
-          } catch (err) {
-            throw new Error(`--json= requires valid JSON object: ${(err as Error).message}`);
-          }
-        } else {
-          tail.push(rest[i]!);
-        }
-      }
-      const text = tail.join(" ").trim();
-      registryCmd = {
-        kind: "answer",
-        runId: rest[2],
-        text: text || null,
-        ...(json ? { json } : {}),
-      };
+  // Subcommands are recognized by the first positional arg matching a known
+  // keyword. A prompt starting with one of these words would conflict — by
+  // convention prompts shouldn't start with these reserved words.
+  const sub = rest[0];
+  if (sub === "clean" && rest[1]) {
+    cleanSlug = rest[1]!;
+  } else if (sub === "ls") {
+    let status: string | undefined;
+    let cwd: string | undefined;
+    let wf: string | undefined;
+    for (let i = 1; i < rest.length; i++) {
+      if (rest[i] === "--status" && rest[i + 1]) { status = rest[++i]; }
+      else if (rest[i]?.startsWith("--status=")) { status = rest[i]!.slice("--status=".length); }
+      else if (rest[i] === "--cwd" && rest[i + 1]) { cwd = rest[++i]; }
+      else if (rest[i]?.startsWith("--cwd=")) { cwd = rest[i]!.slice("--cwd=".length); }
+      else if (rest[i] === "--workflow" && rest[i + 1]) { wf = rest[++i]; }
+      else if (rest[i]?.startsWith("--workflow=")) { wf = rest[i]!.slice("--workflow=".length); }
     }
+    registryCmd = { kind: "ls", status, cwd, workflow: wf };
+  } else if (sub === "show" && rest[1]) {
+    registryCmd = { kind: "show", runId: rest[1]! };
+  } else if (sub === "ui") {
+    let port: number | undefined;
+    let noOpen = false;
+    for (let i = 1; i < rest.length; i++) {
+      if (rest[i] === "--port" && rest[i + 1]) {
+        port = Number(rest[++i]);
+      } else if (rest[i]?.startsWith("--port=")) {
+        port = Number(rest[i]!.slice("--port=".length));
+      } else if (rest[i] === "--no-open") {
+        noOpen = true;
+      }
+    }
+    registryCmd = { kind: "ui", ...(port ? { port } : {}), ...(noOpen ? { noOpen } : {}) };
+  } else if (sub === "answer" && rest[1]) {
+    // Forms:
+    //   harny answer <runId>                   → interactive (walk parked questions)
+    //   harny answer <runId> <text>            → single string
+    //   harny answer <runId> --json '{"q":"a"}' → multi-answer batch
+    let json: Record<string, string> | undefined;
+    const tail: string[] = [];
+    for (let i = 2; i < rest.length; i++) {
+      if (rest[i] === "--json" && rest[i + 1]) {
+        try {
+          json = JSON.parse(rest[++i]!) as Record<string, string>;
+        } catch (err) {
+          throw new Error(`--json requires valid JSON object: ${(err as Error).message}`);
+        }
+      } else if (rest[i]?.startsWith("--json=")) {
+        try {
+          json = JSON.parse(rest[i]!.slice("--json=".length)) as Record<string, string>;
+        } catch (err) {
+          throw new Error(`--json= requires valid JSON object: ${(err as Error).message}`);
+        }
+      } else {
+        tail.push(rest[i]!);
+      }
+    }
+    const text = tail.join(" ").trim();
+    registryCmd = {
+      kind: "answer",
+      runId: rest[1]!,
+      text: text || null,
+      ...(json ? { json } : {}),
+    };
   }
 
   const logMode: LogMode = quiet ? "quiet" : verbose ? "verbose" : "compact";
   return {
     logMode,
     assistant,
-    harness,
     workflow,
     cleanSlug,
     registryCmd,
@@ -272,7 +243,7 @@ async function loadAssistant(name: string): Promise<Assistant> {
     );
   }
 
-  // assistants.json lives at ~/.harness/ (user-global). Paths must be absolute —
+  // assistants.json lives at ~/.harny/ (user-global). Paths must be absolute —
   // relative paths against the config dir aren't meaningful in this location.
   if (!isAbsolute(match.cwd)) {
     throw new Error(
@@ -309,11 +280,28 @@ async function loadAssistant(name: string): Promise<Assistant> {
 }
 
 /**
- * Read every cwd registered in ~/.harness/assistants.json (primary + extras).
- * Used by registry-replacement subcommands (ls/show/answer) and resumeHarness
- * to discover where a run lives without an indexed DB.
+ * Resolve an assistant entry from a name OR fall back to process.cwd() when
+ * name is null. The fallback synthesizes an Assistant whose name is the
+ * basename of the current working directory — used by `bunx harny "..."`
+ * invocations from arbitrary project directories with no prior registration.
  */
-async function loadAllAssistantCwds(): Promise<string[]> {
+async function resolveAssistant(name: string | null): Promise<Assistant> {
+  if (name) return loadAssistant(name);
+  const cwd = process.cwd();
+  return {
+    name: basename(cwd) || "harny",
+    cwd,
+    additionalDirectories: [],
+  };
+}
+
+/**
+ * Read every cwd registered in ~/.harny/assistants.json (primary + extras),
+ * plus process.cwd() as a fallback so unregistered local runs are still
+ * discoverable by ls/show/answer/ui. Used by registry-replacement subcommands
+ * and resumeHarness to find where a run lives without an indexed DB.
+ */
+async function loadSearchCwds(): Promise<string[]> {
   let raw: string;
   try {
     raw = await readFile(ASSISTANTS_FILE, "utf8");
@@ -333,6 +321,9 @@ async function loadAllAssistantCwds(): Promise<string[]> {
       if (isAbsolute(d)) out.add(d);
     }
   }
+  // Always include process.cwd() so a fresh project directory with local runs
+  // is discoverable even if it isn't in assistants.json.
+  out.add(process.cwd());
   return Array.from(out);
 }
 
@@ -340,7 +331,6 @@ async function main() {
   const {
     logMode,
     assistant: assistantName,
-    harness,
     workflow: workflowArg,
     cleanSlug,
     registryCmd,
@@ -355,11 +345,11 @@ async function main() {
     if (registryCmd.kind === "ui") {
       const { startViewer, openBrowser } = await import("./viewer/server.js");
       const { url, stop } = await startViewer({ port: registryCmd.port });
-      console.log(`[harness ui] serving at ${url}`);
-      console.log(`[harness ui] press Ctrl-C to stop`);
+      console.log(`[harny ui] serving at ${url}`);
+      console.log(`[harny ui] press Ctrl-C to stop`);
       if (!registryCmd.noOpen) openBrowser(url);
       const shutdown = () => {
-        console.log("\n[harness ui] stopping…");
+        console.log("\n[harny ui] stopping…");
         stop();
         process.exit(0);
       };
@@ -370,7 +360,7 @@ async function main() {
       return;
     }
 
-    const searchCwds = await loadAllAssistantCwds();
+    const searchCwds = await loadSearchCwds();
 
     if (registryCmd.kind === "ls") {
       let runs = await listAllRuns(searchCwds);
@@ -440,9 +430,9 @@ async function main() {
             sample[qq.question] = qq.options[0]?.label ?? "";
           });
           console.log(
-            `\nTo resume: harness answer ${run.run_id} --json '${JSON.stringify(sample)}'`,
+            `\nTo resume: harny answer ${run.run_id} --json '${JSON.stringify(sample)}'`,
           );
-          console.log(`           (or interactive: harness answer ${run.run_id})`);
+          console.log(`           (or interactive: harny answer ${run.run_id})`);
         } else {
           console.log(`\nPending question (${pq.id.slice(0, 8)}):`);
           console.log(`  ${pq.prompt}`);
@@ -450,7 +440,7 @@ async function main() {
             const opts = pq.options as string[];
             opts.forEach((o, i) => console.log(`    ${i + 1}. ${o}`));
           }
-          console.log(`\nTo resume: harness answer ${run.run_id} "<your answer>"`);
+          console.log(`\nTo resume: harny answer ${run.run_id} "<your answer>"`);
         }
       }
 
@@ -496,7 +486,7 @@ async function main() {
           answersMap = validated;
         } else if (registryCmd.text) {
           console.error(
-            "This run has a multi-question batch. Use --json '{...}' or run `harness answer <runId>` without args for interactive mode.",
+            "This run has a multi-question batch. Use --json '{...}' or run `harny answer <runId>` without args for interactive mode.",
           );
           process.exit(1);
         } else {
@@ -509,18 +499,18 @@ async function main() {
           answersMap = result.updatedInput.answers;
         }
 
-        console.log(`[harness] resuming run ${registryCmd.runId}...`);
+        console.log(`[harny] resuming run ${registryCmd.runId}...`);
         const result = await resumeHarness(registryCmd.runId, answersMap, {
           searchCwds,
         });
-        console.log(`[harness] finished status=${result.status}`);
+        console.log(`[harny] finished status=${result.status}`);
         return;
       }
 
       // Legacy path: single-question code-side park (ctx.askUser).
       if (!registryCmd.text) {
         console.error(
-          "harness answer <runId> <text> — text is required for this run.",
+          "harny answer <runId> <text> — text is required for this run.",
         );
         process.exit(1);
       }
@@ -534,203 +524,96 @@ async function main() {
         }
         answerText = resolved.value;
         if (opts && opts.length > 0) {
-          console.log(`[harness] selected: ${answerText}`);
+          console.log(`[harny] selected: ${answerText}`);
         }
       }
-      console.log(`[harness] resuming run ${registryCmd.runId}...`);
+      console.log(`[harny] resuming run ${registryCmd.runId}...`);
       const result = await resumeHarness(registryCmd.runId, answerText, {
         searchCwds,
       });
-      console.log(`[harness] finished status=${result.status}`);
+      console.log(`[harny] finished status=${result.status}`);
       return;
     }
   }
 
   if (cleanSlug !== null) {
-    if (!assistantName) {
-      console.error("harness clean requires --assistant <name>");
-      process.exit(1);
-    }
-    const assistant = await loadAssistant(assistantName);
+    const assistant = await resolveAssistant(assistantName);
     await cleanRun(assistant.cwd, cleanSlug, logMode === "verbose");
     return;
   }
 
-  const workflowId = harness ? "feature-dev" : workflowArg;
-
-  if (workflowId !== null) {
-    // Validate the workflow exists early so we get a useful error message.
-    try {
-      getWorkflow(workflowId!);
-    } catch (err) {
-      console.error((err as Error).message);
-      process.exit(1);
-    }
-
-    if (!assistantName) {
-      throw new Error("--workflow (or --harness) requires --assistant <name>");
-    }
-    if (!promptArg) {
-      throw new Error("--workflow (or --harness) requires a prompt describing the work");
-    }
-
-    let input: unknown = undefined;
-    if (inputPath) {
-      let raw: string;
-      try {
-        raw = await readFile(inputPath, "utf8");
-      } catch (err) {
-        throw new Error(`Could not read --input file "${inputPath}": ${(err as Error).message}`);
-      }
-      try {
-        input = JSON.parse(raw);
-      } catch (err) {
-        throw new Error(`Invalid JSON in --input file "${inputPath}": ${(err as Error).message}`);
-      }
-      // Validate against workflow's inputSchema if present.
-      const wf = getWorkflow(workflowId!);
-      if (wf.inputSchema) {
-        const result = wf.inputSchema.safeParse(input);
-        if (!result.success) {
-          throw new Error(`--input validation failed for workflow "${workflowId}": ${result.error.message}`);
-        }
-        input = result.data;
-      }
-    }
-
-    const assistant = await loadAssistant(assistantName);
-    const result = await runHarness({
-      cwd: assistant.cwd,
-      userPrompt: promptArg,
-      taskSlug: task ?? undefined,
-      workflowId: workflowId!,
-      isolation: isolation ?? undefined,
-      mode: mode ?? undefined,
-      logMode,
-      input,
-    });
-    if (logMode === "quiet") {
-      console.log(`[harness] status=${result.status} branch=${result.branch}`);
-    } else {
-      console.log(
-        `[harness] finished status=${result.status} plan=${result.planPath}`,
-      );
-    }
+  // If no subcommand matched and no prompt was given, print a short usage hint
+  // so users invoking `harny` with no args see something useful instead of a
+  // raw thrown error.
+  if (!promptArg && !registryCmd && !cleanSlug) {
+    console.log(
+      [
+        "Usage: harny [--workflow <id>] [--task <slug>] [--assistant <name>] \"<prompt>\"",
+        "       harny ls | show <runId> | answer <runId> [...] | clean <slug> | ui",
+        "",
+        "Default workflow: feature-dev. cwd defaults to process.cwd() when --assistant is omitted.",
+      ].join("\n"),
+    );
     return;
   }
 
-  const prompt =
-    promptArg ||
-    "List the skills you have available and briefly describe each one.";
+  // Workflow mode is the only mode. Default to feature-dev when --workflow
+  // not specified.
+  const workflowId = workflowArg ?? "feature-dev";
 
-  const assistant = assistantName ? await loadAssistant(assistantName) : null;
+  // Validate the workflow exists early so we get a useful error message.
+  try {
+    getWorkflow(workflowId);
+  } catch (err) {
+    console.error((err as Error).message);
+    process.exit(1);
+  }
 
-  await mkdir(SESSIONS_DIR, { recursive: true });
+  if (!promptArg) {
+    throw new Error("a prompt is required (describe the work in quotes)");
+  }
 
-  const record: SessionRecord = {
-    session_id: null,
-    assistant: assistant?.name ?? null,
-    cwd: assistant?.cwd ?? null,
-    additional_directories: assistant?.additionalDirectories ?? [],
-    prompt,
-    started_at: new Date().toISOString(),
-    ended_at: null,
-    status: "running",
-    error: null,
-    events: [],
-  };
-
-  let currentPath: string | null = null;
-
-  if (logMode === "verbose") {
-    console.log(`[harness] prompt: ${prompt}`);
-    if (assistant) {
-      console.log(`[harness] assistant: ${assistant.name}`);
-      console.log(`[harness] cwd: ${assistant.cwd}`);
-      if (assistant.additionalDirectories?.length) {
-        console.log(
-          `[harness] additionalDirectories: ${assistant.additionalDirectories.join(", ")}`,
-        );
+  let input: unknown = undefined;
+  if (inputPath) {
+    let raw: string;
+    try {
+      raw = await readFile(inputPath, "utf8");
+    } catch (err) {
+      throw new Error(`Could not read --input file "${inputPath}": ${(err as Error).message}`);
+    }
+    try {
+      input = JSON.parse(raw);
+    } catch (err) {
+      throw new Error(`Invalid JSON in --input file "${inputPath}": ${(err as Error).message}`);
+    }
+    // Validate against workflow's inputSchema if present.
+    const wf = getWorkflow(workflowId);
+    if (wf.inputSchema) {
+      const result = wf.inputSchema.safeParse(input);
+      if (!result.success) {
+        throw new Error(`--input validation failed for workflow "${workflowId}": ${result.error.message}`);
       }
-    } else {
-      console.log(`[harness] assistant: (none, using process.cwd)`);
+      input = result.data;
     }
   }
 
-  // Phoenix instrumentation for the legacy single-query path. No-op when
-  // HARNESS_PHOENIX_URL is unset; otherwise emits one trace per query under
-  // the project derived from the assistant's cwd basename.
-  const phoenix = setupPhoenix({
-    workflowId: "single-query",
-    cwd: assistant?.cwd,
+  const assistant = await resolveAssistant(assistantName);
+  const result = await runHarness({
+    cwd: assistant.cwd,
+    userPrompt: promptArg,
+    taskSlug: task ?? undefined,
+    workflowId,
+    isolation: isolation ?? undefined,
+    mode: mode ?? undefined,
+    logMode,
+    input,
   });
-  const query = phoenix.query;
-
-  try {
-    await withRunSpan(
-      phoenix,
-      "single-query",
-      { "harness.workflow": "single-query" },
-      async () => {
-        for await (const message of query({
-          prompt,
-          options: {
-            allowedTools: [
-              "Skill",
-              "Read",
-              "Edit",
-              "Glob",
-              "Bash",
-              "Grep",
-              "WebSearch",
-              "WebFetch",
-              "ToolSearch",
-            ],
-            permissionMode: "auto",
-            maxTurns: 30,
-            effort: "high",
-            settingSources: ["project", "user"],
-            ...(assistant ? { cwd: assistant.cwd } : {}),
-            ...(assistant?.additionalDirectories?.length
-              ? { additionalDirectories: assistant.additionalDirectories }
-              : {}),
-          },
-        })) {
-          record.events.push(message);
-
-          if (
-            record.session_id == null &&
-            message.type === "system" &&
-            message.subtype === "init"
-          ) {
-            record.session_id = message.session_id;
-            currentPath = join(SESSIONS_DIR, `${record.session_id}.json`);
-            if (logMode === "verbose") {
-              console.log(`[harness] session_id: ${record.session_id}`);
-              console.log(`[harness] file: ${currentPath}`);
-            }
-          }
-
-          if (currentPath) await writeJsonAtomic(currentPath, record);
-          if (logMode === "verbose") {
-            console.log(`[harness] event: ${message.type}`);
-            console.dir(message, { depth: null, colors: true });
-          }
-        }
-      },
+  if (logMode === "quiet") {
+    console.log(`[harny] status=${result.status} branch=${result.branch}`);
+  } else {
+    console.log(
+      `[harny] finished status=${result.status} plan=${result.planPath}`,
     );
-
-    record.status = "completed";
-  } catch (err) {
-    record.status = "error";
-    record.error = err instanceof Error ? err.stack ?? err.message : String(err);
-    console.error(`[harness] error:`, err);
-  } finally {
-    record.ended_at = new Date().toISOString();
-    const finalPath =
-      currentPath ?? join(SESSIONS_DIR, `no-session-${Date.now()}.json`);
-    await writeJsonAtomic(finalPath, record);
-    console.log(`[harness] done. status=${record.status} file=${finalPath}`);
   }
 }
 

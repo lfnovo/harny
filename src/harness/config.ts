@@ -47,7 +47,7 @@ function mergePhase(
 /**
  * Resolves the run mode using the precedence chain:
  *   1. cliMode (--mode flag)
- *   2. harness.json defaultMode
+ *   2. harny.json defaultMode
  *   3. workflow.defaultMode
  *   4. auto: process.stdin.isTTY ? "interactive" : "silent"
  */
@@ -67,7 +67,7 @@ export async function loadHarnessConfig(
   workflow: Workflow,
   cliMode?: RunMode,
 ): Promise<ResolvedHarnessConfig> {
-  const path = join(cwd, "harness.json");
+  const path = join(cwd, "harny.json");
   let parsed: HarnessConfigFile = {};
   try {
     const raw = await readFile(path, "utf8");

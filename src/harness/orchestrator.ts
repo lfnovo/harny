@@ -322,11 +322,11 @@ export async function runHarness(args: {
   const config = await loadHarnessConfig(primaryCwd, workflow, args.mode);
   const isolation = args.isolation ?? config.isolation;
 
-  log(`[harness] cwd=${primaryCwd} isolation=${isolation}`);
-  log(`[harness] workflow=${workflow.id} task=${taskSlug}`);
-  log(`[harness] user prompt >>>`);
+  log(`[harny] cwd=${primaryCwd} isolation=${isolation}`);
+  log(`[harny] workflow=${workflow.id} task=${taskSlug}`);
+  log(`[harny] user prompt >>>`);
   log(args.userPrompt);
-  log(`[harness] user prompt <<<`);
+  log(`[harny] user prompt <<<`);
 
   await assertIsGitRepo(primaryCwd);
 
@@ -337,25 +337,25 @@ export async function runHarness(args: {
   if (existing) {
     if (existing.lifecycle.status === "done" || existing.lifecycle.status === "failed") {
       log(
-        `[harness] run already complete (status=${existing.lifecycle.status}, ended_at=${existing.lifecycle.ended_at ?? "?"}). Use \`harness clean ${taskSlug}\` then rerun.`,
+        `[harny] run already complete (status=${existing.lifecycle.status}, ended_at=${existing.lifecycle.ended_at ?? "?"}). Use \`harny clean ${taskSlug}\` then rerun.`,
       );
       return { status: existing.lifecycle.status, planPath: planFilePath(primaryCwd, taskSlug), branch: existing.environment.branch };
     }
     if (existing.lifecycle.status === "running") {
       throw new Error(
-        `Run ${taskSlug} appears to still be running (pid=${existing.lifecycle.pid}). If it's actually dead, \`harness clean ${taskSlug}\` and retry.`,
+        `Run ${taskSlug} appears to still be running (pid=${existing.lifecycle.pid}). If it's actually dead, \`harny clean ${taskSlug}\` and retry.`,
       );
     }
     if (existing.lifecycle.status === "waiting_human") {
       throw new Error(
-        `Run ${taskSlug} is parked waiting for input. Use \`harness answer ${existing.run_id}\` (or interactive) to continue, or \`harness clean ${taskSlug}\` to discard.`,
+        `Run ${taskSlug} is parked waiting for input. Use \`harny answer ${existing.run_id}\` (or interactive) to continue, or \`harny clean ${taskSlug}\` to discard.`,
       );
     }
   }
 
   let phaseCwd = primaryCwd;
   let worktreePath: string | null = null;
-  const branch = workflow.needsBranch ? `harness/${taskSlug}` : "";
+  const branch = workflow.needsBranch ? `harny/${taskSlug}` : "";
 
   if (workflow.needsBranch) {
     await assertBranchAbsent(primaryCwd, branch);
@@ -364,7 +364,7 @@ export async function runHarness(args: {
       await assertWorktreePathAbsent(worktreePath);
       await addWorktree(primaryCwd, worktreePath, branch);
       phaseCwd = worktreePath;
-      log(`[harness] worktree=${worktreePath}`);
+      log(`[harny] worktree=${worktreePath}`);
     } else {
       await assertCleanTree(primaryCwd);
       await createBranch(primaryCwd, branch);
@@ -375,7 +375,7 @@ export async function runHarness(args: {
   }
 
   log(
-    `[harness] caps: per-task=${config.maxIterationsPerTask} retries-before-reset=${config.maxRetriesBeforeReset} global=${config.maxIterationsGlobal}`,
+    `[harny] caps: per-task=${config.maxIterationsPerTask} retries-before-reset=${config.maxRetriesBeforeReset} global=${config.maxIterationsGlobal}`,
   );
 
   const planPath = planFilePath(primaryCwd, taskSlug);
@@ -452,12 +452,12 @@ export async function runHarness(args: {
     if (outcome === "done") {
       try {
         await removeWorktree(primaryCwd, worktreePath, { force: true });
-        log(`[harness] worktree removed: ${worktreePath}`);
+        log(`[harny] worktree removed: ${worktreePath}`);
       } catch (err) {
-        ctx.warn(`[harness] worktree cleanup failed: ${(err as Error).message}`);
+        ctx.warn(`[harny] worktree cleanup failed: ${(err as Error).message}`);
       }
     } else {
-      log(`[harness] worktree preserved: ${worktreePath} (branch: ${branch})`);
+      log(`[harny] worktree preserved: ${worktreePath} (branch: ${branch})`);
     }
   };
 
@@ -479,10 +479,10 @@ export async function runHarness(args: {
       phoenix,
       taskSlug,
       {
-        "harness.workflow": workflow.id,
-        "harness.run_id": runId,
-        "harness.task_slug": taskSlug,
-        "harness.cwd": primaryCwd,
+        "harny.workflow": workflow.id,
+        "harny.run_id": runId,
+        "harny.task_slug": taskSlug,
+        "harny.cwd": primaryCwd,
       },
       async (traceId): Promise<RunOutcome> => {
         if (traceId && phoenix.projectName) {
@@ -494,7 +494,7 @@ export async function runHarness(args: {
           if (err instanceof PausedForUserInputError) {
             // ctx.runPhase already wrote pending_question + appended history.
             log(
-              `[harness] run parked (waiting_human, AskUserQuestion) runId=${runId} question=${err.questionId}`,
+              `[harny] run parked (waiting_human, AskUserQuestion) runId=${runId} question=${err.questionId}`,
             );
             return { status: "waiting_human" };
           }
@@ -508,7 +508,7 @@ export async function runHarness(args: {
 
   if (result.status === "waiting_human") {
     await store.updateLifecycle({ status: "waiting_human" });
-    log(`[harness] run parked (waiting_human) runId=${runId}`);
+    log(`[harny] run parked (waiting_human) runId=${runId}`);
     return { status: "waiting_human", planPath, branch };
   }
 
@@ -602,7 +602,7 @@ export async function resumeHarness(
 
   // Set up Phoenix for the resume process; gets a NEW trace (resume runs in a
   // separate process, can't continue the original trace). Original trace stays
-  // queryable in Phoenix by harness.run_id resource attribute.
+  // queryable in Phoenix by harny.run_id resource attribute.
   const phoenix = setupPhoenix({
     workflowId: workflow.id,
     runId: found.run_id,
@@ -617,11 +617,11 @@ export async function resumeHarness(
       phoenix,
       `${taskSlug} (resume)`,
       {
-        "harness.workflow": workflow.id,
-        "harness.run_id": found.run_id,
-        "harness.task_slug": taskSlug,
-        "harness.cwd": primaryCwd,
-        "harness.resume": "true",
+        "harny.workflow": workflow.id,
+        "harny.run_id": found.run_id,
+        "harny.task_slug": taskSlug,
+        "harny.cwd": primaryCwd,
+        "harny.resume": "true",
       },
       async (traceId): Promise<RunOutcome> => {
         if (traceId && phoenix.projectName) {

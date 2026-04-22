@@ -24,7 +24,7 @@ export const featureDev = defineWorkflow({
     validator: DEFAULT_VALIDATOR,
   },
   run: async (ctx) => {
-    ctx.log(`[harness] phase=planner`);
+    ctx.log(`[harny] phase=planner`);
     const plannerResult = await runPlanner({
       ctx,
       userPrompt: ctx.userPrompt,
@@ -46,7 +46,7 @@ export const featureDev = defineWorkflow({
         `feature-dev resumeFromAnswer for phase "${ctx.resumeMeta.phaseName}" is not yet supported (Tier 3b v1 only handles planner parks).`,
       );
     }
-    ctx.log(`[harness] resuming planner with answers from parked AskUserQuestion`);
+    ctx.log(`[harny] resuming planner with answers from parked AskUserQuestion`);
     const plannerResult = await runPlanner({
       ctx,
       userPrompt: ctx.userPrompt,
@@ -120,20 +120,20 @@ async function runDevLoop(
   while (true) {
     if (isPlanComplete(plan)) {
       await ctx.updatePlan((p) => { p.status = "done"; });
-      ctx.log(`[harness] all tasks done.`);
+      ctx.log(`[harny] all tasks done.`);
       return { status: "done" };
     }
 
     if (plan.iterations_global >= ctx.config.maxIterationsGlobal) {
       await ctx.updatePlan((p) => { p.status = "exhausted"; });
-      ctx.log(`[harness] global iteration cap reached.`);
+      ctx.log(`[harny] global iteration cap reached.`);
       return { status: "exhausted" };
     }
 
     const task = findNextPendingTask(plan);
     if (!task) {
       await ctx.updatePlan((p) => { p.status = "failed"; });
-      ctx.log(`[harness] no pending tasks but plan not complete (failed).`);
+      ctx.log(`[harny] no pending tasks but plan not complete (failed).`);
       return { status: "failed" };
     }
 
@@ -148,7 +148,7 @@ async function runDevLoop(
     });
 
     ctx.log(
-      `[harness] phase=developer task=${task.id} attempt=${task.attempts} global=${plan.iterations_global}${pendingResume ? " (resuming)" : ""}`,
+      `[harny] phase=developer task=${task.id} attempt=${task.attempts} global=${plan.iterations_global}${pendingResume ? " (resuming)" : ""}`,
     );
 
     const devResult = await runDeveloper({
@@ -195,11 +195,11 @@ async function runDevLoop(
       await ctx.audit({ phase: "harness", event: "decision", task_id: task.id, attempt: task.attempts, action: "blocked_fatal", rationale: `developer reported blocked: ${devResult.verdict.blocked_reason}` });
       await ctx.resetHard(prePhaseSha);
       await ctx.cleanUntracked();
-      ctx.log(`[harness] developer reported blocked — plan marked failed. Reason: ${devResult.verdict.blocked_reason}`);
+      ctx.log(`[harny] developer reported blocked — plan marked failed. Reason: ${devResult.verdict.blocked_reason}`);
       return { status: "failed" };
     }
 
-    ctx.log(`[harness] phase=validator task=${task.id}`);
+    ctx.log(`[harny] phase=validator task=${task.id}`);
     const valResult = await runValidator({
       ctx,
       plan,
@@ -232,11 +232,11 @@ async function runDevLoop(
     });
 
     ctx.log(
-      `[harness] validator task=${task.id} verdict=${valResult.verdict.verdict} reasons=${valResult.verdict.reasons.length}`,
+      `[harny] validator task=${task.id} verdict=${valResult.verdict.verdict} reasons=${valResult.verdict.reasons.length}`,
     );
     if (valResult.verdict.problems && valResult.verdict.problems.length > 0) {
       for (const p of valResult.verdict.problems) {
-        ctx.log(`[harness] problem category=${p.category} severity=${p.severity} detail=${p.description}`);
+        ctx.log(`[harny] problem category=${p.category} severity=${p.severity} detail=${p.description}`);
       }
     }
 
@@ -256,12 +256,12 @@ async function runDevLoop(
       });
       const subject = devResult.verdict.commit_message.split("\n")[0] ?? "";
       ctx.log(
-        `[harness] task ${task.id} committed sha=${outcome.commitSha.slice(0, 8) || "(empty)"} subject="${subject}"`,
+        `[harny] task ${task.id} committed sha=${outcome.commitSha.slice(0, 8) || "(empty)"} subject="${subject}"`,
       );
     } else if (outcome.kind === "retry") {
       await ctx.audit({ phase: "harness", event: "decision", task_id: task.id, attempt: task.attempts, action: "retry", rationale: "validator fail, within retry budget and no reset requested" });
       pendingResume = { sessionId: outcome.resumeSessionId, validator: outcome.validator };
-      ctx.log(`[harness] task ${task.id} will retry (resume dev session)`);
+      ctx.log(`[harny] task ${task.id} will retry (resume dev session)`);
     } else if (outcome.kind === "reset") {
       const before = await ctx.currentSha();
       await ctx.resetHard(prePhaseSha);
@@ -269,7 +269,7 @@ async function runDevLoop(
       const after = await ctx.currentSha();
       await ctx.audit({ phase: "harness", event: "decision", task_id: task.id, attempt: task.attempts, action: "reset", rationale: valResult.verdict.recommend_reset === true ? "validator recommended reset" : `maxRetriesBeforeReset=${ctx.config.maxRetriesBeforeReset} reached` });
       await ctx.audit({ phase: "harness", event: "reset_executed", task_id: task.id, attempt: task.attempts, head_before: before, head_after: after });
-      ctx.log(`[harness] task ${task.id} tree reset to ${after.slice(0, 8)}`);
+      ctx.log(`[harny] task ${task.id} tree reset to ${after.slice(0, 8)}`);
     } else {
       await ctx.updatePlan((p) => {
         const t = p.tasks.find((x) => x.id === task.id)!;
@@ -278,7 +278,7 @@ async function runDevLoop(
       await ctx.resetHard(prePhaseSha);
       await ctx.cleanUntracked();
       await ctx.audit({ phase: "harness", event: "decision", task_id: task.id, attempt: task.attempts, action: "failed", rationale: outcome.reason });
-      ctx.log(`[harness] task ${task.id} failed (${outcome.reason}); tree reset`);
+      ctx.log(`[harny] task ${task.id} failed (${outcome.reason}); tree reset`);
       return { status: "failed" };
     }
   }

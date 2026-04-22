@@ -14,7 +14,7 @@ import { planFilePath } from "./state/plan.js";
 export type PhaseGuards = {
   /** Deny Write/Edit/MultiEdit/NotebookEdit on paths INSIDE the phase cwd. */
   readOnly?: boolean;
-  /** Deny writes to .harness/<slug>/plan.json (sole-writer invariant). */
+  /** Deny writes to .harny/<slug>/plan.json (sole-writer invariant). */
   noPlanWrites?: boolean;
   /** Deny Bash commands that mutate git history inside the phase cwd. */
   noGitHistory?: boolean;
@@ -51,7 +51,7 @@ function validatorReadOnly(phaseCwd: string): HookCallback {
       if (!isUnderPrimary(abs, phase)) return allowPreToolUse();
     }
     return denyPreToolUse(
-      `Validator is read-only on the phase working dir (${phase}). Tool "${input.tool_name}" at ${filePath ?? "<unknown path>"} is not permitted inside the phase dir. Writes to paths outside (e.g., /tmp/harness-e2e-*) are allowed for empirical test setup. Report "fail" in your verdict instead of trying to fix code.`,
+      `Validator is read-only on the phase working dir (${phase}). Tool "${input.tool_name}" at ${filePath ?? "<unknown path>"} is not permitted inside the phase dir. Writes to paths outside (e.g., /tmp/harny-e2e-*) are allowed for empirical test setup. Report "fail" in your verdict instead of trying to fix code.`,
     );
   };
 }

@@ -1,7 +1,7 @@
 /**
  * Viewer server — read-only HTTP wrapper over the per-run state.json files.
  *
- * Spawned by `harness ui`. Lives only as long as the parent CLI process.
+ * Spawned by `harny ui`. Lives only as long as the parent CLI process.
  * No writes, no auth, binds to 127.0.0.1 only.
  */
 
@@ -14,7 +14,7 @@ import { listAllRuns, listRunsInCwd, statePathFor } from "../harness/state/files
 import { planFilePath } from "../harness/state/plan.js";
 import type { State } from "../harness/state/schema.js";
 
-const ASSISTANTS_FILE = join(homedir(), ".harness", "assistants.json");
+const ASSISTANTS_FILE = join(homedir(), ".harny", "assistants.json");
 
 type Assistant = {
   name: string;
@@ -40,6 +40,9 @@ async function loadAllCwds(): Promise<string[]> {
     if (a.cwd) set.add(a.cwd);
     for (const d of a.additionalDirectories ?? []) set.add(d);
   }
+  // Always include the dir the viewer was launched from so unregistered
+  // local runs are visible.
+  set.add(process.cwd());
   return Array.from(set);
 }
 
@@ -147,7 +150,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
   url: string;
   stop: () => void;
 }> {
-  const port = opts.port ?? (Number(process.env.HARNESS_UI_PORT) || 4123);
+  const port = opts.port ?? (Number(process.env.HARNY_UI_PORT) || 4123);
   const host = opts.host ?? "127.0.0.1";
   const html = await loadHtml();
 
@@ -208,7 +211,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         // CORS so the browser can't do the name → ID lookup itself). One link
         // per run — all phases inherit the run's trace_id and live as child
         // spans inside it.
-        const phoenixBase = process.env.HARNESS_PHOENIX_URL;
+        const phoenixBase = process.env.HARNY_PHOENIX_URL;
         let phoenixUrl: string | undefined;
         if (phoenixBase && run.phoenix) {
           const projectMap = await phoenixProjectMap(phoenixBase);
@@ -247,7 +250,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         // Surface env-derived config the SPA needs (Phoenix base URL for
         // deep-links). null when not configured — the SPA hides the link.
         return jsonRes({
-          phoenix_url: process.env.HARNESS_PHOENIX_URL ?? null,
+          phoenix_url: process.env.HARNY_PHOENIX_URL ?? null,
         });
       }
 

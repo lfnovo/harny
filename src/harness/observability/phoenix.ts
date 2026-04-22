@@ -1,5 +1,5 @@
 /**
- * Phoenix observability — opt-in via HARNESS_PHOENIX_URL.
+ * Phoenix observability — opt-in via HARNY_PHOENIX_URL.
  *
  * When the env var is set, registers the Arize phoenix-otel tracer provider
  * and instruments the Claude Agent SDK via OpenInference, so each `query()`
@@ -29,11 +29,11 @@ import {
 } from "@opentelemetry/api";
 
 /** Context key set by sessionRecorder around each query() call so the rename
- *  span processor can flatten "ClaudeAgent.query" → "harness.<phase>". */
-const PHASE_CONTEXT_KEY = createContextKey("harness.phase");
+ *  span processor can flatten "ClaudeAgent.query" → "harny.<phase>". */
+const PHASE_CONTEXT_KEY = createContextKey("harny.phase");
 
 /** Custom span processor: when a "ClaudeAgent.query" span starts inside a
- *  phase context, rename it to "harness.<phase>". This lets us collapse the
+ *  phase context, rename it to "harny.<phase>". This lets us collapse the
  *  double-wrapper (our CHAIN + their AGENT) into a single AGENT span the user
  *  cares about, while still letting OpenInference handle all the heavy
  *  lifting around tool span emission. */
@@ -45,7 +45,7 @@ class RenameClaudeAgentSpanProcessor {
     if (spanWithName.name !== "ClaudeAgent.query") return;
     const phase = parentContext.getValue(PHASE_CONTEXT_KEY);
     if (typeof phase === "string" && phase.length > 0) {
-      spanWithName.updateName(`harness.${phase}`);
+      spanWithName.updateName(`harny.${phase}`);
     }
   }
   onEnd(): void {}
@@ -82,7 +82,7 @@ let tracerProvider: { forceFlush?: () => Promise<void> } | null = null;
  *
  * The Phoenix project name is the basename of the assistant's cwd (per user
  * decision — keeps traces grouped by repo, not by workflow). Falls back to
- * "harness" if cwd is missing or its basename is empty.
+ * "harny" if cwd is missing or its basename is empty.
  */
 export function setupPhoenix(args: {
   workflowId: string;
@@ -90,7 +90,7 @@ export function setupPhoenix(args: {
   taskSlug?: string;
   cwd?: string;
 }): PhoenixSetup {
-  const url = process.env.HARNESS_PHOENIX_URL;
+  const url = process.env.HARNY_PHOENIX_URL;
   if (!url) {
     return {
       query: ClaudeAgentSDKNS.query,
@@ -104,16 +104,16 @@ export function setupPhoenix(args: {
 
   // Resource attrs for filtering in Phoenix UI. Set BEFORE register() so the
   // tracer provider picks them up.
-  const attrs: string[] = [`harness.workflow=${args.workflowId}`];
-  if (args.runId) attrs.push(`harness.run_id=${args.runId}`);
-  if (args.taskSlug) attrs.push(`harness.task_slug=${args.taskSlug}`);
+  const attrs: string[] = [`harny.workflow=${args.workflowId}`];
+  if (args.runId) attrs.push(`harny.run_id=${args.runId}`);
+  if (args.taskSlug) attrs.push(`harny.task_slug=${args.taskSlug}`);
   const existing = process.env.OTEL_RESOURCE_ATTRIBUTES ?? "";
   process.env.OTEL_RESOURCE_ATTRIBUTES = existing
     ? `${existing},${attrs.join(",")}`
     : attrs.join(",");
 
   const projectName =
-    (args.cwd && basename(args.cwd).trim()) || "harness";
+    (args.cwd && basename(args.cwd).trim()) || "harny";
   // OTel SDK 2.x removed `addSpanProcessor`; processors must be passed at
   // construction time via register's spanProcessors. Build the default OTLP
   // exporter processor ourselves + add our rename processor alongside it.
@@ -164,7 +164,7 @@ export async function withRunSpan<T>(
   body: (traceId: string | undefined) => Promise<T>,
 ): Promise<T> {
   if (!setup.enabled) return body(undefined);
-  const tracer = trace.getTracer("harness");
+  const tracer = trace.getTracer("harny");
   const span: Span = tracer.startSpan(taskSlug);
   span.setAttribute("openinference.span.kind", "AGENT");
   for (const [k, v] of Object.entries(attrs)) span.setAttribute(k, v);
@@ -189,7 +189,7 @@ export async function withRunSpan<T>(
 /**
  * Run an async function with a phase name attached to the OTel context, so
  * the rename processor can collapse "ClaudeAgent.query" spans into
- * "harness.<phase>" spans. No new span is created — the SDK's AGENT span
+ * "harny.<phase>" spans. No new span is created — the SDK's AGENT span
  * IS the phase span (just renamed). When Phoenix is disabled, runs the body
  * directly.
  */

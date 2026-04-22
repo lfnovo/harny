@@ -102,7 +102,7 @@ export async function runPhase<T>(args: {
     );
     if (args.logMode !== "quiet") {
       console.log(
-        `[harness:${args.phase}] transient API error on attempt ${attempt}/${MAX_TRANSIENT_RETRIES}; retrying in ${Math.round(delay / 1000)}s`,
+        `[harny:${args.phase}] transient API error on attempt ${attempt}/${MAX_TRANSIENT_RETRIES}; retrying in ${Math.round(delay / 1000)}s`,
       );
     }
     await sleep(delay);
@@ -169,16 +169,16 @@ async function runPhaseAttempt<T>(args: {
 
   const logBlock = (header: string, body: string) => {
     if (logMode === "quiet") return;
-    console.log(`[harness:${phase}] ${header} >>>`);
+    console.log(`[harny:${phase}] ${header} >>>`);
     console.log(body);
-    console.log(`[harness:${phase}] ${header} <<<`);
+    console.log(`[harny:${phase}] ${header} <<<`);
   };
 
   if (logMode !== "quiet") {
-    console.log(`[harness:${phase}] starting`);
-    if (harnessTaskId) console.log(`[harness:${phase}] task=${harnessTaskId}`);
+    console.log(`[harny:${phase}] starting`);
+    if (harnessTaskId) console.log(`[harny:${phase}] task=${harnessTaskId}`);
     if (resumeSessionId)
-      console.log(`[harness:${phase}] resuming session=${resumeSessionId}`);
+      console.log(`[harny:${phase}] resuming session=${resumeSessionId}`);
   }
   logBlock("input", prompt);
 
@@ -198,8 +198,8 @@ async function runPhaseAttempt<T>(args: {
       : phaseConfig.allowedTools;
 
   // Attach phase name to the OTel context so the rename processor relabels
-  // the SDK's "ClaudeAgent.query" span to "harness.<phase>". No extra wrapping
-  // span — keeps the trace tree flat: run → harness.<phase> → tool spans.
+  // the SDK's "ClaudeAgent.query" span to "harny.<phase>". No extra wrapping
+  // span — keeps the trace tree flat: run → harny.<phase> → tool spans.
   await withPhaseContext(
     phoenix,
     phase,
@@ -278,7 +278,7 @@ async function runPhaseAttempt<T>(args: {
       ) {
         record.session_id = message.session_id;
         if (logMode !== "quiet") {
-          console.log(`[harness:${phase}] session=${message.session_id}`);
+          console.log(`[harny:${phase}] session=${message.session_id}`);
         }
       }
 
@@ -294,7 +294,7 @@ async function runPhaseAttempt<T>(args: {
       }
 
       if (logMode === "verbose") {
-        console.log(`[harness:${phase}] event: ${message.type}`);
+        console.log(`[harny:${phase}] event: ${message.type}`);
         console.dir(message, { depth: null, colors: true });
       }
     }
@@ -309,7 +309,7 @@ async function runPhaseAttempt<T>(args: {
         } else {
           record.status = "error";
           record.error = err instanceof Error ? err.stack ?? err.message : String(err);
-          console.error(`[harness:${phase}] error:`, err);
+          console.error(`[harny:${phase}] error:`, err);
         }
       } finally {
         record.ended_at = new Date().toISOString();

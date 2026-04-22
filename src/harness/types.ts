@@ -16,7 +16,7 @@ export type IsolationMode = "worktree" | "inline";
  * - silent: no human available; AskUserQuestion is stripped from allowedTools
  *   and ctx.askUser throws SilentModeError. Agent must make a defensible default.
  * - async: park questions in pending_questions, exit waiting_human, resume
- *   later via `harness answer <runId>` (or HTTP equivalent in Tier 4).
+ *   later via `harny answer <runId>`.
  */
 export type RunMode = "interactive" | "silent" | "async";
 

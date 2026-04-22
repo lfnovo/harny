@@ -88,7 +88,7 @@ export async function resetHard(cwd: string, sha: string): Promise<void> {
 
 export async function cleanUntracked(cwd: string): Promise<void> {
   // -f to actually delete, -d to include directories. Does NOT touch
-  // ignored files (.gitignore'd) so .harness/<slug>/ and its contents
+  // ignored files (.gitignore'd) so .harny/<slug>/ and its contents
   // survive the clean.
   await git(cwd, ["clean", "-fd"]);
 }

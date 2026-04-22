@@ -255,7 +255,7 @@ async function runWriteReviewLoop(
       await ctx.updatePlan((p) => {
         p.status = "exhausted";
       });
-      ctx.log(`[harness] global iteration cap reached.`);
+      ctx.log(`[harny] global iteration cap reached.`);
       return { status: "exhausted" };
     }
 
@@ -268,7 +268,7 @@ async function runWriteReviewLoop(
     });
 
     ctx.log(
-      `[harness] phase=writer task=${task.id} attempt=${task.attempts}${pendingResume ? " (resuming)" : ""}`,
+      `[harny] phase=writer task=${task.id} attempt=${task.attempts}${pendingResume ? " (resuming)" : ""}`,
     );
 
     const writerPrompt = buildWriterPrompt(
@@ -331,7 +331,7 @@ async function runWriteReviewLoop(
       });
       await ctx.resetHard(prePhaseSha);
       await ctx.cleanUntracked();
-      ctx.log(`[harness] writer phase error: ${writerResult.error}`);
+      ctx.log(`[harny] writer phase error: ${writerResult.error}`);
       return { status: "failed" };
     }
 
@@ -354,12 +354,12 @@ async function runWriteReviewLoop(
       await ctx.resetHard(prePhaseSha);
       await ctx.cleanUntracked();
       ctx.log(
-        `[harness] writer reported blocked — plan marked failed. Reason: ${writerVerdict.blocked_reason}`,
+        `[harny] writer reported blocked — plan marked failed. Reason: ${writerVerdict.blocked_reason}`,
       );
       return { status: "failed" };
     }
 
-    ctx.log(`[harness] phase=reviewer task=${task.id}`);
+    ctx.log(`[harny] phase=reviewer task=${task.id}`);
 
     const reviewerPrompt = buildReviewerPrompt(intent, task.id, writerVerdict);
 
@@ -403,14 +403,14 @@ async function runWriteReviewLoop(
       });
       await ctx.resetHard(prePhaseSha);
       await ctx.cleanUntracked();
-      ctx.log(`[harness] reviewer phase error: ${reviewerResult.error}`);
+      ctx.log(`[harny] reviewer phase error: ${reviewerResult.error}`);
       return { status: "failed" };
     }
 
     const reviewerVerdict = reviewerResult.structuredOutput;
 
     ctx.log(
-      `[harness] reviewer task=${task.id} verdict=${reviewerVerdict.verdict} reasons=${reviewerVerdict.reasons.length}`,
+      `[harny] reviewer task=${task.id} verdict=${reviewerVerdict.verdict} reasons=${reviewerVerdict.reasons.length}`,
     );
 
     if (reviewerVerdict.verdict === "pass") {
@@ -435,7 +435,7 @@ async function runWriteReviewLoop(
         message,
       });
       ctx.log(
-        `[harness] task ${task.id} committed sha=${(sha ?? "").slice(0, 8) || "(empty)"}`,
+        `[harny] task ${task.id} committed sha=${(sha ?? "").slice(0, 8) || "(empty)"}`,
       );
       return { status: "done" };
     }
@@ -458,7 +458,7 @@ async function runWriteReviewLoop(
         rationale: `task exceeded maxIterationsPerTask=${ctx.config.maxIterationsPerTask}`,
       });
       ctx.log(
-        `[harness] task ${task.id} exceeded retry budget; tree reset`,
+        `[harny] task ${task.id} exceeded retry budget; tree reset`,
       );
       return { status: "failed" };
     }
@@ -476,7 +476,7 @@ async function runWriteReviewLoop(
       reviewer: reviewerVerdict,
     };
     ctx.log(
-      `[harness] task ${task.id} will retry (resume writer session with reviewer feedback)`,
+      `[harny] task ${task.id} will retry (resume writer session with reviewer feedback)`,
     );
   }
 }

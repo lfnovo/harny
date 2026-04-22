@@ -109,7 +109,7 @@ export const issueTriage = defineWorkflow({
       plan.iterations_global += 1;
     });
 
-    ctx.log(`[harness] phase=triage url=${url}`);
+    ctx.log(`[harny] phase=triage url=${url}`);
 
     const prompt = buildTriagePrompt(url, ctx.userPrompt, task.id);
     const result = await ctx.runPhase({
@@ -125,7 +125,7 @@ export const issueTriage = defineWorkflow({
         plan.tasks[0]!.status = "failed";
         plan.status = "failed";
       });
-      ctx.warn(`[harness] triage phase failed: ${result.error}`);
+      ctx.warn(`[harny] triage phase failed: ${result.error}`);
       return { status: "failed" };
     }
 
@@ -134,7 +134,7 @@ export const issueTriage = defineWorkflow({
       applyTriageVerdict(plan, plan.tasks[0]!, verdict, result.sessionId);
     });
 
-    ctx.log(`[harness] triage done action=${verdict.action} url=${verdict.target_url}`);
+    ctx.log(`[harny] triage done action=${verdict.action} url=${verdict.target_url}`);
     return { status: "done" };
   },
 });

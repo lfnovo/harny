@@ -74,12 +74,12 @@ export type Workflow<TInput = unknown> = {
   /**
    * Per-phase config defaults this workflow expects. Keys are phase names
    * (e.g. "planner", "triage"). The orchestrator merges these with any
-   * overrides from the project's harness.json into ctx.config.phases.
+   * overrides from the project's harny.json into ctx.config.phases.
    */
   phaseDefaults: Record<string, ResolvedPhaseConfig>;
   /**
    * Optional default run mode when the CLI/file don't specify one. CLI flag
-   * and harness.json defaultMode override this.
+   * and harny.json defaultMode override this.
    */
   defaultMode?: RunMode;
   run: (ctx: WorkflowContext) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
