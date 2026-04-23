@@ -115,6 +115,7 @@ try {
           JSON.stringify(phaseConfig?.['allowedTools']),
           JSON.stringify(validEngineArgs.allowedTools),
         ],
+        ['outputSchema', a['outputSchema'], validEngineArgs.schema],
       ];
 
       for (const [field, actual, expected] of checks) {

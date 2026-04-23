@@ -59,8 +59,7 @@ export function adaptRunPhase(
       taskSlug: deps.taskSlug,
       harnessTaskId: null,
       prompt: engineArgs.prompt,
-      // z.unknown() bypasses schema validation at adapter layer; engine owns enforcement
-      outputSchema: z.unknown(),
+      outputSchema: engineArgs.schema as z.ZodType<unknown>,
       resumeSessionId: engineArgs.resumeSessionId,
       workflowId: deps.workflowId,
       runId: deps.runId,
