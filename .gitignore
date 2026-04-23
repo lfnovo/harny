@@ -8,3 +8,4 @@ sessions/
 assistants.json
 .claude/*
 !.claude/skills/
+specs/
