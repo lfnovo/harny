@@ -45,7 +45,7 @@ Published as `@lfnovo/harny` on npm (the unscoped `harny` name was blocked by np
 - `~/.harny/assistants.json` (user-global, optional) — named working directories registered for `harny` invocation. With it, `--assistant <name>` resolves to a registered cwd and `harny ls`/`harny ui` see runs across all registered projects. Without it, `harny` operates on `process.cwd()` only. See `assistants.example.json` for schema.
 - `<cwd>/.harny/<slug>/state.json` (per-run, atomic write) — single source of truth for one harness invocation. Schema versioned at `schema_version: 1`. Holds origin, environment, lifecycle, phases[], history[], pending_question, workflow_state, and (when Phoenix is enabled) `phoenix: {project, trace_id}`.
 - `<cwd>/.harny/<slug>/plan.json` (per-run, feature-dev only) — versioned plan with `tasks: PlanTask[]`, written exclusively by the harness.
-- `harny.json` (target repo root, optional) — per-project overrides: `phases` map, `isolation`, `defaultMode`, `maxIterationsPerTask`, `maxIterationsGlobal`, `maxRetriesBeforeReset`. See `harny.example.json`.
+- `harny.json` (target repo root, optional) — per-project overrides: `phases` map, `isolation`, `defaultMode`, `maxIterationsPerTask`, `maxIterationsGlobal`, `maxRetriesBeforeReset`, `coldWorktreeInstall` (boolean, default `true`) — auto `bun install` in fresh worktrees, `siblingBranchGuard` (boolean, default `true`) — post-developer sibling-branch ownership check. See `harny.example.json`.
 
 ## Environment variables
 
@@ -110,7 +110,7 @@ The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wa
 - Files per task dir: `state.json` (single source of truth) + `plan.json` (feature-dev only). The repo-level `.harny/.gitignore` (`*` + `!.gitignore`) keeps these out of git.
 - `git clean -fd` only removes untracked files; gitignored `.harny/<slug>/` survives.
 - When creating a brand-new file path that did not exist on the current branch, run `git branch -a` and `git log --all --oneline -- <path>` first. A sibling unmerged branch may already own that path; creating a stub silently regresses on merge.
-- Worktrees start without `node_modules`. Phases that import runtime deps or run `bun run typecheck` must `bun install` first. The harness does not currently bootstrap the worktree.
+- Worktrees start without `node_modules`; the orchestrator auto-runs `bun install` on cold worktrees (toggle: `harny.json` `coldWorktreeInstall`, default `true`). The legacy gotcha persists only if the toggle is disabled.
 - Read at least one existing sibling file when adding new files to a module — match its import style (relative vs node:, .ts extensions, ordering).
 - Phoenix integration uses an ESM-namespace-freeze workaround (`{ ...ClaudeAgentSDKNS }` shallow copy before `manuallyInstrument`) — without this, both Bun and Node throw on namespace mutation. Validated in `scripts/probes/phoenix/02-openinference.ts`.
 - macOS has no `timeout(1)` by default. Prefer in-script `Promise.race` hard deadlines over outer `timeout N` wrappers when writing or instructing probes.
@@ -119,3 +119,6 @@ The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wa
 - The run-level Phoenix span only flushes reliably because `withRunSpan` calls `tracerProvider.forceFlush()` in its `finally`. Without that the BatchSpanProcessor commonly drops the root span on process exit.
 - Subcommands are recognized by the first positional arg matching one of `clean|ls|show|answer|ui`. Prompts that literally start with one of those words conflict — phrase prompts to start differently.
 - The Read tool errors with EISDIR on directories. Use Glob `<dir>/**/*` or Bash `ls <dir>` for directory discovery.
+- Harness self-modifications take effect on the NEXT invocation, not the committing run. The harness binary is loaded once at startup; `commit_executed` uses that frozen path. Re-run on a no-op task to verify in-loop.
+- Project enables `noUncheckedIndexedAccess`. Index access on arrays/strings returns `T | undefined`. Use `?? ''` or explicit guards before passing to a string parameter.
+- Harness-managed branches always carry a `harny/` (or legacy `harness/`) prefix. Any feature that introspects "other harness branches" must filter by `^(harny|harness)/`. The unfiltered set includes main, feature/*, and stale locals.

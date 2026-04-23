@@ -4,6 +4,8 @@
   "maxIterationsPerTask": 3,
   "maxIterationsGlobal": 30,
   "maxRetriesBeforeReset": 1,
+  "coldWorktreeInstall": true,
+  "siblingBranchGuard": true,
   "phases": {
     "planner": {
       "prompt": "Optional override of the planner system prompt. If omitted, the workflow's default is used.",
