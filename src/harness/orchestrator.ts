@@ -35,7 +35,8 @@ import { FilesystemStateStore, findRun } from "./state/filesystem.js";
 import type { State } from "./state/schema.js";
 import type { StateStore } from "./state/store.js";
 import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
-import { getWorkflow } from "./workflows/index.js";
+import { getWorkflow, isEngineWorkflow } from "./workflows/index.js";
+import { runEngineWorkflow } from "./engine/runtime/runEngineWorkflow.js";
 import type { IsolationMode, LogMode, PhaseName, ResolvedHarnessConfig, RunMode } from "./types.js";
 import type { WorkflowContext, WorkflowPhaseResult } from "./workflow.js";
 import type { Workflow } from "./workflow.js";
@@ -356,9 +357,14 @@ export async function runHarness(args: {
   const taskSlug = args.taskSlug?.trim() || defaultTaskSlug();
   const logMode = args.logMode ?? "compact";
   const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
+  const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
 
   const workflow = getWorkflow(args.workflowId ?? "feature-dev");
-  const config = await loadHarnessConfig(primaryCwd, workflow, args.mode);
+  const config = await loadHarnessConfig(
+    primaryCwd,
+    isEngineWorkflow(workflow) ? { phaseDefaults: undefined } : workflow,
+    args.mode,
+  );
   const isolation = args.isolation ?? config.isolation;
 
   log(`[harny] cwd=${primaryCwd} isolation=${isolation}`);
@@ -420,18 +426,7 @@ export async function runHarness(args: {
   );
 
   const planPath = planFilePath(primaryCwd, taskSlug);
-  const plan = createPlanSkeleton({
-    taskSlug,
-    userPrompt: args.userPrompt,
-    branch,
-    primaryCwd,
-    isolation,
-    worktreePath,
-  });
-
   const runId = randomUUID();
-  plan.run_id = runId;
-  await savePlan(planPath, plan);
 
   const store = new FilesystemStateStore(primaryCwd, taskSlug);
   const startedAt = new Date().toISOString();
@@ -469,6 +464,62 @@ export async function runHarness(args: {
   };
   await store.createRun(initialState);
 
+  const handleCleanupWorktree = async (
+    outcome: "done" | "failed" | "exhausted" | "waiting_human",
+  ): Promise<void> => {
+    if (!worktreePath) return;
+    if (outcome === "done") {
+      try {
+        await removeWorktree(primaryCwd, worktreePath, { force: true });
+        log(`[harny] worktree removed: ${worktreePath}`);
+      } catch (err) {
+        warn(`[harny] worktree cleanup failed: ${(err as Error).message}`);
+      }
+    } else {
+      log(`[harny] worktree preserved: ${worktreePath} (branch: ${branch})`);
+    }
+  };
+
+  // ENGINE PATH: WorkflowDefinition-shaped workflows run via XState createActor.
+  // No plan skeleton, no buildCtx, no commitComposed — the engine commits via harnyActions.
+  if (isEngineWorkflow(workflow)) {
+    const engineResult = await runEngineWorkflow(workflow, {
+      cwd: phaseCwd,
+      taskSlug,
+      runId,
+      log,
+    });
+
+    await handleCleanupWorktree(engineResult.status);
+
+    await store.updateLifecycle({
+      status: engineResult.status === "done" ? "done" : "failed",
+      ended_at: new Date().toISOString(),
+      ended_reason: engineResult.status,
+      current_phase: null,
+    });
+
+    if (engineResult.status === "failed") {
+      log(`[harny] engine workflow failed: ${engineResult.error ?? "(no error message)"}`);
+    } else {
+      log(`[harny] engine workflow done`);
+    }
+
+    return { status: engineResult.status, planPath, branch };
+  }
+
+  // LEGACY PATH: Workflow-shaped workflows with a .run(ctx) method.
+  const plan = createPlanSkeleton({
+    taskSlug,
+    userPrompt: args.userPrompt,
+    branch,
+    primaryCwd,
+    isolation,
+    worktreePath,
+  });
+  plan.run_id = runId;
+  await savePlan(planPath, plan);
+
   const ctx = buildCtx({
     runId,
     taskSlug,
@@ -485,22 +536,6 @@ export async function runHarness(args: {
     branch,
     store,
   });
-
-  const handleCleanupWorktree = async (
-    outcome: "done" | "failed" | "exhausted" | "waiting_human",
-  ): Promise<void> => {
-    if (!worktreePath) return;
-    if (outcome === "done") {
-      try {
-        await removeWorktree(primaryCwd, worktreePath, { force: true });
-        log(`[harny] worktree removed: ${worktreePath}`);
-      } catch (err) {
-        ctx.warn(`[harny] worktree cleanup failed: ${(err as Error).message}`);
-      }
-    } else {
-      log(`[harny] worktree preserved: ${worktreePath} (branch: ${branch})`);
-    }
-  };
 
   // Set up Phoenix once for this process. Project name = basename(cwd).
   // Wrap the entire workflow run in a single OTel span so all phases inherit
@@ -587,7 +622,11 @@ export async function resumeHarness(
   const planPath = planFilePath(primaryCwd, taskSlug);
   const plan = await loadPlan(planPath);
 
-  const workflow = getWorkflow(found.origin.workflow);
+  const rawWorkflow = getWorkflow(found.origin.workflow);
+  if (isEngineWorkflow(rawWorkflow)) {
+    throw new Error(`Engine workflow "${found.origin.workflow}" does not support resume via harny answer`);
+  }
+  const workflow: Workflow = rawWorkflow;
   if (!workflow.resumeFromAnswer) {
     throw new Error(`Workflow "${found.origin.workflow}" does not implement resumeFromAnswer`);
   }
