@@ -45,7 +45,7 @@ function parseMode(value: string): RunMode {
 
 type RegistryCmd =
   | { kind: "ls"; status?: string; cwd?: string; workflow?: string }
-  | { kind: "show"; runId: string; tail?: boolean }
+  | { kind: "show"; runId: string; tail?: boolean; since?: string }
   | {
       kind: "answer";
       runId: string;
@@ -155,10 +155,13 @@ function parseArgs(argv: string[]): {
     registryCmd = { kind: "ls", status, cwd, workflow: wf };
   } else if (sub === "show" && rest[1]) {
     let tail = false;
+    let since: string | undefined;
     for (let i = 2; i < rest.length; i++) {
       if (rest[i] === "--tail") tail = true;
+      else if (rest[i] === "--since" && rest[i + 1]) { since = rest[++i]; }
+      else if (rest[i]?.startsWith("--since=")) { since = rest[i]!.slice("--since=".length); }
     }
-    registryCmd = { kind: "show", runId: rest[1]!, ...(tail ? { tail: true } : {}) };
+    registryCmd = { kind: "show", runId: rest[1]!, ...(tail ? { tail: true } : {}), ...(since !== undefined ? { since } : {}) };
   } else if (sub === "ui") {
     let port: number | undefined;
     let noOpen = false;
@@ -405,8 +408,9 @@ async function main() {
 
       if (registryCmd.tail) {
         const sfp = statePathFor(run.environment.cwd, run.origin.task_slug);
-        const { tailRun } = await import("./harness/transcripts/tail.js");
-        await tailRun(sfp);
+        const { tailRun, parseSinceArg } = await import("./harness/transcripts/tail.js");
+        const sinceSeconds = registryCmd.since !== undefined ? parseSinceArg(registryCmd.since) : undefined;
+        await tailRun(sfp, sinceSeconds);
         return;
       }
 

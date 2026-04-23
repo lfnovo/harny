@@ -73,13 +73,48 @@ function processLines(lines: string[]): void {
   }
 }
 
-export async function tailRun(stateFilePath: string): Promise<void> {
+export function parseSinceArg(s: string): number {
+  if (/^\d+$/.test(s)) return Number(s);
+  const m = /^(\d+)(s|m|h)$/.exec(s);
+  if (m) {
+    const n = Number(m[1]);
+    if (m[2] === "s") return n;
+    if (m[2] === "m") return n * 60;
+    if (m[2] === "h") return n * 3600;
+  }
+  throw new Error(`--since: unrecognized duration "${s}"`);
+}
+
+export function backfillFilter(events: unknown[], sinceSeconds: number, now?: number): unknown[] {
+  const cutoff = (now ?? Date.now()) - sinceSeconds * 1000;
+  return events.filter((event) => {
+    const e = event as Record<string, unknown>;
+    if (typeof e.timestamp !== "string") return false;
+    const ts = new Date(e.timestamp).getTime();
+    if (isNaN(ts)) return false;
+    return ts >= cutoff;
+  });
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds % 3600 === 0) return `${seconds / 3600}h`;
+  if (seconds % 60 === 0) return `${seconds / 60}m`;
+  return `${seconds}s`;
+}
+
+export async function tailRun(
+  stateFilePath: string,
+  sinceSeconds?: number,
+  signal?: AbortSignal,
+): Promise<void> {
   let interrupted = false;
   const sigintHandler = () => {
     interrupted = true;
     process.stdout.write("\n");
   };
   process.once("SIGINT", sigintHandler);
+
+  const isInterrupted = () => interrupted || (signal?.aborted ?? false);
 
   try {
     let state = await readState(stateFilePath);
@@ -100,7 +135,33 @@ export async function tailRun(stateFilePath: string): Promise<void> {
     let byteOffset = 0;
     let lastStateCheck = Date.now();
 
-    while (!interrupted) {
+    // Backfill: emit recent transcript events before starting live tail
+    if (sinceSeconds && sinceSeconds > 0 && tPath) {
+      try {
+        const buffer = await readFile(tPath);
+        byteOffset = buffer.length;
+        const rawLines = buffer.toString("utf8").split("\n").filter((l) => l.trim());
+        const events: unknown[] = [];
+        for (const line of rawLines) {
+          try {
+            events.push(JSON.parse(line));
+          } catch {
+            // skip malformed
+          }
+        }
+        const filtered = backfillFilter(events, sinceSeconds);
+        console.log(`── backfill: last ${formatDuration(sinceSeconds)} ──`);
+        for (const event of filtered) {
+          const formatted = formatEvent(event);
+          if (formatted !== null) console.log(formatted);
+        }
+        console.log("── live ──");
+      } catch {
+        console.log("── live ──");
+      }
+    }
+
+    while (!isInterrupted()) {
       const now = Date.now();
 
       // Poll transcript for new content every 250ms
