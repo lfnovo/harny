@@ -45,6 +45,8 @@ export interface BuildFeatureDevActorsDeps {
   logMode?: LogMode;
   /** When provided, phases[] and history[] are written around each phase call. */
   store?: StateStore;
+  /** Prompt variant to resolve; defaults to 'default'. */
+  variant?: string;
 }
 
 export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
@@ -53,7 +55,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     workflowId: 'feature-dev',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: { ...DEFAULT_PLANNER, prompt: resolvePrompt('feature-dev', 'default', 'planner', deps.cwd) },
+    phaseConfig: { ...DEFAULT_PLANNER, prompt: resolvePrompt('feature-dev', deps.variant ?? 'default', 'planner', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
@@ -65,7 +67,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     workflowId: 'feature-dev',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: { ...DEFAULT_DEVELOPER, prompt: resolvePrompt('feature-dev', 'default', 'developer', deps.cwd) },
+    phaseConfig: { ...DEFAULT_DEVELOPER, prompt: resolvePrompt('feature-dev', deps.variant ?? 'default', 'developer', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
@@ -77,7 +79,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     workflowId: 'feature-dev',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: { ...DEFAULT_VALIDATOR, prompt: resolvePrompt('feature-dev', 'default', 'validator', deps.cwd) },
+    phaseConfig: { ...DEFAULT_VALIDATOR, prompt: resolvePrompt('feature-dev', deps.variant ?? 'default', 'validator', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
