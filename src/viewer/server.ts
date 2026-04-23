@@ -259,26 +259,35 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         const modifiedFiles = (filesOutput ?? "").split("\n").map((f) => f.trim()).filter(Boolean);
         if (modifiedFiles.length === 0) return jsonRes({ siblingBranches: [] });
 
-        // Unmerged local branches are the candidate siblings.
+        // Unmerged local branches filtered to harny/harness managed only.
         const branchesOutput = await runGit(["branch", "--no-merged", branch], cwd);
         const siblingNames = (branchesOutput ?? "")
           .split("\n")
           .map((b) => b.replace(/^\*?\s+/, "").trim())
-          .filter(Boolean);
+          .filter(Boolean)
+          .filter((b) => /^(harny|harness)\//.test(b));
 
-        // For each sibling, find which modified files it also touches.
-        const siblingMap = new Map<string, string[]>();
+        // One git log per sibling returns all touched files at once (O(S) not O(S×F)).
+        const modifiedFilesSet = new Set(modifiedFiles);
+        const siblingBranches: Array<{ branch: string; files: string[] }> = [];
         for (const sibling of siblingNames) {
-          for (const file of modifiedFiles) {
-            const overlap = await runGit(["log", sibling, "--not", branch, "--", file], cwd);
-            if (overlap) {
-              if (!siblingMap.has(sibling)) siblingMap.set(sibling, []);
-              siblingMap.get(sibling)!.push(file);
-            }
+          const output = await runGit(
+            ["log", sibling, "--not", branch, "--name-only", "--format=", "--", ...modifiedFiles],
+            cwd,
+          );
+          if (output) {
+            const files = [
+              ...new Set(
+                output
+                  .split("\n")
+                  .map((f) => f.trim())
+                  .filter((f) => f.length > 0 && modifiedFilesSet.has(f)),
+              ),
+            ];
+            if (files.length > 0) siblingBranches.push({ branch: sibling, files });
           }
         }
 
-        const siblingBranches = Array.from(siblingMap.entries()).map(([b, files]) => ({ branch: b, files }));
         return jsonRes({ siblingBranches });
       }
 
