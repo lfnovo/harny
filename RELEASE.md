@@ -91,7 +91,23 @@ Exception: stacking by intent (e.g., a follow-up fix on top of a half-done featu
 
 Branches are still preserved (Rule 2) — they form the run history. Merging doesn't delete them.
 
-### Rule 5: This doc evolves
+### Rule 5: Architect spot-checks code before merge
+
+After every PASS verdict and before `git merge --no-ff`, the architect MUST:
+
+1. **Read the diff** with `git show <commit>` (or focus on key files). Look for: code smells, dead code, unused imports, missing error handlers, hidden side effects, observability gaps.
+2. **Re-run the new probe(s)** independently on the merge target branch. Confirms no environment-specific failure.
+3. **Optionally re-run regression probes** if the change touches a load-bearing path.
+
+The validator verifies functional correctness against acceptance criteria. The architect verifies code shape, integration with the rest of the system, and what the validator (correctly scoped to its prompt) can't see — e.g., observability gaps, dead code, missing safety nets that weren't in the AC list.
+
+If issues found:
+- **Blocking** (real bugs that break the AC) → ask the user before merging; consider revert + fix-up run.
+- **Non-blocking** (cosmetic, missing safety net, edge case) → merge anyway and add to backlog as a future cleanup run.
+
+This rule was added retroactively after run #16 (wire-engine-orchestrator) revealed observability + actor-leak issues that PASS-by-validator missed because the AC list didn't require them.
+
+### Rule 6: This doc evolves
 
 `RELEASE.md` is not a contract. It's a working agreement that we update as we learn. If a rule isn't serving us after 5 runs, we change it explicitly here — not silently.
 

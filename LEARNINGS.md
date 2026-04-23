@@ -6,6 +6,22 @@ For agent-emitted issues, see `state.json:problems[]` per run instead.
 
 ---
 
+## Run Epic A — `wire-engine-orchestrator` (2026-04-23)
+
+### L7 — engine path needs Phoenix + machine-error handling parity with legacy
+
+- **Pattern observed:** Epic A wired `WorkflowDefinition.machine` routing into orchestrator, returning early before the legacy `withRunSpan` Phoenix wrapping (line 554) and without subscribing to actor errors. Result: engine workflow runs are invisible to Phoenix observability; machine-internal errors trigger only the 60s timeout instead of fast-failing. The validator passed because the AC list didn't require either.
+- **Counterfactual:** Yes — fresh dev tomorrow asked to add another runtime path would replicate the same omissions. Phoenix wiring is non-obvious cross-cutting concern; XState's `subscribe(snapshot)` callback hides actor-level errors unless you also subscribe to the error channel.
+- **Action:** (a) Backlog harness run: `engine-path-observability-parity` — wrap engine path in `withRunSpan` + add actor.subscribe error handler in runEngineWorkflow.ts + stop actor on timeout. (b) Add a checklist item to `engine-design.md §9` for any new runtime path: "Phoenix wrap, actor error handler, AbortSignal cleanup."
+
+### L8 — architect code review surfaces what validator's AC scope misses
+
+- **Pattern observed:** Validator verified all 11 ACs of Epic A but missed Phoenix gap, actor leak on timeout, missing machine-error handler, dead `planPath` code on engine path. None of these were in the AC list. Surfaced in architect's diff review post-merge.
+- **Counterfactual:** Yes — every harness run has a scope-mismatch gap between "AC verification" and "code health". The validator can only check what's in its prompt; broader code health is the architect's domain.
+- **Action:** RELEASE.md Rule 5 added — architect MUST `git show <commit>` and re-run new probes before each merge. Non-blocking issues go to LEARNINGS as backlog candidates.
+
+---
+
 ## Run #4 — `land-learnings` (2026-04-22)
 
 ### L6 — architect must merge after every run, or branches diverge silently
