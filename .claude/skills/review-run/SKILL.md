@@ -97,8 +97,16 @@ Output structure:
 ### Confusion / errors / slippage
 <bullets with evidence — JSONL line refs or quoted snippets>
 
-### Architect proposals (counterfactual-tested)
-1. **<Name>** — <pattern observed> → <counterfactual verdict> → <action with specific location>
+### Architect proposals (counterfactual-tested + triaged)
+
+Each proposal carries a triage tag so `/release-management` can route it without re-classifying:
+
+- **[NOW-blocks]** — prejudices the current release. Must fix before next harness run.
+- **[NOW-quick]** — quick fixer that rounds out the system; no blocking but compounds (e.g., a small infra hardening, a one-line docs gotcha that prevents a recurring bug class). Apply now if cheap.
+- **[BACKLOG]** — file as `gh issue`; doesn't prejudice the release.
+
+Format:
+1. **<Name>** [NOW-blocks | NOW-quick | BACKLOG] — <pattern observed> → <counterfactual verdict> → <action with specific location>
 2. ...
 
 ### LEARNINGS.md entries to append
@@ -123,6 +131,7 @@ After the architect (user) confirms the review, append the LEARNINGS.md-formatte
 
 ## Notes
 
+- Companion to `/release-management` — that skill GUIDES the running; this one REVIEWS one finished run. The triage tags ([NOW-blocks] / [NOW-quick] / [BACKLOG]) on each proposal feed directly into release-management's per-run loop step 6.
 - This skill is the architect's tool, not the harness's. It runs in the *outer* Claude conversation that orchestrates harny invocations.
 - Sub-agents (Explore type) are the right tool for transcript reading: each transcript can be tens of thousands of lines and you don't want them in the main context.
 - Be skeptical of agent self-reports ("I implemented X correctly") — verify against actual file diffs and validator behavior.
