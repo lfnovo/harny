@@ -534,6 +534,8 @@ export const commandActor = fromPromise<CommandResult, CommandOpts>(
 
 This convention applies to all dispatchers: `commandActor`, `agentActor`, `humanReviewActor`, and any future dispatcher added to `src/harness/engine/dispatchers/`. Each dispatcher file carries a one-line top-of-file comment referencing this section.
 
+When implementing a new dispatcher OR a new probe, read the two most recent siblings (under `src/harness/engine/dispatchers/` and `scripts/probes/engine/0N-*.ts` respectively) as templates — convention propagates by mimicry. Probes should follow the shape of the highest-numbered existing probe in their directory.
+
 ---
 
 ## 9. Engine runtime + persistence
