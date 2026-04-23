@@ -17,47 +17,72 @@ A consolidated map of all OPEN/DEFERRED/PROBE items is in §14.
 
 ---
 
-## 0. Build status snapshot — 2026-04-23
+## 0. Build status snapshot — 2026-04-23 (post-Epic-B-smoke)
 
 Quick overview of what's been built so far against the design. **Updated after each significant epic.**
+
+🏆 **MILESTONE achieved 2026-04-23:** `feature-dev-engine` ran end-to-end against real Claude SDK in a tmp git repo. Planner produced structured plan → developer created file in worktree → validator passed (bytewise verification) → committing state ran gitCommit → real commit landed on `harny/smoke7` branch. Engine now substitutes legacy in production for `feature-dev` shape.
 
 | Area | Status | Where |
 |---|---|---|
 | **Phase 0 spike** | ✅ DONE | XState probe at `scripts/probes/xstate/01-snapshot-recursion.ts` (kept as regression) |
-| **Engine SDK exports** | 🟡 PARTIAL | See §8 inline markers |
+| **Engine SDK exports** | ✅ DONE | All primitives wired (defineWorkflow / agent / command / humanReview / harnyActions / *Logic). One PARTIAL detail = defineWorkflow strict generics (D1, optional). See §8 inline markers. |
 | **Engine dispatchers (§8.4 convention)** | ✅ DONE | `runCommand` + `commandActorLogic` + `commandActor` (idem agent + humanReview); §8.4 |
-| **harnyActions effect actions** | 🟡 PARTIAL | `commit/resetTree/cleanUntracked` ✅; `advanceTask/bumpAttempts/stashValidator/stashDevSession` still stubs (Epic D) |
-| **defineWorkflow** | 🟡 PARTIAL | Validates + frozen output ✅; full strict generics (D1) ⏳ |
-| **runPhaseAdapter (engine ↔ sessionRecorder)** | ✅ DONE | `src/harness/engine/runtime/runPhaseAdapter.ts`, DI seam |
-| **First end-to-end engine workflow** | ✅ DONE | `echoCommit.ts` — defineWorkflow + commandActor + commit, probe 06 |
-| **Engine wired to orchestrator** | 🚧 IN FLIGHT | Epic A (`wire-engine-orchestrator`) running; routes by `WorkflowDefinition.machine` shape |
-| **`auto.ts` boundary workflow** | ❌ NOT STARTED | Phase 1 item per §12; Epic A is a precursor (direct routing without auto.ts boundary yet) |
-| **Router (§5)** | ❌ NOT STARTED | Lives inside `auto.ts:routing`, gated on auto.ts |
-| **state.json v2 schema** (`features`, `workflow_chosen`, `human_review` events) | ❌ NOT STARTED | Phase 1 item per §9.2 |
-| **humanReview production parking** (state.json:pending_question + resume) | ❌ NOT STARTED | Phase 3 in §12; current humanReviewActor uses DI provider only |
-| **L1 prompt overlays + variants** (§10.1) | ❌ NOT STARTED | Phase 2 |
-| **`.extend()` for L3** (§10.2) | ❌ NOT STARTED | Phase 2 |
-| **Stately Studio integration** | ⏭️ DEFERRED | Phase 4 |
-| **meta-improve post-node** | ⏭️ DEFERRED | Phase 5 |
+| **harnyActions: effect actions** | ✅ DONE | `commit/resetTree/cleanUntracked` real impls (auto-stage via `git add -A`); thin wrappers `commitLogic/resetTreeLogic/cleanUntrackedLogic` for `setup({ actors })` composition. |
+| **harnyActions: pure-state assigns (Epic D)** | ✅ DONE | `advanceTask / bumpAttempts / stashValidator / stashDevSession` typed against `PlanDrivenContext`; probe 09 verifies. |
+| **defineWorkflow** | 🟡 MOSTLY | Validates id + machine duck-type, returns frozen object with optional `buildActors` field for runtime actor injection. D1 (full strict generics for action/actor name enforcement) still optional. |
+| **runPhaseAdapter (engine ↔ sessionRecorder)** | ✅ DONE | `src/harness/engine/runtime/runPhaseAdapter.ts`. Threads `phaseConfig`, `mode`, `logMode`, `outputSchema`, `resumeSessionId`. DI seam (`sessionRunPhase`) for probes. |
+| **First end-to-end engine workflow (echoCommit)** | ✅ DONE | `src/harness/engine/workflows/echoCommit.ts` — defineWorkflow + commandActor + commit, probe 06. |
+| **Engine wired to orchestrator (Epic A)** | ✅ DONE | `runEngineWorkflow` runtime helper detects `WorkflowDefinition.machine` shape, calls `machine.provide({ actors: workflow.buildActors(deps) })` then `createActor`. Wrapped in `setupPhoenix + withRunSpan` matching legacy. |
+| **`feature-dev-engine` workflow (Epic B)** | ✅ DONE | `src/harness/engine/workflows/featureDev.ts` + `featureDevActors.ts`. Machine: `planning → loop[developer → validator → committing → next] → done|failed`. All three phase actors wired via `runPhaseAdapter` reusing legacy `DEFAULT_PLANNER/DEVELOPER/VALIDATOR` + `PlannerVerdictSchema/DeveloperVerdictSchema/EngineValidatorVerdictSchema`. Probe 10 (9 scenarios with mocked SDK) + smoke probe 04 (real CLI E2E). |
+| **`auto.ts` boundary workflow** | ❌ NOT STARTED | Phase 1 item per §12. Epic A is a direct-routing precursor; auto.ts adds router + cleanup graph states + meta-improve hook. |
+| **Router (§5)** | ❌ NOT STARTED | Lives inside `auto.ts:routing`. Gated on auto.ts. |
+| **state.json v2 schema** (`features`, `workflow_chosen`, `human_review` events) | ❌ NOT STARTED | Phase 1 item per §9.2. Engine path currently writes minimal lifecycle (status/ended_reason); does NOT populate phases[] or features. |
+| **humanReview production parking** (state.json:pending_question + resume via XState snapshot) | ❌ NOT STARTED | Phase 3 in §12. Current `humanReviewActor` uses DI askProvider; production parking (snapshot persist + restore) still missing. |
+| **L1 prompt overlays + variants** (§10.1) | ❌ NOT STARTED | Phase 2. Engine workflows currently use legacy `DEFAULT_*` prompts hardcoded in `featureDevActors.ts`. |
+| **`.extend()` for L3** (§10.2) | ❌ NOT STARTED | Phase 2. |
+| **Delete `docs.ts` + `issueTriage.ts`** | ❌ NOT STARTED | Phase 1 item per §12. |
+| **Bump to 0.2.0** | ❌ NOT STARTED | Phase 1 final step. |
+| **Stately Studio integration** | ⏭️ DEFERRED | Phase 4. |
+| **meta-improve post-node** | ⏭️ DEFERRED | Phase 5. |
 
-**Infrastructure improvements landed alongside engine work** (not in original design but proven valuable):
-- `LEARNINGS.md` — architect-emitted observation log with cost reference table
-- `.claude/skills/review-run/` — skill that runs post-mortem on harny runs (8-step bottom-up review with parallel sub-agents per phase)
-- `RELEASE.md` — methodology + Rule 4 (merge after each run) + step 6.5 (counterfactual test for promoting findings to durable infra)
-- `src/harness/coldInstall.ts` + `harny.json:coldWorktreeInstall` — auto bun install on cold worktrees (L4 permanent fix)
-- `assertNoSiblingBranchOwnsTouchedPaths` in `src/harness/git.ts` + orchestrator wiring + `harny.json:siblingBranchGuard` — mechanical L6 fix
-- `composeCommitMessage` helper — L1 (dup `task=N` trailer) permanent fix
-- `harny show <runId> --tail [--since=<dur>]` — live transcript viewer (CLI)
-- Viewer "Sibling branches" panel — visual safety net for L6 (with `^(harny|harness)/` filter + O(S) git query)
-- Folder-scoped CLAUDE.md pattern — top-level pointer + `src/harness/engine/CLAUDE.md` for subtree-specific conventions
-- Planner short-circuit on high-spec prompts — `featureDev/defaults.ts` PLANNER_PROMPT additions
+### Infrastructure improvements landed alongside engine work
 
-**Remaining for v0.2.0 to be USABLE** (engine actually substituting legacy in production):
-1. **Epic A** — wire `WorkflowDefinition.machine` → orchestrator routing (in flight)
-2. **Epic D** — implement remaining `harnyActions` XState assigns (advanceTask/bumpAttempts/stash*)
-3. **Epic B** — port `feature-dev` to engine as `feature-dev` machine using harnyActions
+Not in original design but proven valuable. Listed in rough chronological order:
 
-**For full v0.2.0 per §12 Phase 1:** also need auto.ts + router + state.json v2 schema + humanReview real parking + delete legacy workflows. ~6-10 more harness runs after A/D/B.
+- `LEARNINGS.md` — architect-emitted observation log with cost reference table (8 entries L1-L8 covering retry-fail patterns, branch divergence, Phoenix gaps, code-review-vs-validator scope mismatch, etc.).
+- `.claude/skills/review-run/` — skill that runs post-mortem on harny runs (8-step bottom-up review with parallel sub-agents per phase). Saves review markdown to `<run>/review.md` automatically.
+- `RELEASE.md` — methodology with Rules 1-6: no-TS-direto, preserve runs, one commit per run, **merge after each run** (Rule 4 — fixes L6), **architect code review before merge** (Rule 5 — fixes L8), doc evolves.
+- `src/harness/coldInstall.ts` + `harny.json:coldWorktreeInstall` — auto `bun install` on cold worktrees (L4 permanent fix).
+- `assertNoSiblingBranchOwnsTouchedPaths` in `src/harness/git.ts` + orchestrator wiring + `harny.json:siblingBranchGuard` — mechanical L6 fix.
+- `composeCommitMessage` helper in `src/harness/workflows/composeCommit.ts` — L1 (dup `task=N` trailer) permanent fix; engine reuses it.
+- `harny show <runId> --tail [--since=<dur>]` — live transcript viewer (CLI).
+- Viewer "Sibling branches" panel — visual safety net for L6 (with `^(harny|harness)/` filter + O(S) git query — both fixed in cleanup wave).
+- Folder-scoped CLAUDE.md pattern — top-level pointer + `src/harness/engine/CLAUDE.md` for subtree-specific conventions (verified empirically that nested CLAUDE.md is NOT auto-loaded by SDK; pointer pattern is required).
+- Planner short-circuit on high-spec prompts (`featureDev/defaults.ts` PLANNER_PROMPT additions) — cuts planner wall-clock when prompt is already a complete spec.
+- Run cost reference table in LEARNINGS.md — anomaly anchors for future runs (e.g., "engine-scaffolding @ 8m48s baseline").
+
+### What blocked the engine end-to-end (smoke-revealed bugs)
+
+The smoke test on Epic B.5 surfaced 4 bugs that mocked probes hadn't caught — all fixed:
+
+1. **runEngineWorkflow timeout 60s** → real Claude planner takes 2-5 min, aborted prematurely. Raised to 600s default (#12 closed).
+2. **runPhaseAdapter ignored `engineArgs.schema`** → passed `z.unknown()` to SDK → malformed tool definition → API 400. Now passes the real Zod schema (was inside #13 close note).
+3. **runEngineWorkflow did not thread `userPrompt`** → planner received `prompt: undefined` → SDK input validation failed (which surfaced as the misleading "credentials" error originally attributed to #13). Threading fixed.
+4. **gitCommit did not stage files** → dev-created untracked files were never staged → `git commit` silently committed nothing → engine reported success while producing no commit. Now `git add -A` first; throws if nothing staged.
+
+### Remaining for full v0.2.0 per §12 Phase 1
+
+After Epic B-smoke milestone:
+
+1. **`auto.ts` boundary workflow** + router (§4 + §5).
+2. **state.json v2 schema** (§9.2): `features`, `workflow_chosen`, `human_review` events. Engine path currently writes minimal lifecycle.
+3. **humanReview production parking** (§7, §9.3) — replace DI askProvider with snapshot-persist provider.
+4. **L1 prompt overlays + variants** (§10.1) — engine currently hardcodes legacy `DEFAULT_*` prompts.
+5. **Delete `docs.ts` + `issueTriage.ts`** legacy workflows (per §12).
+6. **Schema bump to v2** + **0.2.0 release**.
+
+Open backlog issues (cosmetic/polish) tracked at github.com/lfnovo/harny/issues/2-10 (none blocking).
 
 ---
 
@@ -452,11 +477,11 @@ Combined with `state.json:origin.features` (per-run) and `workflow_file_hash`, t
 
 ```ts
 import {
-  defineWorkflow,        // ✅ DONE — validates id + machine, returns frozen WorkflowDefinition. Strict generics (D1) ⏳ pending.
-  agentActor,            // ✅ DONE — fromPromise wrapping runAgent (DI runPhase callback); production wiring via runPhaseAdapter
+  defineWorkflow,        // ✅ DONE — validates id + machine, returns frozen WorkflowDefinition with optional buildActors. Strict generics (D1) ⏳ optional.
+  agentActor,            // ✅ DONE — fromPromise wrapping runAgent (DI runPhase callback); production wiring via runPhaseAdapter (Epic A); used in feature-dev-engine (Epic B).
   commandActor,          // ✅ DONE — fromPromise factory; runCommand is the canonical async fn (§8.4)
-  humanReviewActor,      // 🟡 PARTIAL — DI askProvider works in probes; production parking via state.json:pending_question NOT yet
-  harnyActions,          // 🟡 PARTIAL — commit/resetTree/cleanUntracked ✅; advanceTask/bumpAttempts/stashValidator/stashDevSession still throw stubs (Epic D)
+  humanReviewActor,      // 🟡 PARTIAL — DI askProvider works in probes; production parking via state.json:pending_question NOT yet (Phase 3)
+  harnyActions,          // ✅ DONE — commit/resetTree/cleanUntracked (effects, real impls with auto-stage) + advanceTask/bumpAttempts/stashValidator/stashDevSession (assigns on PlanDrivenContext, Epic D).
   commandActorLogic,     // ✅ DONE — actor logic for setup({ actors }) composition
   agentActorLogic,       // ✅ DONE — idem
   humanReviewActorLogic, // ✅ DONE — idem
@@ -851,15 +876,17 @@ Validate XState v5 fits before committing. Specifically:
 
 ### Phase 1 — Engine foundation + `auto.ts` 🚧 IN PROGRESS
 
-- ✅ harny SDK exports finalized: `defineWorkflow`, `agentActor`, `commandActor`, `humanReviewActor`, `harnyActions` (effect actions partial — Epic D pending).
-- 🚧 Orchestrator loads and runs XState machines — Epic A in flight; routes by `WorkflowDefinition.machine` shape directly. `auto.ts` boundary NOT yet shipped.
+- ✅ harny SDK exports finalized: `defineWorkflow`, `agentActor`, `commandActor`, `humanReviewActor`, `harnyActions` (effect actions + assigns both done — Epic D).
+- ✅ Orchestrator loads and runs XState machines — Epic A merged. Routes by `WorkflowDefinition.machine` shape via `runEngineWorkflow` runtime helper. `setupPhoenix + withRunSpan` wraps engine path mirroring legacy.
+- ✅ First production engine workflow `feature-dev-engine` — Epic B merged. Smoke7 verified end-to-end against real Claude SDK on 2026-04-23.
 - ❌ Built-in `auto.ts` shipped with router (LLM-only) + invoke leaf + cleanup post-node.
-- ❌ state.json schema bumped to v2 (additions per §9.2).
+- ❌ state.json schema bumped to v2 (additions per §9.2). Engine path currently writes minimal lifecycle only.
 - 🟡 `humanReviewActor` ALPHA — DI provider works in probes; interactive mode (TTY) NOT yet wired in production.
+- ❌ L1 prompt overlays + variants (§10.1). Engine reuses legacy `DEFAULT_*` prompts hardcoded in `featureDevActors.ts`.
 - ❌ Delete `docs.ts` and `issueTriage.ts`.
 - ❌ Bump to **0.2.0** — breaking change. Schema_version refusal for older runs.
 
-**Foundation is solid; the production-replacement work (Epic B — port feature-dev to engine, plus auto.ts + router + v2 schema) is the remaining bulk of Phase 1.**
+**Foundation + first real engine workflow are done. Remaining Phase 1 work: auto.ts/router, state.json v2, humanReview production parking, L1 prompt overlays, delete legacy, 0.2.0 bump.**
 
 ### Phase 2 — Plugin loading + project workflows ❌ NOT STARTED
 
