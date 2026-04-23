@@ -1,6 +1,6 @@
 # src/harness/engine/
 
-XState v5 engine layer for harny v0.2.0. Implements the harny SDK described in engine-design.md §8.
+XState v5 engine layer. See `CLAUDE.md` in this directory for conventions (dispatcher contract, sibling-mirror rule, probe shape, workflow composition).
 
 ## Files
 

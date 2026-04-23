@@ -1,5 +1,5 @@
-// engine-design.md §4 — 'auto' boundary workflow: XState sub-actor wrapper around a leaf workflow.
-// Ships the structural skeleton for §4.2/§4.3 pre/post nodes; router logic is deferred.
+// 'auto' boundary workflow: XState sub-actor wrapper around a leaf workflow.
+// Ships the structural skeleton for pre/post cleanup nodes; router logic is deferred.
 
 import { assign, fromPromise, setup } from 'xstate';
 import { defineWorkflow } from '../defineWorkflow.js';

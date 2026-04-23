@@ -1,4 +1,4 @@
-// engine-design.md §8, §11 — production actor implementations for feature-dev.
+// Production actor implementations for feature-dev.
 // Machine shape lives in featureDev.ts; wired implementations live here.
 // Contract: call machine.provide({ actors: buildFeatureDevActors(deps) }) at run-time.
 

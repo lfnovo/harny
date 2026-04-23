@@ -13,7 +13,7 @@
  *
  * RULE: validator NEVER spawns a nested harny invocation. Use these helpers
  * instead. Full docs: src/harness/testing/ and
- * .claude/skills/release-management/SKILL.md §Cheap validator patterns.
+ * .claude/skills/harny-release/SKILL.md §Cheap validator patterns.
  */
 
 import { existsSync } from 'node:fs';

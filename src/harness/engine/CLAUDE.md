@@ -2,9 +2,9 @@
 
 This file is loaded on-demand when working under `src/harness/engine/`. The Claude Agent SDK auto-loads only the top-level `CLAUDE.md`; the root file points here so agents working in this subtree read it explicitly before making changes.
 
-For full architecture, see `engine-design.md §8`, `§8.4`, and `§11`.
+Sibling-mirror rule below is the primary discipline: before adding a new dispatcher or probe, read the two most recent siblings as templates.
 
-## §8.4 — Dispatcher convention
+## Dispatcher convention
 
 Every dispatcher exports two surfaces: (a) a plain `async fn(opts, signal?)` that contains the canonical implementation and serves as the probe surface, and (b) a thin `fromPromise(fn)` actor wrapper used only as the XState adapter. Probes call the async fn directly with an `AbortController` — do not create an actor and call `.stop()` to test abort paths. Subscribing to a `fromPromise` actor's `onError` is unreliable for abort paths: when `signal.abort()` fires, the internal observer routes the rejection through `.error()`, which plain `.subscribe(nextCb)` subscribers never see.
 

@@ -129,7 +129,7 @@ Beyond the built-in `feature-dev`, `docs`, `issue-triage`, and `feature-dev-engi
 - `commandActor` — wraps `Bun.spawn`.
 - `humanReviewActor` — pauses for human approval / refinement.
 
-See [`engine-design.md`](./engine-design.md) for the full architecture and [`src/harness/engine/workflows/echoCommit.ts`](./src/harness/engine/workflows/echoCommit.ts) for a 60-line working example.
+See [`src/harness/engine/workflows/echoCommit.ts`](./src/harness/engine/workflows/echoCommit.ts) for a 60-line working example; [`src/harness/engine/CLAUDE.md`](./src/harness/engine/CLAUDE.md) for engine conventions.
 
 ## What you get out of the box
 
@@ -170,15 +170,11 @@ git push origin main v0.1.1
 
 The action validates that `package.json:version` matches the tag, runs `bun run typecheck`, and publishes via `npm publish --access public` using the `NPM_TOKEN` repo secret.
 
-## v0.2.0 development
+## Self-hosting
 
-harny v0.2.0 is being built BY harny v0.1.1 itself, in a self-hosting loop documented in [`RELEASE.md`](./RELEASE.md). The XState engine layer (`src/harness/engine/`) lands one prompt at a time; the legacy `feature-dev` workflow (`src/harness/workflows/featureDev/`) remains the production runtime until parity is confirmed.
+harny is built BY harny — the harness that exists today is used to develop the harness of tomorrow. TS production code only lands through harness runs; the policy rules, per-run loop, and cheap-validator patterns live in the [`harny-release`](./.claude/skills/harny-release/) skill. Per-run post-mortem via [`harny-review`](./.claude/skills/harny-review/). Architect learnings captured and drained via [`harny-learnings`](./.claude/skills/harny-learnings/).
 
-🏆 **2026-04-23 milestone:** `feature-dev-engine` ran end-to-end against real Claude SDK in a tmp git repo (planner → dev → validator → commit). Engine substitutes legacy in production for the `feature-dev` shape.
-
-Remaining for full v0.2.0: `auto.ts` boundary workflow + router (§4 + §5 of engine-design), state.json v2 schema, real humanReview parking, L1 prompt overlays + variants, deletion of legacy workflows, version bump.
-
-See [`engine-design.md`](./engine-design.md) for architecture (with `§0 Build status snapshot`), [`RELEASE.md`](./RELEASE.md) for self-hosting methodology, [`LEARNINGS.md`](./LEARNINGS.md) for architect-emitted observations across runs, and [`.claude/skills/`](./.claude/skills/) for the operational skills (`release-management`, `review-run`).
+See [`CLAUDE.md`](./CLAUDE.md) for codebase invariants, key paths, and gotchas. Open decisions and proposals live in [GitHub Issues](https://github.com/lfnovo/harny/issues) and [Discussions](https://github.com/lfnovo/harny/discussions).
 
 ## License
 

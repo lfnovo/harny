@@ -1,5 +1,3 @@
-// engine-design.md §7, §8, §8.4
-
 import { fromPromise } from 'xstate';
 import type { HumanReviewOutput, HumanReviewRunOptions } from '../types.js';
 

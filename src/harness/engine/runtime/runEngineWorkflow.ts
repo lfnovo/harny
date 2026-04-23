@@ -1,4 +1,4 @@
-// engine-design.md §8, §11 — runtime executor for WorkflowDefinition-shaped workflows
+// runtime executor for WorkflowDefinition-shaped workflows
 
 import { createActor } from 'xstate';
 import type { AnyStateMachine } from 'xstate';

@@ -1,5 +1,3 @@
-// engine-design.md §6.1, §7, §8
-
 import type { AnyStateMachine } from 'xstate';
 import type { LogMode, Plan, RunMode } from '../types.ts';
 import type { StateStore } from '../state/store.ts';

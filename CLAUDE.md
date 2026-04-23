@@ -32,7 +32,7 @@ Published as `@lfnovo/harny` on npm (the unscoped `harny` name was blocked by np
 - `src/harness/engine/workflows/featureDev.ts` — canonical `feature-dev` machine (id: `'feature-dev'`): `planning → loop[developer → validator → committing → next] → done|failed`. Default export sets `buildActors: buildFeatureDevActors`. This is the default workflow (`--workflow feature-dev`).
 - `src/harness/engine/workflows/featureDevActors.ts` — `buildFeatureDevActors(deps)` builds production actors. Uses `DEFAULT_PLANNER/DEVELOPER/VALIDATOR` configs and `PlannerVerdictSchema/DeveloperVerdictSchema` from `./featureDev/shared.ts`. Defines engine-only `EngineValidatorVerdictSchema` (extends `pass|fail` to include `blocked`) so the SDK can produce all three. Includes a `commitActor` over `gitCommit` for the `committing` state.
 - `src/harness/engine/workflows/featureDev/shared.ts` — combined phase configs (`DEFAULT_PLANNER`, `DEFAULT_DEVELOPER`, `DEFAULT_VALIDATOR`) and verdict schemas (`PlannerVerdictSchema`, `DeveloperVerdictSchema`) for the `feature-dev` engine workflow.
-- `src/harness/engine/workflows/auto.ts` — `auto` boundary workflow (engine-design.md §4 skeleton). XState machine: `invoking → finalize[cleanup] → done|failed`. `invoking` invokes `feature-dev` as an XState sub-actor (forwarding `cwd + userPrompt`); `onDone → finalize`, `onError → finalize` (error captured in context). `finalize.cleanup` is an idempotent no-op stub today (§4.2/§4.3 extension point). `buildAutoActors(deps)` calls `buildFeatureDevActors(deps)` and wires the leaf machine via `.provide()`, so the store threads through the boundary. Exports: default `WorkflowDefinition` + named `buildAutoActors`.
+- `src/harness/engine/workflows/auto.ts` — `auto` boundary workflow. XState machine: `invoking → finalize[cleanup] → done|failed`. `invoking` invokes `feature-dev` as an XState sub-actor (forwarding `cwd + userPrompt`); `onDone → finalize`, `onError → finalize` (error captured in context). `finalize.cleanup` is an idempotent no-op stub today (extension point for future cleanup hooks). `buildAutoActors(deps)` calls `buildFeatureDevActors(deps)` and wires the leaf machine via `.provide()`, so the store threads through the boundary. Exports: default `WorkflowDefinition` + named `buildAutoActors`.
 - `src/harness/engine/harnyActions.ts` — effect actions (`gitCommit` auto-stages via `git add -A` first; throws on empty stage), pure-state assigns (`advanceTask`, `bumpAttempts`, `stashValidator`, `stashDevSession`) typed against `PlanDrivenContext`. Plus `*Logic` constants (`commandActorLogic`, `commitLogic`, etc.) for `setup({ actors })` composition (factories like `commandActor(opts)` are for direct `createActor` use).
 - `src/harness/workflows/composeCommit.ts` — `composeCommitMessage({ devMessage, taskId, role, evidence })`: strips pre-existing `task=<id>` trailers from devMessage before appending exactly one — prevents the duplicate-trailer bug. Used by both legacy and engine paths.
 - `src/harness/coldInstall.ts` — `coldInstallWorktree({ worktreePath, primaryCwd })`: detects missing `node_modules` in fresh worktree and runs `bun install` (gated by `harny.json:coldWorktreeInstall`, default `true`). Called from orchestrator after `addWorktree`.
@@ -109,13 +109,13 @@ The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wa
 
 ## Operational skills (`.claude/skills/`)
 
-**Audience rule.** Skills under `.claude/skills/` ship to downstream consumers of harny — devs using harny in their own repos. They must be written in generic, dev-agnostic terms. **Architect-only guidance (conventions for people working ON harny itself: release-management methodology, build-status snapshots, meta-loop internals) goes in `CLAUDE.md`, `RELEASE.md`, `LEARNINGS.md`, `engine-design.md` — never in a skill file.** When editing a skill, ask: "would a user of harny in an unrelated repo need this?" If no, it belongs in architect docs.
+Skills are prefixed `harny-` and may target adopters, the architect, or both — the distinction is *level* (beginner / advanced / architect), not a closed audience. Currently installed:
 
-Currently installed skills (some still misplaced — slated for migration to architect docs):
+- **`harny-release`** — orchestrate a release cycle: dispatch runs, code-review merges, triage findings, cheap-validator patterns, per-run loop, "how to re-orient on a fresh context."
+- **`harny-review`** — post-mortem of one finished run (leaves-to-trunk analysis, counterfactual test, triage tags).
+- **`harny-learnings`** — capture (`/harny-learnings <text>`) + drain (`/harny-learnings drain`) the local inbox into GitHub Issues / CLAUDE.md edits / discards.
 
-- **`release-management`** — architect-only methodology; lives here for convenience during Phase 1 but should migrate to `RELEASE.md`/CLAUDE.md.
-- **`review-run`** — architect-only post-mortem tool; same migration applies.
-- Companion docs: `RELEASE.md` (methodology + Rules 1-6), `LEARNINGS.md` (architect-emitted observations L1-L8).
+Full documentation strategy lives in `specs/documentation.md` (gitignored working memory).
 
 ## Subtree conventions
 

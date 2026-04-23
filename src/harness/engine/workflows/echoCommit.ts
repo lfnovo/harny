@@ -1,4 +1,4 @@
-// engine-design.md §8, §11 — end-to-end echo-commit workflow
+// end-to-end echo-commit workflow
 
 import { setup, assign, createMachine } from 'xstate';
 import { commandActorLogic } from '../dispatchers/command.js';

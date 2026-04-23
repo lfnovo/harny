@@ -1,5 +1,3 @@
-// engine-design.md §8, §8.4, §9.1.1
-
 import { fromPromise } from 'xstate';
 import type { AgentRunOptions } from '../types.js';
 

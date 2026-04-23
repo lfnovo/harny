@@ -1,4 +1,4 @@
-// engine-design.md §8, §11 — feature-dev workflow as XState v5 machine (Epic B.1)
+// feature-dev workflow as XState v5 machine
 
 import { assign, fromPromise, setup } from 'xstate';
 import { defineWorkflow } from '../defineWorkflow.js';

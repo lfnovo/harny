@@ -481,8 +481,8 @@ export async function main() {
   }
 
   // Default to feature-dev when --workflow not specified. --workflow accepts
-  // `<id>` or `<id>:<variant>` syntax (engine-design.md §4.5); split here so
-  // the orchestrator receives a clean registry id + variant separately.
+  // `<id>` or `<id>:<variant>` syntax; split here so the orchestrator receives
+  // a clean registry id + variant separately.
   const workflowArgRaw = workflowArg ?? "feature-dev";
   const [workflowId = "feature-dev", variant] = workflowArgRaw.split(":");
 

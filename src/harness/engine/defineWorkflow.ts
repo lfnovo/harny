@@ -1,5 +1,3 @@
-// engine-design.md §8.1
-
 import type { AnyStateMachine } from 'xstate';
 import type { WorkflowDefinition } from './types.js';
 import type { StateStore } from '../state/store.js';

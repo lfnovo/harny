@@ -1,5 +1,3 @@
-// engine-design.md §8.2
-
 import { assign, fromPromise } from 'xstate';
 import type { PlanDrivenContext } from './types.ts';
 

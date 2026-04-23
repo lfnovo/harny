@@ -1,4 +1,3 @@
-// engine-design.md §8, §8.4
 import { z } from 'zod';
 import { runPhase, type PhaseRunResult } from '../../sessionRecorder.js';
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from '../../types.js';
