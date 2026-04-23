@@ -1,4 +1,5 @@
 import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
+import type { PhaseGuards } from "./guardHooks.js";
 
 export type LogMode = "compact" | "verbose" | "quiet";
 
@@ -36,6 +37,13 @@ export type PhaseConfig = {
   effort?: "low" | "medium" | "high" | "xhigh" | "max";
   model?: "opus" | "sonnet" | "haiku" | "inherit";
   mcpServers?: Record<string, McpServerConfig>;
+  /**
+   * SDK-level PreToolUse deny hooks installed for this phase. Enforces
+   * invariants agents can't be trusted to respect via prompt alone
+   * (harness sole-writer of plan.json, sole-committer, validator read-only).
+   * See src/harness/guardHooks.ts.
+   */
+  guards?: PhaseGuards;
 };
 
 export type ResolvedPhaseConfig = Required<

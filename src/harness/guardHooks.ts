@@ -41,6 +41,19 @@ function allowPreToolUse(): HookJSONOutput {
   return { continue: true };
 }
 
+/**
+ * readOnly guard: denies Write/Edit/MultiEdit/NotebookEdit inside phase cwd.
+ *
+ * KNOWN GAP — does NOT cover Bash. A validator still running Bash can do
+ * `echo 'fix' > file.ts`, `sed -i ...`, `rm`, `mv`, etc. We accept this gap
+ * because validators legitimately need Bash to run tests and exercise
+ * commands, and robustly parsing an arbitrary Bash command for mutations
+ * (redirects, piped tools, implicit writes via tools like tee/sed -i) is
+ * brittle. Mitigation is prompt discipline + `allowedTools` curation —
+ * don't include tools the validator shouldn't need. If this gap ever bites
+ * in production, the fix is to add a Bash-inspecting matcher here; until
+ * then, we stay honest about the limit.
+ */
 function validatorReadOnly(phaseCwd: string): HookCallback {
   const phase = resolve(phaseCwd);
   return async (input) => {

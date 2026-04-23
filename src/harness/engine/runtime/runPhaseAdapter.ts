@@ -4,6 +4,7 @@ import { runPhase, type PhaseRunResult } from '../../sessionRecorder.js';
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from '../../types.js';
 import type { AgentRunOptions } from '../types.js';
 import type { StateStore } from '../../state/store.js';
+import type { PhaseGuards } from '../../guardHooks.js';
 
 export type AgentRunOptionsSubset = Pick<
   AgentRunOptions,
@@ -22,6 +23,7 @@ export type SessionRunPhase = (args: {
   resumeSessionId?: string | null;
   logMode?: LogMode;
   mode?: RunMode;
+  guards?: PhaseGuards;
   workflowId: string;
   runId: string;
 }) => Promise<PhaseRunResult<unknown>>;
@@ -89,6 +91,10 @@ export function adaptRunPhase(
         runId: deps.runId,
         mode: deps.mode ?? 'silent',
         logMode: deps.logMode ?? 'compact',
+        // Thread phase-level SDK guards so invariants like "harness is sole
+        // writer of plan.json" / "sole committer" are enforced at the SDK
+        // layer, not just by prompt. See guardHooks.ts.
+        guards: phaseConfig.guards,
       });
 
       if (result.status === 'error') {

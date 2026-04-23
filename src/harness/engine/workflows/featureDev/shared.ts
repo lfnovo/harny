@@ -118,6 +118,8 @@ export const DEFAULT_PLANNER: ResolvedPhaseConfig = {
   effort: 'high',
   model: 'sonnet',
   mcpServers: {},
+  // Planner's allowedTools are already read-only; no SDK-level guards needed.
+  guards: {},
 };
 
 export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
@@ -128,6 +130,10 @@ export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
   effort: 'high',
   model: 'sonnet',
   mcpServers: {},
+  // Enforces two CLAUDE.md invariants at the SDK layer: "harness is sole
+  // writer of plan.json" and "harness is sole committer". Escape hatches
+  // for throwaway paths (cd /tmp/..., git -C /tmp/...) live in guardHooks.ts.
+  guards: { noPlanWrites: true, noGitHistory: true },
 };
 
 export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
@@ -138,6 +144,11 @@ export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
   effort: 'high',
   model: 'sonnet',
   mcpServers: {},
+  // readOnly blocks Edit/Write/MultiEdit/NotebookEdit inside the phase cwd.
+  // NOTE: does NOT cover Bash — validator can still `echo > file`, `sed -i`,
+  // `rm`, etc. Accepted gap: validator needs Bash to exercise tests; full
+  // mutation blocking is brittle. Rely on prompt + allowedTools for Bash.
+  guards: { readOnly: true },
 };
 
 const PROBLEMS_FIELD_DESCRIPTION =
