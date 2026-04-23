@@ -25,9 +25,7 @@ async function git(args: string[], cwd: string): Promise<void> {
   }
 }
 
-async function makeRepo(opts?: {
-  harnyJson?: Record<string, unknown>;
-}): Promise<{ primaryCwd: string; worktreePath: string }> {
+async function makeRepo(): Promise<{ primaryCwd: string; worktreePath: string }> {
   const tmpBase = mkdtempSync(join(tmpdir(), "harny-ci-"));
   const primaryCwd = join(tmpBase, "primary");
   const worktreePath = join(tmpBase, "worktree");
@@ -45,14 +43,6 @@ async function makeRepo(opts?: {
 
   await g("add", ".");
   await g("commit", "-m", "initial");
-
-  if (opts?.harnyJson) {
-    writeFileSync(
-      join(primaryCwd, "harny.json"),
-      JSON.stringify(opts.harnyJson, null, 2) + "\n",
-    );
-  }
-
   await g("worktree", "add", "-b", "test-branch", worktreePath);
 
   return { primaryCwd, worktreePath };
@@ -112,35 +102,6 @@ let failures = 0;
       console.log(`PASS ${name}`);
     } else {
       console.log(`FAIL ${name}: sentinel removed — bun install ran unexpectedly`);
-      failures++;
-    }
-  } catch (e: unknown) {
-    console.log(`FAIL ${name}: ${(e as Error).message}`);
-    failures++;
-  } finally {
-    if (tmpBase) rmSync(tmpBase, { recursive: true, force: true });
-  }
-}
-
-// Scenario (c): skips-when-toggle-off
-{
-  const name = "skips-when-toggle-off";
-  let tmpBase = "";
-  try {
-    const { primaryCwd, worktreePath } = await makeRepo({
-      harnyJson: { coldWorktreeInstall: false },
-    });
-    tmpBase = join(primaryCwd, "..");
-
-    await Promise.race([
-      coldInstallWorktree({ worktreePath, primaryCwd }),
-      timeout(8000),
-    ]);
-
-    if (!existsSync(join(worktreePath, "node_modules"))) {
-      console.log(`PASS ${name}`);
-    } else {
-      console.log(`FAIL ${name}: node_modules created despite coldWorktreeInstall=false`);
       failures++;
     }
   } catch (e: unknown) {

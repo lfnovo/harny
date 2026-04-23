@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { hostname, userInfo } from "node:os";
-import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { loadHarnessConfig } from "./config.js";
 import { coldInstallWorktree } from "./coldInstall.js";
 import { runPhase as runPhaseSession } from "./sessionRecorder.js";
 import {
@@ -37,7 +34,7 @@ import type { StateStore } from "./state/store.js";
 import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
 import { getWorkflow, isEngineWorkflow } from "./workflows/index.js";
 import { runEngineWorkflow } from "./engine/runtime/runEngineWorkflow.js";
-import type { IsolationMode, LogMode, PhaseName, ResolvedHarnessConfig, RunMode } from "./types.js";
+import type { IsolationMode, LogMode, PhaseName, RunMode } from "./types.js";
 import type { WorkflowContext, WorkflowPhaseResult } from "./workflow.js";
 import type { Workflow } from "./workflow.js";
 
@@ -55,7 +52,7 @@ function buildCtx(args: {
   phaseCwd: string;
   worktreePath: string | null;
   input: unknown;
-  config: ResolvedHarnessConfig;
+  mode: RunMode;
   logMode: LogMode;
   planPath: string;
   plan: import("./types.js").Plan;
@@ -70,13 +67,13 @@ function buildCtx(args: {
     primaryCwd,
     phaseCwd,
     input,
+    mode,
     logMode,
     planPath,
     plan,
     workflow,
     store,
   } = args;
-  const config = args.config;
   const log = (msg: string) => {
     if (logMode !== "quiet") console.log(msg);
   };
@@ -90,9 +87,8 @@ function buildCtx(args: {
     primaryCwd,
     phaseCwd,
     input,
-    config,
     logMode,
-    mode: config.mode,
+    mode,
     planPath,
     plan,
     log,
@@ -126,10 +122,10 @@ function buildCtx(args: {
       guards?: import("./guardHooks.js").PhaseGuards;
       resumeSessionId?: string | null;
     }): Promise<WorkflowPhaseResult<T>> => {
-      const baseConfig = config.phases[phaseArgs.phase];
+      const baseConfig = workflow.phaseDefaults[phaseArgs.phase];
       if (!baseConfig) {
         throw new Error(
-          `Workflow "${workflow.id}" tried to run phase "${phaseArgs.phase}" but no config exists for it. Declare it in the workflow's phaseDefaults or in harness.json's phases map.`,
+          `Workflow "${workflow.id}" tried to run phase "${phaseArgs.phase}" but no config exists for it. Declare it in the workflow's phaseDefaults.`,
         );
       }
       const phaseConfig = phaseArgs.allowedTools
@@ -173,7 +169,7 @@ function buildCtx(args: {
           resumeSessionId: phaseArgs.resumeSessionId ?? null,
           logMode,
           guards: phaseArgs.guards,
-          mode: config.mode,
+          mode,
           workflowId: workflow.id,
           runId,
         });
@@ -200,33 +196,25 @@ function buildCtx(args: {
         });
 
         if (phaseArgs.phase === "developer" && phaseStatus === "completed" && args.branch) {
-          let guardEnabled = true;
-          try {
-            const raw = JSON.parse(await readFile(join(primaryCwd, "harny.json"), "utf8")) as Record<string, unknown>;
-            if (raw.siblingBranchGuard === false) guardEnabled = false;
-          } catch { /* ENOENT or parse error — default true */ }
-
-          if (guardEnabled) {
-            const touchedPaths = await listDiffPaths(phaseCwd);
-            if (touchedPaths.length > 0) {
-              const { warnings } = await assertNoSiblingBranchOwnsTouchedPaths(
-                primaryCwd, args.branch, touchedPaths,
-              );
-              if (warnings.length > 0) {
-                warn(`[harny] WARNING: ${warnings.length} sibling-branch overlap(s) detected`);
-                await writeProblems({
-                  primaryCwd,
-                  taskSlug,
-                  phase: phaseArgs.phase,
-                  sessionId: result.sessionId ?? "",
-                  taskId: phaseArgs.harnessTaskId ?? null,
-                  problems: warnings.map(w => ({
-                    category: "design" as const,
-                    severity: "medium" as const,
-                    description: `Sibling branch ${w.siblingBranch} already touches ${w.path}; merge may regress or conflict.`,
-                  })),
-                });
-              }
+          const touchedPaths = await listDiffPaths(phaseCwd);
+          if (touchedPaths.length > 0) {
+            const { warnings } = await assertNoSiblingBranchOwnsTouchedPaths(
+              primaryCwd, args.branch, touchedPaths,
+            );
+            if (warnings.length > 0) {
+              warn(`[harny] WARNING: ${warnings.length} sibling-branch overlap(s) detected`);
+              await writeProblems({
+                primaryCwd,
+                taskSlug,
+                phase: phaseArgs.phase,
+                sessionId: result.sessionId ?? "",
+                taskId: phaseArgs.harnessTaskId ?? null,
+                problems: warnings.map(w => ({
+                  category: "design" as const,
+                  severity: "medium" as const,
+                  description: `Sibling branch ${w.siblingBranch} already touches ${w.path}; merge may regress or conflict.`,
+                })),
+              });
             }
           }
         }
@@ -286,10 +274,10 @@ function buildCtx(args: {
       }
     },
     askUser: async (askArgs: { prompt: string; options?: string[] }) => {
-      if (config.mode === "silent") {
+      if (mode === "silent") {
         throw new SilentModeError();
       }
-      if (config.mode === "interactive") {
+      if (mode === "interactive") {
         const rl = createInterface({ input: process.stdin, output: process.stdout });
         const ask = (q: string) =>
           new Promise<string>((resolve) => {
@@ -361,12 +349,9 @@ export async function runHarness(args: {
   const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
 
   const workflow = getWorkflow(args.workflowId ?? "feature-dev");
-  const config = await loadHarnessConfig(
-    primaryCwd,
-    isEngineWorkflow(workflow) ? { phaseDefaults: undefined } : workflow,
-    args.mode,
-  );
-  const isolation = args.isolation ?? config.isolation;
+  const workflowDefaultMode = isEngineWorkflow(workflow) ? undefined : workflow.defaultMode;
+  const mode: RunMode = args.mode ?? workflowDefaultMode ?? (process.stdin.isTTY ? "interactive" : "silent");
+  const isolation: IsolationMode = args.isolation ?? "worktree";
 
   log(`[harny] cwd=${primaryCwd} isolation=${isolation}`);
   log(`[harny] workflow=${workflow.id} task=${taskSlug}`);
@@ -422,10 +407,6 @@ export async function runHarness(args: {
     await assertCleanTree(primaryCwd);
   }
 
-  log(
-    `[harny] caps: per-task=${config.maxIterationsPerTask} retries-before-reset=${config.maxRetriesBeforeReset} global=${config.maxIterationsGlobal}`,
-  );
-
   const planPath = planFilePath(primaryCwd, taskSlug);
   const runId = randomUUID();
 
@@ -448,7 +429,7 @@ export async function runHarness(args: {
       branch,
       isolation,
       worktree_path: worktreePath,
-      mode: config.mode,
+      mode,
     },
     lifecycle: {
       status: "running",
@@ -513,7 +494,7 @@ export async function runHarness(args: {
           runId,
           userPrompt: args.userPrompt,
           log,
-          mode: config.mode,
+          mode,
           logMode,
           store,
         });
@@ -558,7 +539,7 @@ export async function runHarness(args: {
     phaseCwd,
     worktreePath,
     input: args.input,
-    config,
+    mode,
     logMode,
     planPath,
     plan,
@@ -661,7 +642,7 @@ export async function resumeHarness(
     throw new Error(`Workflow "${found.origin.workflow}" does not implement resumeFromAnswer`);
   }
 
-  const config = await loadHarnessConfig(primaryCwd, workflow);
+  const mode: RunMode = found.environment.mode ?? (process.stdin.isTTY ? "interactive" : "silent");
   const phaseCwd = found.environment.worktree_path ?? primaryCwd;
   const logMode: LogMode = "compact";
 
@@ -697,7 +678,7 @@ export async function resumeHarness(
     phaseCwd,
     worktreePath: found.environment.worktree_path,
     input: typeof answer === "string" ? { intent: answer } : { answers: answer },
-    config,
+    mode,
     logMode,
     planPath,
     plan,
