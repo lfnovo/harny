@@ -1,2 +1,3 @@
 #!/usr/bin/env bun
-import "../src/runner.ts";
+import { main } from "../src/runner.ts";
+main();

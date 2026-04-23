@@ -56,11 +56,13 @@ type RegistryCmd =
     }
   | { kind: "ui"; port?: number; noOpen?: boolean };
 
-function parseArgs(argv: string[]): {
+export function parseArgs(argv: string[]): {
   logMode: LogMode;
   assistant: string | null;
   workflow: string | null;
   cleanSlug: string | null;
+  cleanForce: boolean;
+  cleanKill: boolean;
   registryCmd: RegistryCmd | null;
   task: string | null;
   isolation: IsolationMode | null;
@@ -132,6 +134,8 @@ function parseArgs(argv: string[]): {
   }
 
   let cleanSlug: string | null = null;
+  let cleanForce = false;
+  let cleanKill = false;
   let registryCmd: RegistryCmd | null = null;
 
   // Subcommands are recognized by the first positional arg matching a known
@@ -140,6 +144,10 @@ function parseArgs(argv: string[]): {
   const sub = rest[0];
   if (sub === "clean" && rest[1]) {
     cleanSlug = rest[1]!;
+    for (let i = 2; i < rest.length; i++) {
+      if (rest[i] === "--force") cleanForce = true;
+      else if (rest[i] === "--kill") cleanKill = true;
+    }
   } else if (sub === "ls") {
     let status: string | undefined;
     let cwd: string | undefined;
@@ -214,6 +222,8 @@ function parseArgs(argv: string[]): {
     assistant,
     workflow,
     cleanSlug,
+    cleanForce,
+    cleanKill,
     registryCmd,
     task,
     isolation,
@@ -334,12 +344,14 @@ async function loadSearchCwds(): Promise<string[]> {
   return Array.from(out);
 }
 
-async function main() {
+export async function main() {
   const {
     logMode,
     assistant: assistantName,
     workflow: workflowArg,
     cleanSlug,
+    cleanForce,
+    cleanKill,
     registryCmd,
     task,
     isolation,
@@ -560,7 +572,7 @@ async function main() {
 
   if (cleanSlug !== null) {
     const assistant = await resolveAssistant(assistantName);
-    await cleanRun(assistant.cwd, cleanSlug, logMode === "verbose");
+    await cleanRun(assistant.cwd, cleanSlug, logMode === "verbose", { force: cleanForce, kill: cleanKill });
     return;
   }
 
@@ -639,4 +651,4 @@ async function main() {
   }
 }
 
-main();
+if (import.meta.main) main();
