@@ -1,6 +1,7 @@
 // engine-design.md §6.1, §7, §8
 
 import type { AnyStateMachine } from 'xstate';
+import type { Plan } from '../types.ts';
 
 // §6.1 — structured features captured at run start for meta-agent analytics
 export interface FeatureSet {
@@ -60,6 +61,17 @@ export interface HarnessContext {
   attempts: number;
   validatorResult: unknown;
   devSession: unknown;
+}
+
+// Bookkeeping context for plan-driven workflows; assigns in harnyActions operate on this shape
+export interface PlanDrivenContext {
+  plan: Plan;
+  currentTaskIdx: number;
+  attempts: number;
+  validatorSession?: string;
+  devSession?: string;
+  iterationsGlobal: number;
+  iterationsThisTask: number;
 }
 
 // §9.1.1 — options for the agentActor dispatcher
