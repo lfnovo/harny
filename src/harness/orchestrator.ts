@@ -4,6 +4,7 @@ import { hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { loadHarnessConfig } from "./config.js";
+import { coldInstallWorktree } from "./coldInstall.js";
 import { runPhase as runPhaseSession } from "./sessionRecorder.js";
 import {
   createPlanSkeleton,
@@ -404,6 +405,7 @@ export async function runHarness(args: {
       await addWorktree(primaryCwd, worktreePath, branch);
       phaseCwd = worktreePath;
       log(`[harny] worktree=${worktreePath}`);
+      await coldInstallWorktree({ worktreePath, primaryCwd });
     } else {
       await assertCleanTree(primaryCwd);
       await createBranch(primaryCwd, branch);
