@@ -95,7 +95,7 @@ try {
         }
 
         for (const actor of ['planner', 'developer', 'validator'] as const) {
-          const expected = resolvePrompt('feature-dev-engine', 'default', actor, repo.path);
+          const expected = resolvePrompt('feature-dev', 'default', actor, repo.path);
           const actual = capturedSystemPrompts[actor];
           if (actual === undefined) {
             throw new Error(`${actor}: sessionRunPhase was never called for this phase`);

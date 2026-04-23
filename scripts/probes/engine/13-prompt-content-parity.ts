@@ -6,7 +6,7 @@
  *   bun scripts/probes/engine/13-prompt-content-parity.ts
  */
 
-import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from '../../../src/harness/workflows/featureDev/defaults.ts';
+import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from '../../../src/harness/engine/workflows/featureDev/shared.ts';
 import { resolvePrompt } from '../../../src/harness/engine/promptResolver.ts';
 
 let failures = 0;
@@ -17,7 +17,7 @@ for (const [actor, constant] of [
   ['validator', DEFAULT_VALIDATOR],
 ] as const) {
   try {
-    const fromFile = resolvePrompt('feature-dev-engine', 'default', actor, '/nonexistent-cwd-parity');
+    const fromFile = resolvePrompt('feature-dev', 'default', actor, '/nonexistent-cwd-parity');
     if (fromFile !== constant.prompt) {
       const diffIdx = [...fromFile].findIndex((c, i) => c !== constant.prompt[i]);
       throw new Error(

@@ -1,4 +1,4 @@
-// engine-design.md §8, §11 — production actor implementations for feature-dev-engine.
+// engine-design.md §8, §11 — production actor implementations for feature-dev.
 // Machine shape lives in featureDev.ts; wired implementations live here.
 // Contract: call machine.provide({ actors: buildFeatureDevActors(deps) }) at run-time.
 
@@ -6,9 +6,9 @@ import { fromPromise } from 'xstate';
 import { z } from 'zod';
 import { adaptRunPhase } from '../runtime/runPhaseAdapter.js';
 import type { SessionRunPhase } from '../runtime/runPhaseAdapter.js';
-import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from '../../workflows/featureDev/defaults.js';
+import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from './featureDev/shared.js';
 import { resolvePrompt } from '../promptResolver.js';
-import { PlannerVerdictSchema, DeveloperVerdictSchema } from '../../workflows/featureDev/verdicts.js';
+import { PlannerVerdictSchema, DeveloperVerdictSchema } from './featureDev/shared.js';
 import { gitCommit as defaultGitCommit } from '../harnyActions.js';
 import type { LogMode, Plan, PlanTask, RunMode } from '../../types.js';
 import type { StateStore } from '../../state/store.js';
@@ -50,10 +50,10 @@ export interface BuildFeatureDevActorsDeps {
 export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
   const runPhasePlanner = adaptRunPhase({
     cwd: deps.cwd,
-    workflowId: 'feature-dev-engine',
+    workflowId: 'feature-dev',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: { ...DEFAULT_PLANNER, prompt: resolvePrompt('feature-dev-engine', 'default', 'planner', deps.cwd) },
+    phaseConfig: { ...DEFAULT_PLANNER, prompt: resolvePrompt('feature-dev', 'default', 'planner', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
@@ -62,10 +62,10 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
 
   const runPhaseDev = adaptRunPhase({
     cwd: deps.cwd,
-    workflowId: 'feature-dev-engine',
+    workflowId: 'feature-dev',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: { ...DEFAULT_DEVELOPER, prompt: resolvePrompt('feature-dev-engine', 'default', 'developer', deps.cwd) },
+    phaseConfig: { ...DEFAULT_DEVELOPER, prompt: resolvePrompt('feature-dev', 'default', 'developer', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
@@ -74,10 +74,10 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
 
   const runPhaseValidator = adaptRunPhase({
     cwd: deps.cwd,
-    workflowId: 'feature-dev-engine',
+    workflowId: 'feature-dev',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: { ...DEFAULT_VALIDATOR, prompt: resolvePrompt('feature-dev-engine', 'default', 'validator', deps.cwd) },
+    phaseConfig: { ...DEFAULT_VALIDATOR, prompt: resolvePrompt('feature-dev', 'default', 'validator', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
