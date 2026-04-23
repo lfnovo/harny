@@ -11,6 +11,7 @@ export async function runEngineWorkflow(
     cwd: string;
     taskSlug: string;
     runId: string;
+    userPrompt: string;
     log?: (msg: string) => void;
     timeoutMs?: number;
     mode?: RunMode;
@@ -28,7 +29,7 @@ export async function runEngineWorkflow(
       const machineWithActors = workflow.buildActors
         ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId, mode: ctx.mode ?? 'silent', logMode: ctx.logMode ?? 'compact' }) })
         : workflow.machine;
-      const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd } });
+      const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd, userPrompt: ctx.userPrompt } });
       actorCleanup.stop = () => actor.stop();
 
       actor.subscribe({
