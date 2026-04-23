@@ -8,7 +8,7 @@ import type { StateStore } from '../../state/store.js';
 export type AgentRunOptionsSubset = Pick<
   AgentRunOptions,
   'phaseName' | 'prompt' | 'schema' | 'allowedTools' | 'resumeSessionId'
-> & { signal?: AbortSignal };
+> & { signal?: AbortSignal; attempt?: number };
 
 export type SessionRunPhase = (args: {
   phase: PhaseName;
@@ -54,12 +54,13 @@ export function adaptRunPhase(
       allowedTools: engineArgs.allowedTools,
     };
 
+    const attempt = engineArgs.attempt ?? 1;
     const startedAt = new Date().toISOString();
 
     if (deps.store) {
       await deps.store.appendPhase({
         name: engineArgs.phaseName,
-        attempt: 1,
+        attempt,
         started_at: startedAt,
         ended_at: null,
         status: 'running',
@@ -107,7 +108,7 @@ export function adaptRunPhase(
     } finally {
       if (deps.store) {
         const endedAt = new Date().toISOString();
-        await deps.store.updatePhase(engineArgs.phaseName, 1, {
+        await deps.store.updatePhase(engineArgs.phaseName, attempt, {
           ended_at: endedAt,
           status: phaseStatus,
           session_id: phaseSessionId,

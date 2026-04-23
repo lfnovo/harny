@@ -91,6 +91,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
         prompt: input.prompt,
         schema: PlannerVerdictSchema,
         allowedTools: DEFAULT_PLANNER.allowedTools,
+        attempt: 1,
       });
 
       const verdict = PlannerVerdictSchema.parse(result.output);
@@ -126,7 +127,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
 
   const developerActor = fromPromise<
     { session_id: string; status: 'done' | 'blocked'; commit_message: string },
-    { task: PlanTask; cwd: string; resumeSessionId?: string }
+    { task: PlanTask; cwd: string; resumeSessionId?: string; attempt?: number }
   >(async ({ input }) => {
     const prompt = buildDeveloperPrompt(input.task);
     const result = await runPhaseDev({
@@ -135,6 +136,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
       schema: DeveloperVerdictSchema,
       allowedTools: DEFAULT_DEVELOPER.allowedTools,
       resumeSessionId: input.resumeSessionId,
+      attempt: input.attempt ?? 1,
     });
     const verdict = EngineDeveloperOutputSchema.parse(result.output);
     return {
@@ -146,7 +148,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
 
   const validatorActor = fromPromise<
     { verdict: 'pass' | 'fail' | 'blocked'; session_id: string; reasons: string[] },
-    { task: PlanTask; cwd: string; resumeSessionId?: string }
+    { task: PlanTask; cwd: string; resumeSessionId?: string; attempt?: number }
   >(async ({ input }) => {
     const prompt = buildValidatorPrompt(input.task);
     const result = await runPhaseValidator({
@@ -155,6 +157,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
       schema: EngineValidatorVerdictSchema,
       allowedTools: DEFAULT_VALIDATOR.allowedTools,
       resumeSessionId: input.resumeSessionId,
+      attempt: input.attempt ?? 1,
     });
     const verdict = EngineValidatorOutputSchema.parse(result.output);
     return {
