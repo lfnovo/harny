@@ -132,9 +132,13 @@ export async function listRunsInCwd(cwd: string): Promise<State[]> {
     try {
       const raw = await readFile(statePath, "utf8");
       const parsed = StateSchema.safeParse(JSON.parse(raw));
-      if (parsed.success) states.push(parsed.data);
+      if (parsed.success) {
+        states.push(parsed.data);
+      } else {
+        console.warn(`[harny] skipping malformed state (schema): ${statePath}`);
+      }
     } catch {
-      // skip malformed silently — diagnostic surface lives in viewer
+      console.warn(`[harny] skipping malformed state (parse error): ${statePath}`);
     }
   }
   return states;

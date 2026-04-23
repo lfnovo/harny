@@ -20,11 +20,6 @@ const EngineDeveloperOutputSchema = z.object({
   commit_message: z.string().default(''),
 }).passthrough();
 
-const EngineValidatorOutputSchema = z.object({
-  verdict: z.enum(['pass', 'fail', 'blocked']),
-  reasons: z.array(z.string()).default([]),
-}).passthrough();
-
 // Engine-layer validator schema — includes 'blocked' which the legacy ValidatorVerdictSchema omits.
 // The legacy schema only has 'pass'|'fail'; passing it to the SDK would prevent the model from
 // ever returning 'blocked', silently breaking the engine's blocked→failed routing.
@@ -162,7 +157,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
       resumeSessionId: input.resumeSessionId,
       attempt: input.attempt ?? 1,
     });
-    const verdict = EngineValidatorOutputSchema.parse(result.output);
+    const verdict = EngineValidatorVerdictSchema.parse(result.output);
     return {
       session_id: result.session_id,
       verdict: verdict.verdict,
