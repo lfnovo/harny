@@ -2,7 +2,6 @@
 
 import { assign, fromPromise, setup } from 'xstate';
 import { defineWorkflow } from '../defineWorkflow.js';
-import { harnyActions } from '../harnyActions.js';
 import { composeCommitMessage } from '../../workflows/composeCommit.js';
 import { buildFeatureDevActors } from './featureDevActors.js';
 import type { Plan, PlanTask } from '../../types.js';
@@ -57,19 +56,41 @@ const machine = setup({
     ),
   },
   actions: {
-    // TODO: remove casts when PlanDrivenContext.plan becomes Plan | null
-    advanceTask: harnyActions.advanceTask as any,
-    bumpAttempts: harnyActions.bumpAttempts as any,
-    stashValidator: harnyActions.stashValidator as any,
-    stashDevOutput: assign(({ event }: { context: FeatureDevContext; event: any }) => ({
-      devSession: event.output?.session_id ?? null,
-      lastDevCommitMessage: event.output?.commit_message ?? '',
+    // Inlined rather than imported from harnyActions because XState v5
+    // propagates the machine's TActor union to action signatures; external
+    // `assign(...)` calls carry a wildcard TActor that doesn't match, forcing
+    // a cast. harnyActions still exports these assigns independently for
+    // standalone probes (scripts/probes/engine/09-actions-assigns.ts), where
+    // the context IS PlanDrivenContext directly and TActor resolves cleanly.
+    //
+    // The `(event as any).output` access in stash* / assignLastVerdict is
+    // the honest shape of XState v5 named actions: events here widen to
+    // AnyEventObject because a named action can be referenced from any
+    // transition. Typed event.output is only available when the action is
+    // defined *inline* at a specific transition — not worth the duplication
+    // for actions reused across 3+ branches (e.g. stashValidator).
+    advanceTask: assign(({ context }) => ({
+      currentTaskIdx: context.currentTaskIdx + 1,
+      attempts: 0,
+      iterationsThisTask: 0,
     })),
-    stashValidatorReasons: assign(({ event }: { context: FeatureDevContext; event: any }) => ({
-      lastValidatorReasons: event.output?.reasons ?? [],
+    bumpAttempts: assign(({ context }) => ({
+      attempts: context.attempts + 1,
+      iterationsThisTask: context.iterationsThisTask + 1,
+      iterationsGlobal: context.iterationsGlobal + 1,
     })),
-    assignLastVerdict: assign(({ event }: { context: FeatureDevContext; event: any }) => ({
-      lastValidatorVerdict: event.output.verdict as 'pass' | 'fail' | 'blocked',
+    stashValidator: assign(({ event }) => ({
+      validatorSession: (event as any).output?.session_id ?? null,
+    })),
+    stashDevOutput: assign(({ event }) => ({
+      devSession: (event as any).output?.session_id ?? null,
+      lastDevCommitMessage: (event as any).output?.commit_message ?? '',
+    })),
+    stashValidatorReasons: assign(({ event }) => ({
+      lastValidatorReasons: (event as any).output?.reasons ?? [],
+    })),
+    assignLastVerdict: assign(({ event }) => ({
+      lastValidatorVerdict: (event as any).output.verdict as 'pass' | 'fail' | 'blocked',
     })),
   },
 }).createMachine({

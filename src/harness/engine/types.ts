@@ -66,9 +66,12 @@ export interface HarnessContext {
   devSession: unknown;
 }
 
-// Bookkeeping context for plan-driven workflows; assigns in harnyActions operate on this shape
+// Bookkeeping context for plan-driven workflows; assigns in harnyActions operate
+// on this shape. plan is nullable because machines start with plan: null before
+// plannerActor returns. harnyActions bodies don't read context.plan directly,
+// so the nullability is structural compatibility only.
 export interface PlanDrivenContext {
-  plan: Plan;
+  plan: Plan | null;
   currentTaskIdx: number;
   attempts: number;
   validatorSession?: string;
