@@ -4,6 +4,7 @@ import { assign, fromPromise, setup } from 'xstate';
 import { defineWorkflow } from '../defineWorkflow.js';
 import { composeCommitMessage } from '../../workflows/composeCommit.js';
 import { buildFeatureDevActors } from './featureDevActors.js';
+import { harnyActions } from '../harnyActions.js';
 import type { Plan, PlanTask } from '../../types.js';
 
 interface FeatureDevContext {
@@ -57,19 +58,10 @@ const machine = setup({
     ),
   },
   actions: {
-    // Inlined rather than imported from harnyActions because XState v5
-    // propagates the machine's TActor union to action signatures; external
-    // `assign(...)` calls carry a wildcard TActor that doesn't match, forcing
-    // a cast. harnyActions still exports these assigns independently for
-    // standalone probes (scripts/probes/engine/09-actions-assigns.ts), where
-    // the context IS PlanDrivenContext directly and TActor resolves cleanly.
-    //
     // The `(event as any).output` access in stash* / assignLastVerdict is
-    // the honest shape of XState v5 named actions: events here widen to
+    // the honest shape of XState v5 named actions: events widen to
     // AnyEventObject because a named action can be referenced from any
-    // transition. Typed event.output is only available when the action is
-    // defined *inline* at a specific transition — not worth the duplication
-    // for actions reused across 3+ branches (e.g. stashValidator).
+    // transition. harnyActions uses the same pattern.
     advanceTask: assign(({ context }) => ({
       currentTaskIdx: context.currentTaskIdx + 1,
       attempts: 0,
@@ -80,11 +72,9 @@ const machine = setup({
       iterationsThisTask: context.iterationsThisTask + 1,
       iterationsGlobal: context.iterationsGlobal + 1,
     })),
-    stashValidator: assign(({ event }) => ({
-      validatorSession: (event as any).output?.session_id ?? null,
-    })),
-    stashDevOutput: assign(({ event }) => ({
-      devSession: (event as any).output?.session_id ?? null,
+    stashValidator: harnyActions.stashValidator as any,
+    stashDevSession: harnyActions.stashDevSession as any,
+    stashDevCommitMessage: assign(({ event }) => ({
       lastDevCommitMessage: (event as any).output?.commit_message ?? '',
     })),
     stashValidatorReasons: assign(({ event }) => ({
@@ -159,7 +149,7 @@ const machine = setup({
                 actions: assign({ error: ({ context }) => `developer blocked on task ${context.plan?.tasks[context.currentTaskIdx]?.id ?? '?'}` }),
               },
               {
-                actions: ['stashDevOutput'],
+                actions: ['stashDevSession', 'stashDevCommitMessage'],
                 target: 'validator',
               },
             ],
