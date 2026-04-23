@@ -105,9 +105,13 @@ The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wa
 - SDK transcripts live in `~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl` (managed by the SDK, not by us). The harness only stores `phases[].session_id` references in `state.json`.
 - Files per task dir: `state.json` (single source of truth) + `plan.json` (feature-dev only). The repo-level `.harny/.gitignore` (`*` + `!.gitignore`) keeps these out of git.
 - `git clean -fd` only removes untracked files; gitignored `.harny/<slug>/` survives.
+- When creating a brand-new file path that did not exist on the current branch, run `git branch -a` and `git log --all --oneline -- <path>` first. A sibling unmerged branch may already own that path; creating a stub silently regresses on merge.
 - Worktrees start without `node_modules`. Phases that import runtime deps or run `bun run typecheck` must `bun install` first. The harness does not currently bootstrap the worktree.
+- Read at least one existing sibling file when adding new files to a module — match its import style (relative vs node:, .ts extensions, ordering).
 - Phoenix integration uses an ESM-namespace-freeze workaround (`{ ...ClaudeAgentSDKNS }` shallow copy before `manuallyInstrument`) — without this, both Bun and Node throw on namespace mutation. Validated in `scripts/probes/phoenix/02-openinference.ts`.
 - macOS has no `timeout(1)` by default. Prefer in-script `Promise.race` hard deadlines over outer `timeout N` wrappers when writing or instructing probes.
+- When verifying a command succeeded, capture its exit code explicitly: `cmd; echo "exit: $?"` — stdout text alone (e.g. 'no errors') is not a reliable success signal.
 - Phoenix's UI doesn't expose CORS, so the viewer resolves project name → GraphQL global ID server-side (cached 30s) when building deep-link URLs.
 - The run-level Phoenix span only flushes reliably because `withRunSpan` calls `tracerProvider.forceFlush()` in its `finally`. Without that the BatchSpanProcessor commonly drops the root span on process exit.
 - Subcommands are recognized by the first positional arg matching one of `clean|ls|show|answer|ui`. Prompts that literally start with one of those words conflict — phrase prompts to start differently.
+- The Read tool errors with EISDIR on directories. Use Glob `<dir>/**/*` or Bash `ls <dir>` for directory discovery.
