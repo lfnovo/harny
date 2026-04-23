@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { hostname, userInfo } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { loadHarnessConfig } from "./config.js";
 import { runPhase as runPhaseSession } from "./sessionRecorder.js";
@@ -16,14 +18,17 @@ import {
   assertCleanTree,
   assertHasInitialCommit,
   assertIsGitRepo,
+  assertNoSiblingBranchOwnsTouchedPaths,
   assertWorktreePathAbsent,
   cleanUntracked,
   commitComposed,
   createBranch,
   headSha,
+  listDiffPaths,
   removeWorktree,
   resetHard,
 } from "./git.js";
+import { writeProblems } from "./state/problem.js";
 import { resolveAnswer, SilentModeError, PausedForUserInputError } from "./askUser.js";
 import { FilesystemStateStore, findRun } from "./state/filesystem.js";
 import type { State } from "./state/schema.js";
@@ -190,6 +195,38 @@ function buildCtx(args: {
           status: result.status,
           error: result.error ?? null,
         });
+
+        if (phaseArgs.phase === "developer" && phaseStatus === "completed" && args.branch) {
+          let guardEnabled = true;
+          try {
+            const raw = JSON.parse(await readFile(join(primaryCwd, "harny.json"), "utf8")) as Record<string, unknown>;
+            if (raw.siblingBranchGuard === false) guardEnabled = false;
+          } catch { /* ENOENT or parse error — default true */ }
+
+          if (guardEnabled) {
+            const touchedPaths = await listDiffPaths(phaseCwd);
+            if (touchedPaths.length > 0) {
+              const { warnings } = await assertNoSiblingBranchOwnsTouchedPaths(
+                primaryCwd, args.branch, touchedPaths,
+              );
+              if (warnings.length > 0) {
+                warn(`[harny] WARNING: ${warnings.length} sibling-branch overlap(s) detected`);
+                await writeProblems({
+                  primaryCwd,
+                  taskSlug,
+                  phase: phaseArgs.phase,
+                  sessionId: result.sessionId ?? "",
+                  taskId: phaseArgs.harnessTaskId ?? null,
+                  problems: warnings.map(w => ({
+                    category: "design" as const,
+                    severity: "medium" as const,
+                    description: `Sibling branch ${w.siblingBranch} already touches ${w.path}; merge may regress or conflict.`,
+                  })),
+                });
+              }
+            }
+          }
+        }
 
         if (result.status === "paused_for_user_input" && result.parked) {
           // Persist the parked AskUserQuestion batch + throw so the orchestrator
