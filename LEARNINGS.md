@@ -109,6 +109,12 @@ Use these as anomaly anchors. A future similar-shape run that takes >2x its base
 | l1-prompt-overlays-redux | ~11m30s | 1 | 0 | 4-level prompt resolver + bundled defaults + wire-up; **validator 40s vs 45min+ on original attempt** (67x speedup, first cheap-infra use on a real task) |
 | state-json-v2-redux | ~20m | 2 | 0 | schema v2 + engine store write-through + 3 probes. Both validators <2m (cheap infra held even with larger diff +122/-38 across 11 files). First 2-task plan under cheap-validator discipline. |
 | auto-workflow-skeleton | ~9m | 1 | 0 | `auto` boundary workflow (XState sub-actor wrapping feature-dev-engine). Validator included probe 01 as cross-cutting regression guard — first run with that pattern (formalized after probe 01 broke silently on state-json-v2 merge). |
+| adapter-attempt-wiring | ~10m | 1 | 0 | #17-A: thread real attempt number through adapter + featureDev actors. Intentionally-terse prompt; planner produced clean wire-up. |
+| clean-kills-running | ~10m | 1 | 0 | #16: live-pid guard + --force/--kill on harny clean. Enabled dogfood pivot workflow (kill + clean + retry). |
+| promote-engine-canonical | ~13m | 1 | 0 | Biggest refactor of v0.2.0: delete legacy feature-dev dir, rename engine id, shared.ts extract. +361/-697 net. Introduced store-threading regression (see L11). |
+| remove-harny-json | ~17m | 1 | 0 (3rd try) | Two prior attempts failed silently to the store-threading regression + 10min engine deadline being too tight. Root cause documented in L11; 30min deadline landed as hotfix 5442aa6. |
+| viewer-polish-fg | ~12m | 1 | 1 | #17-F+G: dynamic default branch + preserved stderr in gitLog. First attempt failed to same store regression as remove-harny-json. |
+| variant-cli-selection | ~17m | 1 | 0 (run PASS, latent CLI bug) | CLI `--workflow <id>:<variant>` syntax threaded through the engine. Run passed validator but shipped a latent bug the probes couldn't catch — see L12. |
 
 ---
 
@@ -117,3 +123,27 @@ Use these as anomaly anchors. A future similar-shape run that takes >2x its base
 - **Pattern observed:** Before `src/harness/testing/` existed (Phase 1 runs through 2026-04-23 morning), validators that asserted engine behavior spawned nested `bun bin/harny.ts` E2E smokes. The killed `l1-prompt-overlays` (first attempt) had validator running 45+ min doing two nested real-Claude runs, ratio 7:1 validator:dev. After `cheap-validator-infra` shipped, `l1-prompt-overlays-redux` ran the same task shape with validator in 40 seconds using `runPhaseWithFixture` + `tmpGitRepo` + direct probe assertions. Ratio fell to 1:14 validator:dev.
 - **Counterfactual:** Without the infra, every engine-touching run pays the nested-harny tax. With the infra available AND the prompt actively steering the planner toward it, cheap is the default.
 - **Action:** Already infra-shipped (#15). Keep reinforcing the pattern in every new prompt — `RELEASE.md §Cheap validator patterns` is the canonical reference. Future runs that regress to nested-harny in the validator should be killed and retried.
+
+---
+
+## L10 — CLI surface probes must parse args and reach the observable effect
+
+- **Pattern observed:** `variant-cli-selection` (2026-04-23 PM) landed a feature "add `--workflow <id>:<variant>` CLI syntax". Validator PASSED with probes 21 + 22. Post-merge spot-check revealed `harny --workflow feature-dev:just-bugs "..."` failed with "Unknown workflow" — the feature was broken in the real CLI. Root cause: `runner.ts` validated `getWorkflow(workflowId)` with the full `<id>:<variant>` string before anything split on `:`. Probe 21 only tested `"a:b".split(":")` in isolation; probe 22 tested the engine path starting from the orchestrator downward. Neither exercised `runner → orchestrator`.
+- **Counterfactual:** Any probe that parses the exact CLI argv vector through the same `parseArgs` the binary uses, and chains through to the observable effect (e.g., `getWorkflow()` lookup resolved, or `store.appendPhase` called with expected id), would have caught this in seconds.
+- **Action:** When a run adds CLI surface, at least ONE probe must (a) construct the full argv vector, (b) call the runner's exported `parseArgs` or equivalent, (c) verify the observable downstream effect. Probes that only test internal layers (string split, actor wiring) are necessary but not sufficient. Add to prompt guidance: "at least one probe runs the full argv → observable-effect path."
+
+---
+
+## L11 — refactors that rewrite orchestrator.ts need a store-threading guard
+
+- **Pattern observed:** `promote-engine-canonical` (2026-04-23) regenerated large sections of `orchestrator.ts` and silently dropped the `store` argument from `runEngineWorkflow(workflow, { ..., store })`. State.json was initialized, but `runPhaseAdapter` had no store to write phases[] / history events through. Next two runs (`remove-harny-json` + `viewer-polish-fg`) failed with engine-wide 600s timeout + empty `phases[]` + `history[]` containing only `run_started`. Looked like a total hang with zero diagnostic footprint. Compounded by a second bug (L12): 600s deadline was too tight for planner+dev+validator on bigger tasks, so even with store restored, the first `remove-harny-json` retry timed out mid-developer.
+- **Counterfactual:** A structural probe that asserts `src/harness/orchestrator.ts` text contains `store` in the options object passed to `runEngineWorkflow(` would have failed before the regression merged. Probe 08 (`scripts/probes/orchestrator/08-engine-store-preserved.ts`) now does exactly that.
+- **Action:** Probe 08 is the guard going forward. More broadly: when a harness run refactors a load-bearing integration file, add structural text-level assertions that specific wires exist. File-text probes are cheap (milliseconds, zero setup) and catch exactly the class of bug where a regenerator "forgot" a line.
+
+---
+
+## L12 — default engine timeout needs headroom for all three phases
+
+- **Pattern observed:** The engine-wide timeout was 600s (10 min) — documented as "10 min default covers real LLM planner + dev phases." Reality: larger refactors (`remove-harny-json` = +232/-335) push developer alone to 8-10 minutes, leaving zero headroom for validator. Combined with L11, the first two `remove-harny-json` retries died at exactly 600s with the validator never starting.
+- **Counterfactual:** A 30-min default (1_800_000ms) covers planner 2-5min + developer 8-12min + validator 1-5min + a retry attempt if needed, with comfortable headroom. Probes stay tight via explicit `ctx.timeoutMs` overrides (1500-5000ms range).
+- **Action:** Bumped to 1800s in commit 5442aa6. Future runs that hit the new ceiling indicate either a genuine stuck task OR that 30min isn't enough — either way, worth a review not a blind bump. Engine probes stay on short deadlines via explicit override; real CLI runs use the default.
