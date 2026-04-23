@@ -464,7 +464,13 @@ async function main() {
       if (recent.length > 0) {
         console.log(`\nLast ${recent.length} events:`);
         for (const e of recent) {
-          console.log(`  [${e.at}] ${e.phase} / ${e.event}`);
+          if ('kind' in e && (e as Record<string, unknown>)['kind'] === 'human_review') {
+            const hr = e as { at: string; kind: string; state_path: string };
+            console.log(`  [${hr.at}] human_review / ${hr.state_path}`);
+          } else {
+            const le = e as { at: string; phase: string; event: string };
+            console.log(`  [${le.at}] ${le.phase} / ${le.event}`);
+          }
         }
       }
       return;

@@ -34,7 +34,9 @@ export class FilesystemStateStore implements StateStore {
     const parsed = StateSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) {
       throw new Error(
-        `Invalid state.json at ${this.statePath}: ${parsed.error.message}`,
+        `state.json at ${this.statePath} failed schema validation (schema_version mismatch or corrupt). ` +
+          `Delete the run dir ${dirname(this.statePath)} or re-run with a new task slug. ` +
+          `Details: ${parsed.error.message}`,
       );
     }
     return parsed.data;

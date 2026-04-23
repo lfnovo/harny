@@ -15,13 +15,25 @@ export const PhaseEntrySchema = z.object({
   session_id: z.string().nullable(),
 });
 
-export const HistoryEntrySchema = z
-  .object({
-    at: z.string(),
-    phase: z.string(),
-    event: z.string(),
-  })
-  .passthrough();
+export const HumanReviewHistoryEntrySchema = z.object({
+  at: z.string(),
+  kind: z.literal("human_review"),
+  state_path: z.string(),
+  question: z.string(),
+  answered: z.boolean(),
+  answer: z.string().optional(),
+});
+
+export const HistoryEntrySchema = z.union([
+  z
+    .object({
+      at: z.string(),
+      phase: z.string(),
+      event: z.string(),
+    })
+    .passthrough(),
+  HumanReviewHistoryEntrySchema,
+]);
 
 export const PendingQuestionSchema = z.object({
   id: z.string(),
@@ -40,7 +52,7 @@ export const PendingQuestionSchema = z.object({
 });
 
 export const StateSchema = z.object({
-  schema_version: z.literal(1),
+  schema_version: z.literal(2),
   run_id: z.string(),
   origin: z.object({
     prompt: z.string(),
@@ -49,6 +61,7 @@ export const StateSchema = z.object({
     started_at: z.string(),
     host: z.string(),
     user: z.string(),
+    features: z.record(z.string(), z.unknown()).nullable().default(null),
   }),
   environment: z.object({
     cwd: z.string(),
@@ -68,6 +81,10 @@ export const StateSchema = z.object({
   history: z.array(HistoryEntrySchema),
   pending_question: PendingQuestionSchema.nullable(),
   workflow_state: z.record(z.string(), z.unknown()),
+  workflow_chosen: z
+    .object({ id: z.string(), variant: z.string() })
+    .nullable()
+    .default(null),
   /** Top-level Phoenix link — single trace per harness run, all phases live
    *  inside it as child spans. Absent when Phoenix observability isn't
    *  enabled. On resume, may be overwritten with the resume invocation's
@@ -78,5 +95,6 @@ export const StateSchema = z.object({
 export type State = z.infer<typeof StateSchema>;
 export type PhaseEntry = z.infer<typeof PhaseEntrySchema>;
 export type HistoryEntry = z.infer<typeof HistoryEntrySchema>;
+export type HumanReviewHistoryEntry = z.infer<typeof HumanReviewHistoryEntrySchema>;
 export type PendingQuestion = z.infer<typeof PendingQuestionSchema>;
 export type PhoenixRef = z.infer<typeof PhoenixRefSchema>;
