@@ -21,7 +21,10 @@ export async function runEngineWorkflow(
 
   const actorPromise = new Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }>(
     (resolve) => {
-      const actor = createActor(workflow.machine, { input: { cwd: ctx.cwd } });
+      const machineWithActors = workflow.buildActors
+        ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId }) })
+        : workflow.machine;
+      const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd } });
       actorCleanup.stop = () => actor.stop();
 
       actor.subscribe({
