@@ -37,7 +37,7 @@ Quick overview of what's been built so far against the design. **Updated after e
 | **`feature-dev-engine` workflow (Epic B)** | ✅ DONE | `src/harness/engine/workflows/featureDev.ts` + `featureDevActors.ts`. Machine: `planning → loop[developer → validator → committing → next] → done|failed`. All three phase actors wired via `runPhaseAdapter` reusing legacy `DEFAULT_PLANNER/DEVELOPER/VALIDATOR` + `PlannerVerdictSchema/DeveloperVerdictSchema/EngineValidatorVerdictSchema`. Probe 10 (9 scenarios with mocked SDK) + smoke probe 04 (real CLI E2E). |
 | **`auto.ts` boundary workflow** | ❌ NOT STARTED | Phase 1 item per §12. Epic A is a direct-routing precursor; auto.ts adds router + cleanup graph states + meta-improve hook. |
 | **Router (§5)** | ❌ NOT STARTED | Lives inside `auto.ts:routing`. Gated on auto.ts. |
-| **state.json v2 schema** (`features`, `workflow_chosen`, `human_review` events) | ❌ NOT STARTED | Phase 1 item per §9.2. Engine path currently writes minimal lifecycle (status/ended_reason); does NOT populate phases[] or features. |
+| **state.json v2 schema** (`features`, `workflow_chosen`, `human_review` events) | ✅ DONE | `schema_version: 2` with v1 rejection (no migration). `origin.features`, `workflow_chosen`, and `human_review` history entry kind all added as optional/defaulted. Engine path now writes `phases[]` + `history[]` via `StateStore` threaded through `runEngineWorkflow` → `buildActors` → `runPhaseAdapter` (state-json-v2-redux, 2026-04-23). Three zero-Claude probes (14/15/03) lock the behavior. |
 | **humanReview production parking** (state.json:pending_question + resume via XState snapshot) | ❌ NOT STARTED | Phase 3 in §12. Current `humanReviewActor` uses DI askProvider; production parking (snapshot persist + restore) still missing. |
 | **L1 prompt overlays + variants** (§10.1) | 🟡 MOSTLY | `src/harness/engine/promptResolver.ts` implements 4-level chain (project-variant → project-default → bundled-variant → bundled-default). Bundled defaults live at `src/harness/engine/workflows/prompts/default/{planner,developer,validator}.md` (byte-identical to legacy `DEFAULT_*` constants). `featureDevActors.ts` wires `resolvePrompt()` for all three phases with hardcoded `variant='default'`. **Remaining:** CLI variant selection (`--workflow X:variant`) comes with the router run. |
 | **`.extend()` for L3** (§10.2) | ❌ NOT STARTED | Phase 2. |
@@ -76,7 +76,7 @@ The smoke test on Epic B.5 surfaced 4 bugs that mocked probes hadn't caught — 
 After Epic B-smoke milestone:
 
 1. **`auto.ts` boundary workflow** + router (§4 + §5).
-2. **state.json v2 schema** (§9.2): `features`, `workflow_chosen`, `human_review` events. Engine path currently writes minimal lifecycle.
+2. ~~**state.json v2 schema** (§9.2): `features`, `workflow_chosen`, `human_review` events. Engine path currently writes minimal lifecycle.~~ DONE (2026-04-23, `state-json-v2-redux`). Schema_version=2 with v1 rejection; engine path writes phases[]/history[] via StateStore threading.
 3. **humanReview production parking** (§7, §9.3) — replace DI askProvider with snapshot-persist provider.
 4. ~~**L1 prompt overlays + variants** (§10.1) — engine currently hardcodes legacy `DEFAULT_*` prompts.~~ MOSTLY DONE (2026-04-23, `l1-prompt-overlays-redux`). Default variant is file-backed; variant selection requires router.
 5. **Delete `docs.ts` + `issueTriage.ts`** legacy workflows (per §12).

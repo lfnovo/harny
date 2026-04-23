@@ -107,6 +107,7 @@ Use these as anomaly anchors. A future similar-shape run that takes >2x its base
 | obs-content-layer | ~20m | 1 | 1 | #14 bundle: tail format + commits filter + events substance; 1 retry on orchestrator verdict-wiring |
 | cheap-validator-infra | ~12m | 1 | 0 | #15: src/harness/testing/ helpers + template + probe; **validator ran in <1s using its own infra (dogfood)** |
 | l1-prompt-overlays-redux | ~11m30s | 1 | 0 | 4-level prompt resolver + bundled defaults + wire-up; **validator 40s vs 45min+ on original attempt** (67x speedup, first cheap-infra use on a real task) |
+| state-json-v2-redux | ~20m | 2 | 0 | schema v2 + engine store write-through + 3 probes. Both validators <2m (cheap infra held even with larger diff +122/-38 across 11 files). First 2-task plan under cheap-validator discipline. |
 
 ---
 
