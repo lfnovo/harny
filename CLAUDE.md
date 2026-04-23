@@ -98,6 +98,10 @@ git tag v0.1.1 && git push origin main v0.1.1
 
 The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wasn't set yet. All subsequent releases go through CI.
 
+## Subtree conventions
+
+- When touching files under `src/harness/engine/`, also read `src/harness/engine/CLAUDE.md` first for engine-specific conventions (dispatcher pattern, sibling-mirror rule, probe shape).
+
 ## Gotchas
 
 - The `claude-code` binary embedded by the SDK uses `jsonSchema` internally; `outputFormat.schema` is translated at the SDK layer. If structured outputs are missing, check the schema for the `$schema` top-level key first.

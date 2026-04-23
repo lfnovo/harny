@@ -124,6 +124,12 @@ git push origin main v0.1.1
 
 The action validates that `package.json:version` matches the tag, runs `bun run typecheck`, and publishes via `npm publish --access public` using the `NPM_TOKEN` repo secret (a granular npm token with `Bypass 2FA` enabled, scoped to `@lfnovo/harny`).
 
+## v0.2.0 development (Phase 1)
+
+harny v0.2.0 is being built BY harny v0.1.1 itself, in a self-hosting loop documented in RELEASE.md and engine-design.md. Phase 1 lands the XState engine layer (`src/harness/engine/`) one prompt at a time. The legacy feature-dev workflow (`src/harness/workflows/featureDev/`) remains the production runtime.
+
+See [engine-design.md](./engine-design.md) for architecture, [RELEASE.md](./RELEASE.md) for methodology, [LEARNINGS.md](./LEARNINGS.md) for architect-emitted observations across runs.
+
 ## License
 
 MIT
