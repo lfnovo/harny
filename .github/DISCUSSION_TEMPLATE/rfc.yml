@@ -1,0 +1,25 @@
+title: "rfc: "
+labels: ["rfc"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why are we discussing this now?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Initial take. Expect it to evolve in the thread.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: open_questions
+    attributes:
+      label: Open questions

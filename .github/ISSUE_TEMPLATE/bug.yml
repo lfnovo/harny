@@ -1,0 +1,23 @@
+name: Bug
+description: Something is broken or behaving wrong
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened
+      description: Actual behavior, with logs/errors if any.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal steps to trigger it.

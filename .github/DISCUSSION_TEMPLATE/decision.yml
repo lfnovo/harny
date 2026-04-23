@@ -1,0 +1,29 @@
+title: "decide: "
+labels: ["decision"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: What are we deciding?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Background, constraints, what's already been tried.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: Enumerate the candidates with trade-offs.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision (fill when resolved)
+      description: The chosen option + rationale. Apply label `resolved` when this is filled.

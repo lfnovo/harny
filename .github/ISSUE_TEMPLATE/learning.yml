@@ -1,0 +1,26 @@
+name: Learning (promoted)
+description: Learning drained from inbox into an actionable improvement
+title: "learning: "
+labels: ["learning"]
+body:
+  - type: textarea
+    id: observation
+    attributes:
+      label: Observation
+      description: What was noticed. Quote the original inbox entry if helpful.
+    validations:
+      required: true
+  - type: textarea
+    id: counterfactual
+    attributes:
+      label: Counterfactual
+      description: Would a fresh dev hit the same friction reading only CLAUDE.md + code?
+    validations:
+      required: true
+  - type: textarea
+    id: action
+    attributes:
+      label: Proposed action
+      description: Concrete change. Specify target file/module when possible.
+    validations:
+      required: true
