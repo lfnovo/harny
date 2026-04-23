@@ -10,7 +10,7 @@ type CommandOutput = { exit_code: number; stdout: string; stderr: string; durati
 interface EchoCommitContext {
   cwd: string;
   commandOutput?: CommandOutput;
-  commitSha?: string;
+  commitSha?: string | null;
 }
 
 const machine = setup({

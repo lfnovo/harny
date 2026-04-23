@@ -39,11 +39,14 @@ async function spawnGit(args: string[], signal: AbortSignal): Promise<string> {
 export async function gitCommit(
   { cwd, message }: { cwd: string; message: string },
   signal: AbortSignal,
-): Promise<{ sha: string }> {
+): Promise<{ sha: string | null }> {
   await spawnGit(['-C', cwd, 'add', '-A'], signal);
   const staged = await spawnGit(['-C', cwd, 'diff', '--cached', '--name-only'], signal);
   if (staged.trim().length === 0) {
-    throw new Error('gitCommit: nothing staged after add -A; refusing empty commit');
+    // Verified-only task: developer reported done but produced no diff (e.g.
+    // the work was already in place from an earlier commit). Treat as a
+    // successful no-op so the loop advances to the next task.
+    return { sha: null };
   }
   await spawnGit(['-C', cwd, 'commit', '-m', message], signal);
   const sha = await spawnGit(['-C', cwd, 'rev-parse', 'HEAD'], signal);
@@ -65,7 +68,7 @@ export async function gitCleanUntracked(
 }
 
 // Actor logic constants — for setup({ actors }) composition in workflows.
-export const commitLogic = fromPromise<{ sha: string }, { cwd: string; message: string }>(
+export const commitLogic = fromPromise<{ sha: string | null }, { cwd: string; message: string }>(
   ({ input, signal }) => gitCommit(input, signal),
 );
 

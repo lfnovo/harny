@@ -22,6 +22,7 @@ interface FeatureDevContext {
   lastDevCommitMessage: string;
   lastValidatorReasons: string[];
   commitSha?: string;
+  error?: string;
 }
 
 const machine = setup({
@@ -45,7 +46,7 @@ const machine = setup({
     >(
       async () => { throw new Error('not wired'); },
     ),
-    commitActor: fromPromise<{ sha: string }, { cwd: string; message: string }>(
+    commitActor: fromPromise<{ sha: string | null }, { cwd: string; message: string }>(
       async () => { throw new Error('not wired'); },
     ),
     // Persists the plan produced by plannerActor to .harny/<slug>/plan.json.
@@ -118,7 +119,10 @@ const machine = setup({
           actions: assign({ plan: ({ event }) => event.output }),
           target: 'persistingPlan',
         },
-        onError: { target: '#feature-dev.failed' },
+        onError: {
+          target: '#feature-dev.failed',
+          actions: assign({ error: ({ event }) => `planner: ${String((event as { error?: unknown }).error)}` }),
+        },
       },
     },
     persistingPlan: {
@@ -130,7 +134,10 @@ const machine = setup({
           plan: context.plan!,
         }),
         onDone: { target: 'loop' },
-        onError: { target: '#feature-dev.failed' },
+        onError: {
+          target: '#feature-dev.failed',
+          actions: assign({ error: ({ event }) => `persistPlan: ${String((event as { error?: unknown }).error)}` }),
+        },
       },
     },
     loop: {
@@ -149,13 +156,17 @@ const machine = setup({
               {
                 guard: ({ event }) => event.output.status === 'blocked',
                 target: 'failed',
+                actions: assign({ error: ({ context }) => `developer blocked on task ${context.plan?.tasks[context.currentTaskIdx]?.id ?? '?'}` }),
               },
               {
                 actions: ['stashDevOutput'],
                 target: 'validator',
               },
             ],
-            onError: { target: 'failed' },
+            onError: {
+              target: 'failed',
+              actions: assign({ error: ({ event }) => `developer: ${String((event as { error?: unknown }).error)}` }),
+            },
           },
         },
         validator: {
@@ -181,10 +192,17 @@ const machine = setup({
               },
               {
                 target: 'failed',
-                actions: ['stashValidator', 'assignLastVerdict'],
+                actions: [
+                  'stashValidator',
+                  'assignLastVerdict',
+                  assign({ error: ({ context, event }) => `validator: ${event.output.verdict} after ${context.attempts + 1} attempt(s) on task ${context.plan?.tasks[context.currentTaskIdx]?.id ?? '?'}; reasons: ${event.output.reasons.join('; ')}` }),
+                ],
               },
             ],
-            onError: { target: 'failed' },
+            onError: {
+              target: 'failed',
+              actions: assign({ error: ({ event }) => `validator: ${String((event as { error?: unknown }).error)}` }),
+            },
           },
         },
         committing: {
@@ -200,10 +218,16 @@ const machine = setup({
               }),
             }),
             onDone: {
-              actions: assign({ commitSha: ({ event }) => event.output.sha }),
+              // event.output.sha is null when the developer reported done but
+              // produced no diff (verified-only task) — see gitCommit. Skip the
+              // commitSha update in that case but still advance to the next task.
+              actions: assign({ commitSha: ({ event, context }) => event.output.sha ?? context.commitSha }),
               target: 'next',
             },
-            onError: { target: 'failed' },
+            onError: {
+              target: 'failed',
+              actions: assign({ error: ({ event }) => `committing: ${String((event as { error?: unknown }).error)}` }),
+            },
           },
         },
         next: {

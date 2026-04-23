@@ -41,7 +41,7 @@ export interface BuildFeatureDevActorsDeps {
   /** Injectable for testing; omit to use the real runPhase from sessionRecorder. */
   sessionRunPhase?: SessionRunPhase;
   /** Injectable for testing; omit to use the real gitCommit from harnyActions. */
-  gitCommit?: (opts: { cwd: string; message: string }, signal: AbortSignal) => Promise<{ sha: string }>;
+  gitCommit?: (opts: { cwd: string; message: string }, signal: AbortSignal) => Promise<{ sha: string | null }>;
   mode?: RunMode;
   logMode?: LogMode;
   /** When provided, phases[] and history[] are written around each phase call. */
@@ -171,7 +171,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
   });
 
   const gitCommitFn = deps.gitCommit ?? defaultGitCommit;
-  const commitActor = fromPromise<{ sha: string }, { cwd: string; message: string }>(
+  const commitActor = fromPromise<{ sha: string | null }, { cwd: string; message: string }>(
     ({ input, signal }) => gitCommitFn({ cwd: input.cwd, message: input.message }, signal),
   );
 
