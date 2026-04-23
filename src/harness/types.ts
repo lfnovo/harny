@@ -48,6 +48,8 @@ export type HarnessConfigFile = {
   maxRetriesBeforeReset?: number;
   isolation?: IsolationMode;
   defaultMode?: RunMode;
+  coldWorktreeInstall?: boolean;
+  siblingBranchGuard?: boolean;
 };
 
 export type ResolvedPhaseConfig = Required<

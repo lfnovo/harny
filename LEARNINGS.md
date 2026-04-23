@@ -30,6 +30,8 @@ For agent-emitted issues, see `state.json:problems[]` per run instead.
 - **Counterfactual:** Yes — any phase that imports runtime deps or runs typecheck on a fresh worktree hits this.
 - **Action:** Start with a CLAUDE.md "Gotchas" bullet ("Worktrees start without node_modules. Phases that run typecheck or import runtime deps must `bun install` first."). Revisit with an orchestrator change (auto `bun install` on cold-start worktree) if it recurs.
 
+**Permanent fix landed** in run auto-bun-install (commit 0f26a6d, 2026-04-23): orchestrator auto-runs bun install on cold worktrees. Toggle: `harny.json` `coldWorktreeInstall`.
+
 ### L5 — macOS lacks `timeout(1)`
 
 - **Pattern observed:** Architect prescribed `timeout 20 bun ...` in run #2's prompt. Both dev and validator hit `command not found: timeout` on macOS (no coreutils by default). Both recovered by invoking bun directly. The probe's internal 3s-per-scenario `Promise.race` was the actual safety net. Confirmed again in run #3 (`tail-show`) — validator explicitly noted *"`timeout` binary not in PATH on macOS zsh; used direct bun invocation"*.
