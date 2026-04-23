@@ -9,7 +9,7 @@ export type AgentRunOptionsSubset = Pick<
   'phaseName' | 'prompt' | 'schema' | 'allowedTools' | 'resumeSessionId'
 > & { signal?: AbortSignal };
 
-type SessionRunPhase = (args: {
+export type SessionRunPhase = (args: {
   phase: PhaseName;
   phaseConfig: ResolvedPhaseConfig;
   primaryCwd: string;

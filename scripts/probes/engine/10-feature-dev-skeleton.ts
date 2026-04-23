@@ -1,6 +1,8 @@
 /**
- * Probe: feature-dev-engine skeleton — 4 scenarios using mock actors.
- * Each raced 1500ms, whole probe under 6s.
+ * Probe: feature-dev-engine skeleton — 6 scenarios using mock actors.
+ * Scenarios 1-4: mock actors only. Scenario 5: real-planner-shape (no invocation).
+ * Scenario 6: real-planner-mock-injection (mock sessionRunPhase).
+ * Each raced 1500ms or 2000ms, whole probe under 8s.
  *
  * RUN
  *   bun scripts/probes/engine/10-feature-dev-skeleton.ts
@@ -8,6 +10,7 @@
 
 import { createActor, fromPromise } from 'xstate';
 import featureDevWorkflow from '../../../src/harness/engine/workflows/featureDev.ts';
+import { buildFeatureDevActors } from '../../../src/harness/engine/workflows/featureDevActors.ts';
 import type { Plan, PlanTask } from '../../../src/harness/types.ts';
 
 const DEADLINE_MS = 1500;
@@ -209,6 +212,92 @@ try {
   ]);
 } catch (e: any) {
   console.log(`FAIL validator-blocked: ${e.message}`);
+  failures++;
+}
+
+// Scenario 5: real-planner-shape — assert plannerActor from buildFeatureDevActors is a valid actor logic object
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'real-planner-shape';
+      const actors = buildFeatureDevActors({ cwd: '/tmp', taskSlug: 'probe', runId: 'probe-uuid' });
+
+      if (!actors.plannerActor || typeof actors.plannerActor !== 'object') {
+        throw new Error('plannerActor is not an object');
+      }
+      // fromPromise returns ActorLogic with a config property referencing the promise fn
+      if (typeof (actors.plannerActor as any).config !== 'function') {
+        throw new Error('plannerActor.config is not a function — not a valid fromPromise actor');
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('hard deadline exceeded')), 1500)),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL real-planner-shape: ${e.message}`);
+  failures++;
+}
+
+// Scenario 6: real-planner-mock-injection — inject mock sessionRunPhase, drive machine to 'done'
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'real-planner-mock-injection';
+
+      const mockSessionRunPhase = async (_args: unknown) => ({
+        status: 'completed' as const,
+        structuredOutput: {
+          summary: 'Build X',
+          tasks: [{ id: 't1', title: 'Task', description: 'Do it', acceptance: ['AC1'] }],
+        },
+        sessionId: 'mock-sess',
+        error: null,
+        resultSubtype: null,
+        events: [],
+      });
+
+      const actors = buildFeatureDevActors({
+        cwd: '/tmp',
+        taskSlug: 'probe',
+        runId: 'probe-uuid',
+        sessionRunPhase: mockSessionRunPhase as any,
+      });
+
+      const provided = machine.provide({
+        actors: {
+          plannerActor: actors.plannerActor as any,
+          developerActor: fromPromise(async () => ({ session_id: 'dev' })) as any,
+          validatorActor: fromPromise(async () => ({ verdict: 'pass' as const, session_id: 'val' })) as any,
+        },
+      });
+
+      const snapshot = await new Promise<any>((resolve) => {
+        const actor = createActor(provided, { input: { cwd: '/tmp', userPrompt: 'build something', maxRetries: 3 } });
+        actor.subscribe((s) => {
+          if (s.status === 'done') resolve(s);
+        });
+        actor.start();
+      });
+
+      if (snapshot.value !== 'done') {
+        throw new Error(`expected state 'done', got '${JSON.stringify(snapshot.value)}'`);
+      }
+      if (!snapshot.context.plan) {
+        throw new Error('expected context.plan to be set');
+      }
+      const firstTask: PlanTask | undefined = snapshot.context.plan.tasks[0];
+      if (!firstTask) {
+        throw new Error('expected at least one task in plan');
+      }
+      if (firstTask.id !== 't1') {
+        throw new Error(`expected tasks[0].id 't1', got '${firstTask.id}'`);
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('hard deadline exceeded')), 2000)),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL real-planner-mock-injection: ${e.message}`);
   failures++;
 }
 
