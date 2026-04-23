@@ -4,8 +4,6 @@ import { createActor } from 'xstate';
 import type { AnyStateMachine } from 'xstate';
 import type { WorkflowDefinition } from '../types.js';
 
-const TIMEOUT_MS = 60_000;
-
 export async function runEngineWorkflow(
   workflow: WorkflowDefinition<AnyStateMachine>,
   ctx: {
@@ -13,31 +11,39 @@ export async function runEngineWorkflow(
     taskSlug: string;
     runId: string;
     log?: (msg: string) => void;
+    timeoutMs?: number;
   },
 ): Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }> {
   const log = ctx.log ?? ((_msg: string) => {});
+  const timeoutMs = ctx.timeoutMs ?? 60_000;
+
+  const actorCleanup: { stop?: () => void } = {};
 
   const actorPromise = new Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }>(
     (resolve) => {
       const actor = createActor(workflow.machine, { input: { cwd: ctx.cwd } });
+      actorCleanup.stop = () => actor.stop();
 
-      actor.subscribe((snapshot) => {
-        log(`[engine] workflow=${workflow.id} state=${String(snapshot.value)} status=${snapshot.status}`);
+      actor.subscribe({
+        next: (snapshot) => {
+          log(`[engine] workflow=${workflow.id} state=${String(snapshot.value)} status=${snapshot.status}`);
 
-        if (snapshot.status === 'done') {
-          if (snapshot.value === 'failed') {
-            resolve({
-              status: 'failed',
-              finalContext: snapshot.context,
-              error: (snapshot.context as any)?.error ?? 'workflow reached failed state',
-            });
-          } else {
-            resolve({
-              status: 'done',
-              finalContext: snapshot.context,
-            });
+          if (snapshot.status === 'done') {
+            if (snapshot.value === 'failed') {
+              resolve({
+                status: 'failed',
+                finalContext: snapshot.context,
+                error: (snapshot.context as any)?.error ?? 'workflow reached failed state',
+              });
+            } else {
+              resolve({
+                status: 'done',
+                finalContext: snapshot.context,
+              });
+            }
           }
-        }
+        },
+        error: (err) => resolve({ status: 'failed', finalContext: null, error: String(err) }),
       });
 
       actor.start();
@@ -46,8 +52,8 @@ export async function runEngineWorkflow(
 
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(
-      () => reject(new Error(`engine workflow "${workflow.id}" timed out after ${TIMEOUT_MS}ms`)),
-      TIMEOUT_MS,
+      () => reject(new Error(`engine workflow "${workflow.id}" timed out after ${timeoutMs}ms`)),
+      timeoutMs,
     ),
   );
 
@@ -59,5 +65,7 @@ export async function runEngineWorkflow(
       finalContext: null,
       error: (err as Error).message,
     };
+  } finally {
+    actorCleanup.stop?.();
   }
 }
