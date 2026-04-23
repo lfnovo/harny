@@ -21,8 +21,9 @@ export async function runEngineWorkflow(
   },
 ): Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }> {
   const log = ctx.log ?? ((_msg: string) => {});
-  // 10 min default covers real LLM planner + dev phases; probes override via ctx.timeoutMs
-  const timeoutMs = ctx.timeoutMs ?? 600_000;
+  // 30 min default covers real planner + multiple dev/validator attempts on larger tasks;
+  // probes override via ctx.timeoutMs (engine probes use tight deadlines of 1500ms-5000ms).
+  const timeoutMs = ctx.timeoutMs ?? 1_800_000;
 
   const actorCleanup: { stop?: () => void } = {};
 
