@@ -509,6 +509,8 @@ export async function runHarness(args: {
           taskSlug,
           runId,
           log,
+          mode: config.mode,
+          logMode,
         });
 
         await handleCleanupWorktree(engineResult.status);

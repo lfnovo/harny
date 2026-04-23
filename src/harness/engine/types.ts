@@ -1,7 +1,7 @@
 // engine-design.md §6.1, §7, §8
 
 import type { AnyStateMachine } from 'xstate';
-import type { Plan } from '../types.ts';
+import type { LogMode, Plan, RunMode } from '../types.ts';
 
 // §6.1 — structured features captured at run start for meta-agent analytics
 export interface FeatureSet {
@@ -45,7 +45,7 @@ export interface WorkflowDefinition<TMachine extends AnyStateMachine> {
   needsWorktree?: boolean;
   machine: TMachine;
   // Optional. When set, runEngineWorkflow calls machine.provide({ actors: buildActors(deps) }) before createActor.
-  buildActors?: (deps: { cwd: string; taskSlug: string; runId: string }) => Record<string, any>;
+  buildActors?: (deps: { cwd: string; taskSlug: string; runId: string; mode?: RunMode; logMode?: LogMode }) => Record<string, any>;
 }
 
 // Runtime context passed to actor factories; populated by the harny runtime

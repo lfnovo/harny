@@ -35,6 +35,8 @@ export interface AdaptRunPhaseDeps {
   phaseConfig: ResolvedPhaseConfig;
   /** Injectable for testing; defaults to the real runPhase from sessionRecorder. */
   sessionRunPhase?: SessionRunPhase;
+  mode?: RunMode;
+  logMode?: LogMode;
 }
 
 export function adaptRunPhase(
@@ -62,6 +64,8 @@ export function adaptRunPhase(
       resumeSessionId: engineArgs.resumeSessionId,
       workflowId: deps.workflowId,
       runId: deps.runId,
+      mode: deps.mode ?? 'silent',
+      logMode: deps.logMode ?? 'compact',
     });
 
     if (result.status === 'error') {
