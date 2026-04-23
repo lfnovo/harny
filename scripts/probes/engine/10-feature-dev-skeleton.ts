@@ -1,8 +1,10 @@
 /**
- * Probe: feature-dev-engine skeleton — 6 scenarios using mock actors.
+ * Probe: feature-dev-engine skeleton — 8 scenarios using mock actors.
  * Scenarios 1-4: mock actors only. Scenario 5: real-planner-shape (no invocation).
  * Scenario 6: real-planner-mock-injection (mock sessionRunPhase).
- * Each raced 1500ms or 2000ms, whole probe under 8s.
+ * Scenario 7: real-developer-mock-injection (all three actors via buildFeatureDevActors).
+ * Scenario 8: real-validator-blocks-machine (validator 'blocked' → machine 'failed').
+ * Each raced 1500ms or 2000ms, whole probe under 12s.
  *
  * RUN
  *   bun scripts/probes/engine/10-feature-dev-skeleton.ts
@@ -298,6 +300,154 @@ try {
   ]);
 } catch (e: any) {
   console.log(`FAIL real-planner-mock-injection: ${e.message}`);
+  failures++;
+}
+
+// Scenario 7: real-developer-mock-injection — all three actors via buildFeatureDevActors with mock
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'real-developer-mock-injection';
+
+      let callCount = 0;
+      const mockSessionRunPhase = async (_args: unknown) => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            status: 'completed' as const,
+            structuredOutput: {
+              summary: 'Build X',
+              tasks: [{ id: 't1', title: 'Task', description: 'Do it', acceptance: ['AC1'] }],
+            },
+            sessionId: 'plan-sess-1',
+            error: null,
+            resultSubtype: null,
+            events: [],
+          };
+        } else if (callCount === 2) {
+          return {
+            status: 'completed' as const,
+            structuredOutput: { status: 'done', commit_message: 'feat: synthetic' },
+            sessionId: 'dev-sess-1',
+            error: null,
+            resultSubtype: null,
+            events: [],
+          };
+        } else {
+          return {
+            status: 'completed' as const,
+            structuredOutput: { verdict: 'pass', reasons: ['ok'] },
+            sessionId: 'val-sess-1',
+            error: null,
+            resultSubtype: null,
+            events: [],
+          };
+        }
+      };
+
+      const actors = buildFeatureDevActors({
+        cwd: '/tmp',
+        taskSlug: 'probe',
+        runId: 'probe-uuid',
+        sessionRunPhase: mockSessionRunPhase as any,
+      });
+
+      const provided = machine.provide({ actors } as any);
+
+      const snapshot = await new Promise<any>((resolve) => {
+        const actor = createActor(provided, { input: { cwd: '/tmp', userPrompt: 'build something', maxRetries: 3 } });
+        actor.subscribe((s) => {
+          if (s.status === 'done') resolve(s);
+        });
+        actor.start();
+      });
+
+      if (snapshot.value !== 'done') {
+        throw new Error(`expected state 'done', got '${JSON.stringify(snapshot.value)}'`);
+      }
+      if (snapshot.context.devSession !== 'dev-sess-1') {
+        throw new Error(`expected context.devSession 'dev-sess-1', got '${snapshot.context.devSession}'`);
+      }
+      if (snapshot.context.validatorSession !== 'val-sess-1') {
+        throw new Error(`expected context.validatorSession 'val-sess-1', got '${snapshot.context.validatorSession}'`);
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('hard deadline exceeded')), 2000)),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL real-developer-mock-injection: ${e.message}`);
+  failures++;
+}
+
+// Scenario 8: real-validator-blocks-machine — validator returns 'blocked', machine reaches 'failed'
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'real-validator-blocks-machine';
+
+      let callCount = 0;
+      const mockSessionRunPhase = async (_args: unknown) => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            status: 'completed' as const,
+            structuredOutput: {
+              summary: 'Build X',
+              tasks: [{ id: 't1', title: 'Task', description: 'Do it', acceptance: ['AC1'] }],
+            },
+            sessionId: 'plan-sess-1',
+            error: null,
+            resultSubtype: null,
+            events: [],
+          };
+        } else if (callCount === 2) {
+          return {
+            status: 'completed' as const,
+            structuredOutput: { status: 'done', commit_message: 'feat: x' },
+            sessionId: 'dev-sess-1',
+            error: null,
+            resultSubtype: null,
+            events: [],
+          };
+        } else {
+          return {
+            status: 'completed' as const,
+            structuredOutput: { verdict: 'blocked', reasons: ['cannot proceed'] },
+            sessionId: 'val-sess-1',
+            error: null,
+            resultSubtype: null,
+            events: [],
+          };
+        }
+      };
+
+      const actors = buildFeatureDevActors({
+        cwd: '/tmp',
+        taskSlug: 'probe',
+        runId: 'probe-uuid',
+        sessionRunPhase: mockSessionRunPhase as any,
+      });
+
+      const provided = machine.provide({ actors } as any);
+
+      const snapshot = await new Promise<any>((resolve) => {
+        const actor = createActor(provided, { input: { cwd: '/tmp', userPrompt: 'build something', maxRetries: 3 } });
+        actor.subscribe((s) => {
+          if (s.status === 'done') resolve(s);
+        });
+        actor.start();
+      });
+
+      if (snapshot.value !== 'failed') {
+        throw new Error(`expected state 'failed', got '${JSON.stringify(snapshot.value)}'`);
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('hard deadline exceeded')), 2000)),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL real-validator-blocks-machine: ${e.message}`);
   failures++;
 }
 

@@ -28,11 +28,14 @@ const machine = setup({
     plannerActor: fromPromise<Plan, { prompt: string; cwd: string }>(
       async () => { throw new Error('not wired'); },
     ),
-    developerActor: fromPromise<{ session_id?: string }, { task: PlanTask; cwd: string; resumeSessionId?: string }>(
+    developerActor: fromPromise<
+      { session_id: string; status: 'done' | 'blocked'; commit_message: string },
+      { task: PlanTask; cwd: string; resumeSessionId?: string }
+    >(
       async () => { throw new Error('not wired'); },
     ),
     validatorActor: fromPromise<
-      { verdict: 'pass' | 'fail' | 'blocked'; session_id?: string },
+      { verdict: 'pass' | 'fail' | 'blocked'; session_id: string; reasons: string[] },
       { task: PlanTask; cwd: string; resumeSessionId?: string }
     >(
       async () => { throw new Error('not wired'); },
@@ -85,10 +88,16 @@ const machine = setup({
               cwd: context.cwd,
               resumeSessionId: context.devSession,
             }),
-            onDone: {
-              actions: ['stashDevSession'],
-              target: 'validator',
-            },
+            onDone: [
+              {
+                guard: ({ event }) => event.output.status === 'blocked',
+                target: 'failed',
+              },
+              {
+                actions: ['stashDevSession'],
+                target: 'validator',
+              },
+            ],
             onError: { target: 'failed' },
           },
         },
