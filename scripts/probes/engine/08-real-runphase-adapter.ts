@@ -45,6 +45,15 @@ const mockDeps = {
   workflowId: 'test-workflow',
   taskSlug: 'test-task',
   runId: 'run-001',
+  phaseConfig: {
+    prompt: 'test prompt',
+    allowedTools: ['Read', 'Glob'],
+    permissionMode: 'bypassPermissions' as const,
+    maxTurns: 50,
+    effort: 'high' as const,
+    model: 'sonnet' as const,
+    mcpServers: {},
+  },
 };
 
 const validEngineArgs: AgentRunOptionsSubset = {

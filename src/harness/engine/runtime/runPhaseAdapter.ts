@@ -31,21 +31,11 @@ export interface AdaptRunPhaseDeps {
   taskSlug: string;
   runId: string;
   log?: (msg: string) => void;
-  /** Shallow-merged into default phaseConfig; engine allowedTools always win. */
-  phaseConfig?: Partial<ResolvedPhaseConfig>;
+  /** Full phase config; engine allowedTools always win over this value. */
+  phaseConfig: ResolvedPhaseConfig;
   /** Injectable for testing; defaults to the real runPhase from sessionRecorder. */
   sessionRunPhase?: SessionRunPhase;
 }
-
-const defaultPhaseConfig: ResolvedPhaseConfig = {
-  prompt: '',
-  permissionMode: 'default',
-  maxTurns: 100,
-  effort: 'high',
-  model: undefined,
-  mcpServers: {},
-  allowedTools: [],
-};
 
 export function adaptRunPhase(
   deps: AdaptRunPhaseDeps,
@@ -54,7 +44,6 @@ export function adaptRunPhase(
 
   return async (engineArgs: AgentRunOptionsSubset) => {
     const phaseConfig: ResolvedPhaseConfig = {
-      ...defaultPhaseConfig,
       ...deps.phaseConfig,
       // engine args always win on allowedTools
       allowedTools: engineArgs.allowedTools,
