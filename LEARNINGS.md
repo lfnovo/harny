@@ -66,3 +66,22 @@ For agent-emitted issues, see `state.json:problems[]` per run instead.
 - **Pattern observed:** Validator's `evidence` field gets pasted verbatim under `validator: ...` in the commit body. Useful as audit trail but pollutes `git log --oneline` width and makes squash-merge messages unwieldy.
 - **Counterfactual:** Architect concern, not agent concern.
 - **Action:** Backlog. Options: (a) cap evidence at N chars, (b) move to a separate trailer line, (c) move out of commit message into `state.json` only. Decide later based on whether anyone actually reads commit-body evidence.
+
+---
+
+## Run cost reference points
+
+Use these as anomaly anchors. A future similar-shape run that takes >2x its baseline merits a separate review.
+
+| Run | Wall-clock | Tasks | Retries | Notes |
+|-----|-----------|-------|---------|-------|
+| engine-scaffolding | 8m48s | 1 | 0 | additive scaffold of stub files + xstate dep |
+| command-actor | 11m19s | 1 | 1 | first real subprocess actor with abort/timeout |
+| tail-show | 8m21s | 1 | 0 | CLI feature + new module |
+| land-learnings | 3m40s | 1 | 0 | pure docs landing |
+| agent-actor | 3m57s | 1 | 0 | DI pattern actor (mirror of command) |
+| define-workflow | 4m20s | 1 | 0 | function impl + integration probe |
+| human-review-actor | 4m02s | 1 | 0 | DI actor (third dispatcher, convention paid off) |
+| git-actions | 3m04s | 1 | 0 | three git effect actions + probe with tmp repos |
+| echo-commit-workflow | 6m17s | 1 | 0 | first end-to-end engine workflow |
+| docs-consolidation | 2m41s | 1 | 0 | 4 CLAUDE.md gotchas + 1 §8.4 sentence |
