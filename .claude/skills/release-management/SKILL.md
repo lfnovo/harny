@@ -101,3 +101,64 @@ Successful runs in this session: 4 parallel runs at peak (#11 docs + #18 probe +
 - **`RELEASE.md`** — the methodology rules (1-6) + per-run ritual (steps 1-7 + 6.5).
 - **`LEARNINGS.md`** — architect-emitted observation log (L1-L8 + cost reference table).
 - **`engine-design.md` §0** — current build status snapshot.
+
+## Cheap validator patterns
+
+### The absolute rule
+
+**The validator NEVER spawns a nested harny invocation.** A validator that invokes `bun bin/harny.ts` (or equivalent) to verify its own work burns real Claude tokens and introduces non-determinism. It also makes the harness non-composable — harny-in-validator creates process nesting, double-state writes, and a second run that the outer harness cannot observe.
+
+### Use the testing infrastructure instead
+
+`src/harness/testing/` exports five cheap helpers designed for exactly this purpose:
+
+| Helper | What it gives you |
+|---|---|
+| `tmpGitRepo()` | Disposable `git init` dir with async `cleanup()`. |
+| `runPhaseWithFixture(config, fixture)` | Canned `PhaseRunResult` injected via the `sessionRunPhase` DI seam — zero SDK calls. |
+| `assertStateField(dir, dotPath, predicate)` | Read `state.json`, walk a dot-path, assert literal or predicate match. |
+| `withSyntheticState(dir, partial, fn)` | Write a minimal valid `state.json`, run `fn`, clean up in finally. |
+| `runEngineWorkflowDry(workflow, input, fixtures)` | Full XState machine run with all actors stubbed. Zero tokens. Returns final snapshot. |
+
+Template: `scripts/probes/_templates/validator-smoke.ts` — copy and fill in.
+
+### SDK-boundary escalation list
+
+The only cases that may require real-Claude verification are changes that cross the Claude Agent SDK boundary:
+
+- **`runPhaseAdapter`** — changes to how engine args are translated to `sessionRunPhase` args
+- **`sessionRecorder`** — changes to the `runPhase` loop, event parsing, or `PhaseRunResult` shape
+- **Zod-SDK schema serialization** — how `z.ZodType` is translated to `outputFormat.schema` (the `$schema` strip, field mappings)
+- **Tool definitions** — new or renamed entries in `allowedTools` that the SDK must actually invoke
+- **Hooks** (`buildGuardHooks`) — guard logic that intercepts tool calls
+- **`canUseTool` semantics** — new modes or conditions on the tool-gating callback
+- **Session resume** — changes to the `resume` option threading or `resumeSessionId` plumbing
+
+Even for these, the right escalation path is an **architect-run post-merge smoke** (e.g., `scripts/probes/engine/08-real-runphase-adapter.ts` style), never a nested harny invocation inside a validator phase.
+
+### Before/after: E2E smoke → fixture-based AC
+
+**Before (expensive, non-deterministic):**
+```
+AC: Run `bun bin/harny.ts --task l1-prompt-overlays "add overlay support"` against a tmp
+    git repo. Assert the run produces a commit on the branch and state.json shows
+    lifecycle.status = "done".
+```
+This spends real Claude tokens and makes the validator phase non-repeatable.
+
+**After (fixture-based, zero tokens):**
+```
+AC: bun scripts/probes/testing/01-l1-prompt-overlays.ts exits 0.
+
+The probe must:
+1. Call runEngineWorkflowDry(featureDevWorkflow, input, fixtures) with plannerActor
+   stubbed to return a plan containing the overlay task, developerActor stubbed to
+   return { status: 'done', commit_message: 'feat: overlays' }, validatorActor
+   stubbed to return { verdict: 'pass', reasons: ['overlays rendered'] }, and
+   commitActor stubbed to return { sha: 'abc123' }.
+2. Assert snapshot.status === 'done'.
+3. Call withSyntheticState + assertStateField to verify lifecycle.status = 'done'
+   without any real harness invocation.
+```
+
+The after-form is deterministic, fast, and gives the validator everything it needs to confirm the code wires up correctly — without burning tokens.
