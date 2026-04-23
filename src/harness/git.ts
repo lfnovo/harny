@@ -156,3 +156,38 @@ export async function removeWorktree(
     throw err;
   }
 }
+
+export async function listDiffPaths(cwd: string): Promise<string[]> {
+  const { stdout } = await runGit(cwd, ["diff", "--name-only", "HEAD"]);
+  return stdout.split("\n").map(l => l.trim()).filter(Boolean);
+}
+
+export async function assertNoSiblingBranchOwnsTouchedPaths(
+  cwd: string,
+  currentBranch: string,
+  touchedPaths: string[],
+): Promise<{ warnings: Array<{ path: string; siblingBranch: string }> }> {
+  const warnings: Array<{ path: string; siblingBranch: string }> = [];
+  for (const p of touchedPaths) {
+    const { stdout: logOut } = await runGit(cwd, [
+      "log", "--all", "--not", currentBranch, "--oneline", "--", p,
+    ]);
+    const shas = logOut.split("\n").map(l => l.split(" ")[0] ?? "").filter(s => s.length > 0);
+    const seen = new Set<string>();
+    for (const sha of shas) {
+      const { stdout: bOut } = await runGit(cwd, ["branch", "--contains", sha]);
+      const branches = bOut
+        .split("\n")
+        .map(b => b.replace(/^\*?\s+/, "").trim())
+        .filter(b => b && /^(harny|harness)\//.test(b));
+      for (const b of branches) {
+        const key = `${p}:${b}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          warnings.push({ path: p, siblingBranch: b });
+        }
+      }
+    }
+  }
+  return { warnings };
+}
