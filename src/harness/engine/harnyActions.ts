@@ -1,6 +1,7 @@
 // engine-design.md §8.2
 
 import { assign, fromPromise } from 'xstate';
+import type { PlanDrivenContext } from './types.ts';
 
 async function spawnGit(args: string[], signal: AbortSignal): Promise<string> {
   const proc = Bun.spawn(['git', ...args], { stdout: 'pipe', stderr: 'pipe' });
@@ -80,16 +81,20 @@ export const harnyActions = {
     gitResetTree(opts, signal),
   cleanUntracked: async (opts: { cwd: string }, signal: AbortSignal) =>
     gitCleanUntracked(opts, signal),
-  advanceTask: assign(({ context }: { context: any; event: any }) => ({
-    currentTaskIdx: (context.currentTaskIdx as number) + 1,
+  advanceTask: assign(({ context }: { context: PlanDrivenContext; event: any }) => ({
+    currentTaskIdx: context.currentTaskIdx + 1,
+    attempts: 0,
+    iterationsThisTask: 0,
   })),
-  bumpAttempts: assign(({ context }: { context: any; event: any }) => ({
-    attempts: (context.attempts as number) + 1,
+  bumpAttempts: assign(({ context }: { context: PlanDrivenContext; event: any }) => ({
+    attempts: context.attempts + 1,
+    iterationsThisTask: context.iterationsThisTask + 1,
+    iterationsGlobal: context.iterationsGlobal + 1,
   })),
-  stashValidator: assign((_args: { context: any; event: any }) => ({
-    validatorResult: null as unknown,
+  stashValidator: assign(({ event }: { context: PlanDrivenContext; event: any }) => ({
+    validatorSession: event.output?.session_id ?? null,
   })),
-  stashDevSession: assign((_args: { context: any; event: any }) => ({
-    devSession: null as unknown,
+  stashDevSession: assign(({ event }: { context: PlanDrivenContext; event: any }) => ({
+    devSession: event.output?.session_id ?? null,
   })),
 };
