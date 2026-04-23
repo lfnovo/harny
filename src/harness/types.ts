@@ -12,11 +12,13 @@ export type IsolationMode = "worktree" | "inline";
 
 /**
  * How the harness handles human-in-the-loop interactions:
- * - interactive: TTY readline for both ctx.askUser and AskUserQuestion.
- * - silent: no human available; AskUserQuestion is stripped from allowedTools
- *   and ctx.askUser throws SilentModeError. Agent must make a defensible default.
- * - async: park questions in pending_questions, exit waiting_human, resume
- *   later via `harny answer <runId>`.
+ * - interactive: TTY readline for AskUserQuestion tool calls.
+ * - silent: AskUserQuestion is stripped from allowedTools before the SDK sees
+ *   it (belt-and-suspenders deny on any stray call). Agent must make a
+ *   defensible default.
+ * - async: AskUserQuestion calls are parked in state.pending_question and the
+ *   run exits waiting_human. NOTE: engine workflows do not yet implement
+ *   resume — a parked run is currently discard-only via `harny clean <slug>`.
  */
 export type RunMode = "interactive" | "silent" | "async";
 

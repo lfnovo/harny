@@ -11,7 +11,6 @@ function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
 import { buildGuardHooks, type PhaseGuards } from "./guardHooks.js";
 import {
   runAskUserQuestionTTY,
-  denyAskUserQuestionHeadless,
   type AskUserQuestionInput,
 } from "./askUser.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from "./types.js";

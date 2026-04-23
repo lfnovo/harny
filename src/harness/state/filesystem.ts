@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename, readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -9,13 +9,7 @@ import {
   type PendingQuestion,
 } from "./schema.js";
 import type { StateStore } from "./store.js";
-
-async function writeJsonAtomic(path: string, data: unknown): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  await writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  await rename(tmp, path);
-}
+import { writeJsonAtomic } from "./atomic.js";
 
 export function statePathFor(cwd: string, taskSlug: string): string {
   return join(cwd, ".harny", taskSlug, "state.json");

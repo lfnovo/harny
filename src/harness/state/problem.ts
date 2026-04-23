@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { mkdir, writeFile } from "node:fs/promises";
-import { randomBytes } from "node:crypto";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 export const PROBLEM_SCHEMA_VERSION = 1;
 
@@ -47,41 +45,4 @@ export type PersistedProblem = z.infer<typeof PersistedProblemSchema>;
 
 export function problemsDir(primaryCwd: string, taskSlug: string): string {
   return resolve(primaryCwd, ".harny", taskSlug, "problems");
-}
-
-function generateId(): string {
-  const ts = Date.now().toString(36).padStart(9, "0");
-  const rand = randomBytes(5).toString("hex");
-  return `${ts}_${rand}`;
-}
-
-export async function writeProblems(args: {
-  primaryCwd: string;
-  taskSlug: string;
-  phase: string;
-  sessionId: string;
-  taskId: string | null;
-  problems: Problem[];
-}): Promise<string[]> {
-  if (args.problems.length === 0) return [];
-  const dir = problemsDir(args.primaryCwd, args.taskSlug);
-  await mkdir(dir, { recursive: true });
-  const now = new Date().toISOString();
-  const written: string[] = [];
-  for (const p of args.problems) {
-    const id = generateId();
-    const record: PersistedProblem = {
-      schema_version: PROBLEM_SCHEMA_VERSION,
-      id,
-      at: now,
-      phase: args.phase,
-      session_id: args.sessionId,
-      task_id: args.taskId,
-      ...p,
-    };
-    const path = join(dir, `${id}.json`);
-    await writeFile(path, JSON.stringify(record, null, 2) + "\n", "utf8");
-    written.push(path);
-  }
-  return written;
 }

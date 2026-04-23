@@ -1,17 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, isAbsolute, basename } from "node:path";
-import { runHarness, resumeHarness } from "./harness/orchestrator.js";
+import { runHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
-import { getWorkflow, isEngineWorkflow } from "./harness/workflows/index.js";
+import { getWorkflow } from "./harness/workflows/index.js";
 import { listAllRuns, findRun, statePathFor } from "./harness/state/filesystem.js";
-import type { PendingQuestion } from "./harness/state/schema.js";
-import {
-  resolveAnswer,
-  runAskUserQuestionTTY,
-  type AskUserQuestionInput,
-  type AskUserQuestionItem,
-} from "./harness/askUser.js";
+import type { AskUserQuestionItem } from "./harness/askUser.js";
 import type { IsolationMode, LogMode, RunMode } from "./harness/types.js";
 
 // User-global config: list of named workspaces. Lives in ~/.harny/ so it's
@@ -46,14 +40,7 @@ function parseMode(value: string): RunMode {
 type RegistryCmd =
   | { kind: "ls"; status?: string; cwd?: string; workflow?: string }
   | { kind: "show"; runId: string; tail?: boolean; since?: string }
-  | {
-      kind: "answer";
-      runId: string;
-      /** Raw text answer (string mode), or null when --json provided or interactive fallback. */
-      text: string | null;
-      /** Parsed JSON answer map (object mode). */
-      json?: Record<string, string>;
-    }
+  | { kind: "answer"; runId: string }
   | { kind: "ui"; port?: number; noOpen?: boolean };
 
 export function parseArgs(argv: string[]): {
@@ -67,7 +54,6 @@ export function parseArgs(argv: string[]): {
   task: string | null;
   isolation: IsolationMode | null;
   mode: RunMode | null;
-  inputPath: string | null;
   prompt: string;
 } {
   let verbose = false;
@@ -77,7 +63,6 @@ export function parseArgs(argv: string[]): {
   let task: string | null = null;
   let isolation: IsolationMode | null = null;
   let mode: RunMode | null = null;
-  let inputPath: string | null = null;
   const rest: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -93,13 +78,6 @@ export function parseArgs(argv: string[]): {
       i++;
     } else if (a.startsWith("--workflow=")) {
       workflow = a.slice("--workflow=".length);
-    } else if (a === "--input") {
-      const next = argv[i + 1];
-      if (!next) throw new Error("--input requires a file path");
-      inputPath = next;
-      i++;
-    } else if (a.startsWith("--input=")) {
-      inputPath = a.slice("--input=".length);
     } else if (a === "--assistant") {
       const next = argv[i + 1];
       if (!next) throw new Error("--assistant requires a name");
@@ -184,36 +162,10 @@ export function parseArgs(argv: string[]): {
     }
     registryCmd = { kind: "ui", ...(port ? { port } : {}), ...(noOpen ? { noOpen } : {}) };
   } else if (sub === "answer" && rest[1]) {
-    // Forms:
-    //   harny answer <runId>                   → interactive (walk parked questions)
-    //   harny answer <runId> <text>            → single string
-    //   harny answer <runId> --json '{"q":"a"}' → multi-answer batch
-    let json: Record<string, string> | undefined;
-    const tail: string[] = [];
-    for (let i = 2; i < rest.length; i++) {
-      if (rest[i] === "--json" && rest[i + 1]) {
-        try {
-          json = JSON.parse(rest[++i]!) as Record<string, string>;
-        } catch (err) {
-          throw new Error(`--json requires valid JSON object: ${(err as Error).message}`);
-        }
-      } else if (rest[i]?.startsWith("--json=")) {
-        try {
-          json = JSON.parse(rest[i]!.slice("--json=".length)) as Record<string, string>;
-        } catch (err) {
-          throw new Error(`--json= requires valid JSON object: ${(err as Error).message}`);
-        }
-      } else {
-        tail.push(rest[i]!);
-      }
-    }
-    const text = tail.join(" ").trim();
-    registryCmd = {
-      kind: "answer",
-      runId: rest[1]!,
-      text: text || null,
-      ...(json ? { json } : {}),
-    };
+    // Engine workflows do not yet support resume; subcommand is recognized so
+    // users who try it get a clear error (see main()) rather than a cryptic
+    // "unknown command". Extra args (--json, free text) are ignored.
+    registryCmd = { kind: "answer", runId: rest[1]! };
   }
 
   const logMode: LogMode = quiet ? "quiet" : verbose ? "verbose" : "compact";
@@ -228,7 +180,6 @@ export function parseArgs(argv: string[]): {
     task,
     isolation,
     mode,
-    inputPath,
     prompt: rest.join(" ").trim(),
   };
 }
@@ -322,14 +273,24 @@ async function loadSearchCwds(): Promise<string[]> {
   let raw: string;
   try {
     raw = await readFile(ASSISTANTS_FILE, "utf8");
-  } catch {
-    return [];
+  } catch (err) {
+    // ENOENT is the expected case for users without assistants.json; stay silent.
+    // Anything else (permission denied, etc.) is worth surfacing.
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(
+        `[harny] could not read ${ASSISTANTS_FILE}: ${(err as Error).message} — falling back to process.cwd() only`,
+      );
+    }
+    return [process.cwd()];
   }
   let parsed: AssistantsFile;
   try {
     parsed = JSON.parse(raw) as AssistantsFile;
-  } catch {
-    return [];
+  } catch (err) {
+    console.warn(
+      `[harny] invalid JSON in ${ASSISTANTS_FILE}: ${(err as Error).message} — falling back to process.cwd() only`,
+    );
+    return [process.cwd()];
   }
   const out = new Set<string>();
   for (const a of parsed.assistants ?? []) {
@@ -356,7 +317,6 @@ export async function main() {
     task,
     isolation,
     mode,
-    inputPath,
     prompt: promptArg,
   } = parseArgs(process.argv.slice(2));
 
@@ -453,14 +413,6 @@ export async function main() {
             });
             if (qq.multiSelect) console.log(`      (multiSelect)`);
           });
-          const sample: Record<string, string> = {};
-          questions.forEach((qq) => {
-            sample[qq.question] = qq.options[0]?.label ?? "";
-          });
-          console.log(
-            `\nTo resume: harny answer ${run.run_id} --json '${JSON.stringify(sample)}'`,
-          );
-          console.log(`           (or interactive: harny answer ${run.run_id})`);
         } else {
           console.log(`\nPending question (${pq.id.slice(0, 8)}):`);
           console.log(`  ${pq.prompt}`);
@@ -468,8 +420,10 @@ export async function main() {
             const opts = pq.options as string[];
             opts.forEach((o, i) => console.log(`    ${i + 1}. ${o}`));
           }
-          console.log(`\nTo resume: harny answer ${run.run_id} "<your answer>"`);
         }
+        console.log(
+          `\nEngine workflows do not yet support resume. To discard the parked run: harny clean ${run.origin.task_slug}`,
+        );
       }
 
       const recent = run.history.slice(-20);
@@ -494,79 +448,14 @@ export async function main() {
         console.error(`Run not found: ${registryCmd.runId}`);
         process.exit(1);
       }
-      const pq: PendingQuestion | null = run.pending_question;
-
-      // Dispatch: SDK batch park vs legacy single-question park.
-      if (pq && pq.kind === "ask_user_question_batch") {
-        const questions = (pq.options ?? []) as AskUserQuestionItem[];
-        let answersMap: Record<string, string>;
-
-        if (registryCmd.json) {
-          const validated: Record<string, string> = {};
-          for (const question of questions) {
-            const raw = registryCmd.json[question.question];
-            if (raw === undefined) {
-              console.error(`Missing answer for question: "${question.question}"`);
-              process.exit(1);
-            }
-            const labels = question.options.map((o) => o.label);
-            const r = resolveAnswer(labels, raw);
-            if (!r.ok) {
-              console.error(`For "${question.question}": ${r.error}`);
-              process.exit(1);
-            }
-            validated[question.question] = r.value;
-          }
-          answersMap = validated;
-        } else if (registryCmd.text) {
-          console.error(
-            "This run has a multi-question batch. Use --json '{...}' or run `harny answer <runId>` without args for interactive mode.",
-          );
-          process.exit(1);
-        } else {
-          const input: AskUserQuestionInput = { questions };
-          const result = await runAskUserQuestionTTY(input);
-          if (result.behavior !== "allow") {
-            console.error("Interactive answer cancelled.");
-            process.exit(1);
-          }
-          answersMap = result.updatedInput.answers;
-        }
-
-        console.log(`[harny] resuming run ${registryCmd.runId}...`);
-        const result = await resumeHarness(registryCmd.runId, answersMap, {
-          searchCwds,
-        });
-        console.log(`[harny] finished status=${result.status}`);
-        return;
-      }
-
-      // Legacy path: single-question code-side park (ctx.askUser).
-      if (!registryCmd.text) {
-        console.error(
-          "harny answer <runId> <text> — text is required for this run.",
-        );
-        process.exit(1);
-      }
-      let answerText: string = registryCmd.text;
-      if (pq) {
-        const opts = (pq.options ?? null) as string[] | null;
-        const resolved = resolveAnswer(opts, registryCmd.text);
-        if (!resolved.ok) {
-          console.error(resolved.error);
-          process.exit(1);
-        }
-        answerText = resolved.value;
-        if (opts && opts.length > 0) {
-          console.log(`[harny] selected: ${answerText}`);
-        }
-      }
-      console.log(`[harny] resuming run ${registryCmd.runId}...`);
-      const result = await resumeHarness(registryCmd.runId, answerText, {
-        searchCwds,
-      });
-      console.log(`[harny] finished status=${result.status}`);
-      return;
+      // Engine workflows (the only kind today) do not yet support resume.
+      // Park is still honored (runs exit waiting_human and show up in `harny
+      // ls --status waiting_human`), but the only remediation is to discard.
+      console.error(
+        `harny answer is not yet supported — engine workflows cannot be resumed from a parked question.\n` +
+          `To discard this run: harny clean ${run.origin.task_slug}`,
+      );
+      process.exit(1);
     }
   }
 
@@ -583,7 +472,7 @@ export async function main() {
     console.log(
       [
         "Usage: harny [--workflow <id>] [--task <slug>] [--assistant <name>] \"<prompt>\"",
-        "       harny ls | show <runId> | answer <runId> [...] | clean <slug> | ui",
+        "       harny ls | show <runId> | clean <slug> | ui",
         "",
         "Default workflow: feature-dev. cwd defaults to process.cwd() when --assistant is omitted.",
       ].join("\n"),
@@ -591,10 +480,9 @@ export async function main() {
     return;
   }
 
-  // Workflow mode is the only mode. Default to feature-dev when --workflow
-  // not specified. --workflow accepts `<id>` or `<id>:<variant>` syntax
-  // (engine-design.md §4.5); split here so the orchestrator receives a clean
-  // registry id + variant separately.
+  // Default to feature-dev when --workflow not specified. --workflow accepts
+  // `<id>` or `<id>:<variant>` syntax (engine-design.md §4.5); split here so
+  // the orchestrator receives a clean registry id + variant separately.
   const workflowArgRaw = workflowArg ?? "feature-dev";
   const [workflowId = "feature-dev", variant] = workflowArgRaw.split(":");
 
@@ -610,30 +498,6 @@ export async function main() {
     throw new Error("a prompt is required (describe the work in quotes)");
   }
 
-  let input: unknown = undefined;
-  if (inputPath) {
-    let raw: string;
-    try {
-      raw = await readFile(inputPath, "utf8");
-    } catch (err) {
-      throw new Error(`Could not read --input file "${inputPath}": ${(err as Error).message}`);
-    }
-    try {
-      input = JSON.parse(raw);
-    } catch (err) {
-      throw new Error(`Invalid JSON in --input file "${inputPath}": ${(err as Error).message}`);
-    }
-    // Validate against workflow's inputSchema if present (legacy workflows only).
-    const wf = getWorkflow(workflowId);
-    if (!isEngineWorkflow(wf) && wf.inputSchema) {
-      const result = wf.inputSchema.safeParse(input);
-      if (!result.success) {
-        throw new Error(`--input validation failed for workflow "${workflowId}": ${result.error.message}`);
-      }
-      input = result.data;
-    }
-  }
-
   const assistant = await resolveAssistant(assistantName);
   const result = await runHarness({
     cwd: assistant.cwd,
@@ -644,14 +508,11 @@ export async function main() {
     isolation: isolation ?? undefined,
     mode: mode ?? undefined,
     logMode,
-    input,
   });
   if (logMode === "quiet") {
     console.log(`[harny] status=${result.status} branch=${result.branch}`);
   } else {
-    console.log(
-      `[harny] finished status=${result.status} plan=${result.planPath}`,
-    );
+    console.log(`[harny] finished status=${result.status} branch=${result.branch}`);
   }
 }
 

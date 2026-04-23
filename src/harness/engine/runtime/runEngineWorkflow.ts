@@ -42,10 +42,13 @@ export async function runEngineWorkflow(
 
           if (snapshot.status === 'done') {
             if (snapshot.value === 'failed') {
+              const ctxError = (snapshot.context as any)?.error;
               resolve({
                 status: 'failed',
                 finalContext: snapshot.context,
-                error: (snapshot.context as any)?.error ?? 'workflow reached failed state',
+                error:
+                  ctxError ??
+                  `workflow "${workflow.id}" reached 'failed' state with no context.error set`,
               });
             } else {
               resolve({

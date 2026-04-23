@@ -91,28 +91,6 @@ export async function headSha(cwd: string): Promise<string> {
   return (await git(cwd, ["rev-parse", "HEAD"])).trim();
 }
 
-export async function resetHard(cwd: string, sha: string): Promise<void> {
-  await git(cwd, ["reset", "--hard", sha]);
-}
-
-export async function cleanUntracked(cwd: string): Promise<void> {
-  // -f to actually delete, -d to include directories. Does NOT touch
-  // ignored files (.gitignore'd) so .harny/<slug>/ and its contents
-  // survive the clean.
-  await git(cwd, ["clean", "-fd"]);
-}
-
-export async function commitComposed(
-  cwd: string,
-  message: string,
-): Promise<string | null> {
-  await git(cwd, ["add", "-A"]);
-  const { stdout } = await runGit(cwd, ["diff", "--cached", "--name-only"]);
-  if (stdout.trim().length === 0) return null;
-  await git(cwd, ["commit", "-m", message]);
-  return (await git(cwd, ["rev-parse", "HEAD"])).trim();
-}
-
 export async function assertWorktreePathAbsent(
   worktreePath: string,
 ): Promise<void> {
@@ -157,37 +135,3 @@ export async function removeWorktree(
   }
 }
 
-export async function listDiffPaths(cwd: string): Promise<string[]> {
-  const { stdout } = await runGit(cwd, ["diff", "--name-only", "HEAD"]);
-  return stdout.split("\n").map(l => l.trim()).filter(Boolean);
-}
-
-export async function assertNoSiblingBranchOwnsTouchedPaths(
-  cwd: string,
-  currentBranch: string,
-  touchedPaths: string[],
-): Promise<{ warnings: Array<{ path: string; siblingBranch: string }> }> {
-  const warnings: Array<{ path: string; siblingBranch: string }> = [];
-  for (const p of touchedPaths) {
-    const { stdout: logOut } = await runGit(cwd, [
-      "log", "--all", "--not", currentBranch, "--oneline", "--", p,
-    ]);
-    const shas = logOut.split("\n").map(l => l.split(" ")[0] ?? "").filter(s => s.length > 0);
-    const seen = new Set<string>();
-    for (const sha of shas) {
-      const { stdout: bOut } = await runGit(cwd, ["branch", "--contains", sha]);
-      const branches = bOut
-        .split("\n")
-        .map(b => b.replace(/^\*?\s+/, "").trim())
-        .filter(b => b && /^(harny|harness)\//.test(b));
-      for (const b of branches) {
-        const key = `${p}:${b}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          warnings.push({ path: p, siblingBranch: b });
-        }
-      }
-    }
-  }
-  return { warnings };
-}

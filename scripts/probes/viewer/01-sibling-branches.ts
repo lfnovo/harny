@@ -26,7 +26,7 @@ function writeStateJson(tmpDir: string): void {
   const runDir = join(tmpDir, '.harny', 'my-probe-run');
   mkdirSync(runDir, { recursive: true });
   const state = {
-    schema_version: 1,
+    schema_version: 2,
     run_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     origin: {
       prompt: 'probe test',
@@ -35,6 +35,7 @@ function writeStateJson(tmpDir: string): void {
       started_at: '2026-01-01T00:00:00.000Z',
       host: 'test-host',
       user: 'test-user',
+      features: null,
     },
     environment: {
       cwd: tmpDir,
@@ -54,6 +55,7 @@ function writeStateJson(tmpDir: string): void {
     history: [],
     pending_question: null,
     workflow_state: {},
+    workflow_chosen: null,
   };
   writeFileSync(join(runDir, 'state.json'), JSON.stringify(state, null, 2));
 }

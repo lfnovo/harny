@@ -1,38 +1,5 @@
 import { createInterface } from "node:readline";
 
-export class SilentModeError extends Error {
-  constructor(message = "askUser called in silent mode; workflow must handle this case (e.g. pick a defensible default)") {
-    super(message);
-    this.name = "SilentModeError";
-  }
-}
-
-/**
- * Thrown by a phase (via sessionRecorder) when an AskUserQuestion tool call
- * is parked in async mode. The orchestrator catches this and treats it as
- * `status: "waiting_human"` — the run exits cleanly and can be resumed via
- * `harny answer <runId>`.
- */
-export class PausedForUserInputError extends Error {
-  questionId: string;
-  phaseSessionId: string;
-  toolUseId: string | null;
-  phaseName: string;
-  constructor(args: {
-    questionId: string;
-    phaseSessionId: string;
-    toolUseId: string | null;
-    phaseName: string;
-  }) {
-    super(`Paused for user input (question=${args.questionId}, phase=${args.phaseName})`);
-    this.name = "PausedForUserInputError";
-    this.questionId = args.questionId;
-    this.phaseSessionId = args.phaseSessionId;
-    this.toolUseId = args.toolUseId;
-    this.phaseName = args.phaseName;
-  }
-}
-
 export type ResolvedAnswer =
   | { ok: true; value: string }
   | { ok: false; error: string };
@@ -145,14 +112,6 @@ export async function runAskUserQuestionTTY(
   return {
     behavior: "allow",
     updatedInput: { questions: input.questions, answers },
-  };
-}
-
-export function denyAskUserQuestionHeadless(): AskUserQuestionResult {
-  return {
-    behavior: "deny",
-    message:
-      "AskUserQuestion is not supported in headless mode. Make a defensible default and document the assumption in your output.",
   };
 }
 
