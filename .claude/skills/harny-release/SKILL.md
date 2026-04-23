@@ -1,6 +1,6 @@
 ---
 name: harny-release
-description: Orchestrate a harny release — dispatch harness runs with product-vision prompts, parallelize when safe, code-review every merge, triage findings into now/quick/backlog, and surface gaps through smoke tests. Architect-side skill that runs in the outer Claude conversation, not inside a harny run. Sister of harny-review (per-run post-mortem) and harny-learnings (inbox capture + drain).
+description: Orchestrate a release cycle driven by harny — dispatch harness runs with product-vision prompts, parallelize when safe, code-review every merge, triage findings into now/quick/backlog, and surface gaps through smoke tests. Architect-side skill that runs in the outer Claude conversation, not inside a harness run. Sister of harny-review (per-run post-mortem) and harny-learnings (inbox capture + drain).
 ---
 
 # harny-release
@@ -32,30 +32,28 @@ The detailed plan (file paths, function signatures, code shape) is the **planner
 - Hide tooling gaps (you don't notice the missing template/helper because you inlined it).
 - Make the planner over-think.
 
-**Litmus test before dispatching:** if your prompt contains file paths, function signatures, or TypeScript code blocks → STOP, you're doing the planner's job. Rewrite as outcome + AC.
+**Litmus test before dispatching:** if your prompt contains file paths, function signatures, or code blocks → STOP, you're doing the planner's job. Rewrite as outcome + AC.
 
 ## Rules of engagement
 
 These rules are policy, not contract. If a rule isn't serving after 5+ runs, change it explicitly.
 
-### Rule 1 — No TS direto
+### Rule 1 — No code by hand
 
-No human writes TypeScript by hand. Every TS change goes through harness.
+No human writes production code by hand. Every change to production code goes through a harness run.
 
-- Markdown (prompts, docs, CHANGELOG): editable by hand for agility.
-- JSON config files: editable by hand.
-- Probes (`scripts/probes/*`): may be hand-written when investigating XState/Bun behaviors that need empirical validation.
-- TS production code (`src/**/*.ts`, `bin/**/*.ts`): **harness only**. If the architect feels they "need to just edit this real quick", pause and improve the setup — don't break the rule.
+- Markdown (prompts, docs, CHANGELOG), JSON config, and test probes may be hand-edited.
+- Production code lands through harness runs. If the architect feels they "need to just edit this real quick", pause and improve the setup — don't break the rule.
 
 ### Rule 2 — Preserve all runs
 
-No `harny clean` during active development. Every run's `.harny/<slug>/` directory stays on disk indefinitely. Historical record + training data + comparison fuel.
+No `harny clean` during active development. Every run's `.harny/<slug>/` directory stays on disk. Historical record + training data + comparison fuel.
 
-When `.harny/` gets too cluttered (10+ runs), revisit — but default is preserve.
+When `.harny/` gets too cluttered, revisit — but default is preserve.
 
 ### Rule 3 — Each run produces one logical commit
 
-Each `harny "..."` invocation should produce a coherent commit chain representing one focused change. Multi-task plans are fine if validator gates each task individually. Don't bundle multiple concerns into one prompt — that's N runs.
+Each `harny "..."` invocation should produce a coherent commit chain representing one focused change. Multi-task plans are fine if the validator gates each task individually. Don't bundle multiple concerns into one prompt — that's N runs.
 
 ### Rule 4 — Merge to main after every passing run
 
@@ -81,10 +79,14 @@ The validator verifies functional correctness against AC. The architect verifies
 
 Issues found → triage per "Per-run loop" step 6.
 
+### Rule 6 — This doc evolves
+
+If a rule isn't serving you, change it — but change it explicitly, not silently.
+
 ## Per-run loop
 
 1. **Align prompt with architect** — product-vision shape (see "Prompt writing" below). Discuss until you both agree what success looks like.
-2. **Dispatch** — `bun bin/harny.ts --task <slug> "..."` in background. Parallel where safe (see "Parallelism" below).
+2. **Dispatch** — `harny --task <slug> "..."` in background. Parallel where safe (see "Parallelism" below).
 3. **Monitor** — `ScheduleWakeup` for long runs OR await background notification. Don't poll.
 4. **Code-review (Rule 5)** — `git show <commit>` + re-run new probes + scan for dead code, missing error handlers, observability gaps, scope drift.
 5. **Merge (Rule 4)** — `git checkout main && git merge --no-ff harny/<slug>` before next run.
@@ -101,18 +103,17 @@ Issues found → triage per "Per-run loop" step 6.
 
 ### DO
 
-- **Outcome statement.** "Wire X into Y so Z is invokable from CLI."
-- **AC as observable behaviors.** "Running `harny --workflow <id>` against a tmp git repo produces a real commit on the run branch."
-- **Constraints (must / must-not).** "Do not modify legacy `src/.../`. Do not invoke real Claude API in probes."
-- **Test plan reference.** "Probe should be self-bounding (Promise.race deadlines)."
-- **Separate validator-exercise vs read-only verification** when env limits exercise (e.g., no API key in validator subprocess). Be explicit: "Validator MUST exercise X. Validator MUST verify Y by reading code only."
+- **Outcome statement.** "Wire X into Y so Z is invokable from the CLI."
+- **AC as observable behaviors.** "Running the CLI against a tmp git repo produces a real commit on the run branch."
+- **Constraints (must / must-not).** "Do not modify legacy module X. Do not invoke real LLM APIs in probes."
+- **Test plan reference.** "Probe should be self-bounding (hard deadlines, no open-ended waits)."
+- **Separate validator-exercise vs read-only verification** when the environment limits exercise (e.g., no API key in the validator's subprocess). Be explicit: "Validator MUST exercise X. Validator MUST verify Y by reading code only."
 
 ### DON'T
 
 - File paths or function signatures (planner's job).
-- TypeScript code blocks specifying implementation (planner's job).
+- Code blocks specifying implementation (planner's job).
 - AC numbered with cross-references that constrain order of operations.
-- Prescribe `timeout N` (macOS gotcha — see CLAUDE.md "Gotchas").
 - Inline reasoning the planner should derive.
 
 ### When you reach for detail, ask
@@ -122,92 +123,66 @@ Issues found → triage per "Per-run loop" step 6.
 
 ## Parallelism heuristic
 
-Multiple runs can dispatch concurrently if they touch **disjoint file sets**. Build a touch matrix before dispatching:
+Multiple runs can dispatch concurrently if they touch **disjoint file sets**. Before dispatching, build a touch matrix for your codebase:
 
 | Run | Files touched | Conflicts with |
 |---|---|---|
-| docs bundle | CLAUDE.md, README.md | (other docs runs) |
-| orchestrator change | src/harness/orchestrator.ts | (other orchestrator runs) |
-| new probe | scripts/probes/.../*.ts (new) | none (additive) |
-| viewer | src/viewer/* | (other viewer runs) |
+| (fill with the files each pending run will modify) | | |
 
-Sequential when:
-- Two runs touch the same file (e.g., orchestrator-touching changes serialize).
-- One run depends on another's output.
+Rule of thumb:
+- Two runs touching the same file → sequential.
+- One run depending on another's output → sequential.
+- Otherwise → parallel is safe.
 
 ## Anti-patterns
 
 | Anti-pattern | Cost | Fix |
 |---|---|---|
 | Architecture-detail prompts | Planner over-thinks; hides gaps | Product-vision prompts; trust planner |
-| Mocks without smoke | Mocks pass while real system breaks | Always run real CLI smoke when wiring crosses engine ↔ SDK boundary |
+| Mocks without smoke | Mocks pass while real system breaks | Always run a real end-to-end smoke when wiring crosses a module boundary |
 | Ambiguous OR-AC | Validator can't satisfy "either A or B" when env limits one branch | Separate "MUST exercise" vs "MUST verify by reading" explicitly |
-| Merging without diff review | Observability gaps + actor leaks slip past AC-scope checks | Rule 5: `git show <commit>` + re-run probe before every merge |
+| Merging without diff review | Observability gaps + resource leaks slip past AC-scope checks | Rule 5: `git show <commit>` + re-run probe before every merge |
 | Branching successive runs from stale main | Sibling-branch divergence | Rule 4: merge to main between runs |
 | Stuck processes accumulate | CPU/token burn | Kill on first sign of hang; ask architect for auth |
 
-## Cheap validator patterns
+## Cheap validator principles
+
+The validator is a phase of your harness run. It is expensive when it does expensive things, cheap when it does cheap things.
 
 ### The absolute rule
 
-**The validator NEVER spawns a nested harny invocation.** A validator that invokes `bun bin/harny.ts` (or equivalent) to verify its own work burns real Claude tokens and introduces non-determinism. It also makes the harness non-composable — harny-in-validator creates process nesting, double-state writes, and a second run the outer harness cannot observe.
+**The validator NEVER spawns a nested harness invocation of its own.** A validator that re-invokes the full harness to verify its work burns real LLM tokens, introduces non-determinism, and makes the harness non-composable — process nesting, double-state writes, and a second run the outer harness cannot observe.
 
-### Use the testing infrastructure instead
+### Principles
 
-`src/harness/testing/` exports cheap helpers designed for exactly this purpose:
+- **Prefer fixture-based tests over live LLM calls** in validator phases. Stub the phase-runner seam and inject canned outputs.
+- **Prefer probes with exit codes** over probes that "check by reading text." A probe that exits 0/1 is a cheap, deterministic signal the validator can consume.
+- **Keep probe wall-clock budgeted.** Hard deadlines in each scenario; total probe time bounded.
+- **Only escalate to real-API verification when the change genuinely crosses an LLM-SDK boundary.** Even then, prefer an **architect-run post-merge smoke** over a nested invocation inside the validator.
 
-| Helper | What it gives you |
-|---|---|
-| `tmpGitRepo()` | Disposable `git init` dir with async `cleanup()`. |
-| `runPhaseWithFixture(config, fixture)` | Canned `PhaseRunResult` injected via the `sessionRunPhase` DI seam — zero SDK calls. |
-| `assertStateField(dir, dotPath, predicate)` | Read `state.json`, walk a dot-path, assert literal or predicate match. |
-| `withSyntheticState(dir, partial, fn)` | Write a minimal valid `state.json`, run `fn`, clean up in finally. |
-| `runEngineWorkflowDry(workflow, input, fixtures)` | Full XState machine run with all actors stubbed. Zero tokens. Returns final snapshot. |
-
-Template: `scripts/probes/_templates/validator-smoke.ts` — copy and fill in.
-
-### SDK-boundary escalation list
-
-The only cases that may require real-Claude verification are changes that cross the Claude Agent SDK boundary:
-
-- **`runPhaseAdapter`** — how engine args translate to `sessionRunPhase` args.
-- **`sessionRecorder`** — the `runPhase` loop, event parsing, `PhaseRunResult` shape.
-- **Zod-SDK schema serialization** — `z.ZodType` → `outputFormat.schema` translation (the `$schema` strip, field mappings).
-- **Tool definitions** — new or renamed entries in `allowedTools` that the SDK must actually invoke.
-- **Hooks** (`buildGuardHooks`) — guard logic that intercepts tool calls.
-- **`canUseTool` semantics** — new modes or conditions on the tool-gating callback.
-- **Session resume** — changes to the `resume` option threading or `resumeSessionId` plumbing.
-
-Even for these, the right path is an **architect-run post-merge smoke** (e.g., `scripts/probes/engine/08-real-runphase-adapter.ts` style), never a nested harny invocation inside a validator phase.
-
-### Before/after: E2E smoke → fixture-based AC
+### AC framing, before/after
 
 **Before (expensive, non-deterministic):**
 ```
-AC: Run `bun bin/harny.ts --task X "..."` against a tmp git repo. Assert the run
-    produces a commit on the branch and state.json shows lifecycle.status = "done".
+AC: Run the full CLI against a tmp git repo. Assert the run produces a commit
+    on the branch and state shows status = "done".
 ```
-Spends real Claude tokens; non-repeatable.
+Spends real tokens; non-repeatable.
 
 **After (fixture-based, zero tokens):**
 ```
-AC: bun scripts/probes/testing/0N-task.ts exits 0.
+AC: bun <probe-path> exits 0.
 
-The probe must:
-1. Call runEngineWorkflowDry(workflow, input, fixtures) with actors stubbed
-   (planner returns a plan, developer returns { status: 'done', commit_message },
-   validator returns { verdict: 'pass', reasons }, commitActor returns { sha }).
-2. Assert snapshot.status === 'done'.
-3. Call withSyntheticState + assertStateField to verify lifecycle.status = 'done'.
+The probe stubs the actors/phase-runner with canned outputs, runs the workflow
+end-to-end in-process, and asserts the final state structurally.
 ```
-
 Deterministic, fast, same correctness signal.
 
 ## How to re-orient on a fresh context
 
 If returning to this work after a context compaction:
 
-1. Read [`CLAUDE.md`](../../../CLAUDE.md) — invariants, gotchas, key paths.
+1. Read your project's `CLAUDE.md` — invariants, gotchas, key paths.
 2. Re-read this skill — policy + operational HOW.
 3. Check `git log --oneline -20` — what was last committed.
 4. Check `.harny/` for the most recent run; read its `state.json` + `review.md` (if `/harny-review` was invoked).
