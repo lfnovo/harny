@@ -103,3 +103,15 @@ Use these as anomaly anchors. A future similar-shape run that takes >2x its base
 | git-actions | 3m04s | 1 | 0 | three git effect actions + probe with tmp repos |
 | echo-commit-workflow | 6m17s | 1 | 0 | first end-to-end engine workflow |
 | docs-consolidation | 2m41s | 1 | 0 | 4 CLAUDE.md gotchas + 1 §8.4 sentence |
+| delete-legacy-workflows | ~4m | 1 | 0 | purge docs.ts + issueTriage.ts from registry |
+| obs-content-layer | ~20m | 1 | 1 | #14 bundle: tail format + commits filter + events substance; 1 retry on orchestrator verdict-wiring |
+| cheap-validator-infra | ~12m | 1 | 0 | #15: src/harness/testing/ helpers + template + probe; **validator ran in <1s using its own infra (dogfood)** |
+| l1-prompt-overlays-redux | ~11m30s | 1 | 0 | 4-level prompt resolver + bundled defaults + wire-up; **validator 40s vs 45min+ on original attempt** (67x speedup, first cheap-infra use on a real task) |
+
+---
+
+## L9 — cheap validator infra collapses validator wall-clock
+
+- **Pattern observed:** Before `src/harness/testing/` existed (Phase 1 runs through 2026-04-23 morning), validators that asserted engine behavior spawned nested `bun bin/harny.ts` E2E smokes. The killed `l1-prompt-overlays` (first attempt) had validator running 45+ min doing two nested real-Claude runs, ratio 7:1 validator:dev. After `cheap-validator-infra` shipped, `l1-prompt-overlays-redux` ran the same task shape with validator in 40 seconds using `runPhaseWithFixture` + `tmpGitRepo` + direct probe assertions. Ratio fell to 1:14 validator:dev.
+- **Counterfactual:** Without the infra, every engine-touching run pays the nested-harny tax. With the infra available AND the prompt actively steering the planner toward it, cheap is the default.
+- **Action:** Already infra-shipped (#15). Keep reinforcing the pattern in every new prompt — `RELEASE.md §Cheap validator patterns` is the canonical reference. Future runs that regress to nested-harny in the validator should be killed and retried.
