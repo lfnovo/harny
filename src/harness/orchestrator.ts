@@ -188,6 +188,7 @@ function buildCtx(args: {
           ended_at: new Date().toISOString(),
           status: phaseStatus,
           session_id: result.sessionId,
+          verdict: result.structuredOutput != null ? JSON.stringify(result.structuredOutput) : null,
         });
         await store.appendHistory({
           at: new Date().toISOString(),

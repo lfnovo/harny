@@ -14,7 +14,7 @@ function formatTimestamp(ts: string | undefined): string {
 
 function truncate(s: string, n: number): string {
   if (s.length <= n) return s;
-  return s.slice(0, n - 1) + "…";
+  return s.slice(0, n) + "...";
 }
 
 function inputSummary(input: unknown): string {
@@ -22,19 +22,19 @@ function inputSummary(input: unknown): string {
 }
 
 function outputSummary(content: unknown): string {
-  if (typeof content === "string") return truncate(content, 80);
+  if (typeof content === "string") return truncate(content, 120);
   if (Array.isArray(content)) {
     for (const item of content) {
       if (item && typeof item === "object") {
         const b = item as Record<string, unknown>;
         if (b.type === "text") {
-          return truncate(typeof b.text === "string" ? b.text : JSON.stringify(b.text), 80);
+          return truncate(typeof b.text === "string" ? b.text : JSON.stringify(b.text), 120);
         }
       }
     }
-    return truncate(JSON.stringify(content), 80);
+    return truncate(JSON.stringify(content), 120);
   }
-  return truncate(JSON.stringify(content), 80);
+  return truncate(JSON.stringify(content), 120);
 }
 
 export function formatEvent(event: unknown): string | null {

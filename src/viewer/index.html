@@ -73,6 +73,40 @@
       })[c]);
     }
 
+    function eventSubstance(e, state, plan) {
+      if (e.event !== 'phase_end') return e.event;
+      const phase = e.phase ?? '';
+      if (phase === 'planner') {
+        if (plan && Array.isArray(plan.tasks)) return plan.tasks.length + ' tasks planned';
+        return 'planner done';
+      }
+      if (phase.startsWith('developer')) {
+        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && p.attempt === e.attempt);
+        if (entry && entry.verdict) {
+          try {
+            const v = JSON.parse(entry.verdict);
+            const s = 'task ' + (v.task_id ?? '?') + ': ' + (v.status ?? '?');
+            return s.length > 80 ? s.slice(0, 80) + '...' : s;
+          } catch {}
+        }
+        return 'developer done';
+      }
+      if (phase.startsWith('validator')) {
+        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && p.attempt === e.attempt);
+        if (entry && entry.verdict) {
+          try {
+            const v = JSON.parse(entry.verdict);
+            const label = v.status === 'pass' ? 'PASS' : 'FAIL';
+            const evText = (v.evidence ?? '');
+            const truncated = evText.length > 80;
+            return label + ': ' + evText.slice(0, 80) + (truncated ? '...' : '');
+          } catch {}
+        }
+        return 'validator done';
+      }
+      return e.event;
+    }
+
     async function fetchJSON(path) {
       const res = await fetch(path);
       if (!res.ok) throw new Error(`${path}: ${res.status}`);
@@ -323,7 +357,7 @@
               <div class="bg-white border border-slate-200 rounded-lg p-4">
                 <h2 class="text-sm font-semibold mb-3 text-slate-700">Recent events</h2>
                 <ul class="space-y-1">
-                  ${recentHistory.map(e => `<li class="text-xs"><span class="text-slate-400">${escapeHtml(fmtTime(e.at))}</span> · <span class="text-slate-600">${escapeHtml(e.phase)}</span> · <span class="font-medium">${escapeHtml(e.event)}</span></li>`).join('')}
+                  ${recentHistory.map(e => `<li class="text-xs"><span class="text-slate-400">${escapeHtml(fmtTime(e.at))}</span> · <span class="text-slate-600">${escapeHtml(e.phase)}</span> · <span class="font-medium">${escapeHtml(eventSubstance(e, state, plan))}</span></li>`).join('')}
                 </ul>
               </div>
             </div>

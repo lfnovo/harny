@@ -58,26 +58,19 @@ async function findOneRun(cwd: string, slug: string): Promise<State | null> {
   return states.find((s) => s.origin.task_slug === slug) ?? null;
 }
 
-function gitLog(cwd: string, branch: string): Promise<{ commits: { sha: string; date: string; subject: string }[]; error?: string }> {
+function gitLogRaw(
+  cwd: string,
+  rangeArg: string,
+): Promise<{ commits: { sha: string; date: string; subject: string }[] } | null> {
   return new Promise((resolve) => {
-    const args = [
-      "log",
-      branch,
-      "--pretty=format:%h%x09%aI%x09%s",
-      "-n",
-      "50",
-    ];
+    const args = ["log", rangeArg, "--pretty=format:%h%x09%aI%x09%s", "-n", "50"];
     const proc = spawn("git", args, { cwd });
     let stdout = "";
-    let stderr = "";
     proc.stdout.on("data", (d) => (stdout += d.toString()));
-    proc.stderr.on("data", (d) => (stderr += d.toString()));
-    proc.on("error", (err) => resolve({ commits: [], error: err.message }));
+    proc.stderr.on("data", () => {});
+    proc.on("error", () => resolve(null));
     proc.on("close", (code) => {
-      if (code !== 0) {
-        resolve({ commits: [], error: stderr.trim() || `git exited ${code}` });
-        return;
-      }
+      if (code !== 0) { resolve(null); return; }
       const commits = stdout
         .split("\n")
         .filter(Boolean)
@@ -88,6 +81,17 @@ function gitLog(cwd: string, branch: string): Promise<{ commits: { sha: string; 
       resolve({ commits });
     });
   });
+}
+
+async function gitLog(
+  cwd: string,
+  branch: string,
+): Promise<{ commits: { sha: string; date: string; subject: string }[]; error?: string }> {
+  const ahead = await gitLogRaw(cwd, `main..${branch}`);
+  if (ahead !== null) return ahead;
+  const fallback = await gitLogRaw(cwd, branch);
+  if (fallback !== null) return fallback;
+  return { commits: [], error: "git log failed" };
 }
 
 function runGit(args: string[], cwd: string): Promise<string | null> {
