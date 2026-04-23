@@ -5,7 +5,6 @@ import type { PhaseGuards } from "./guardHooks.js";
 import type {
   LogMode,
   PhaseName,
-  ResolvedHarnessConfig,
   ResolvedPhaseConfig,
   RunMode,
 } from "./types.js";
@@ -27,7 +26,6 @@ export type WorkflowContext = {
   primaryCwd: string;
   phaseCwd: string;
   input: unknown;
-  config: ResolvedHarnessConfig;
   logMode: LogMode;
   mode: RunMode;
   planPath: string;
@@ -73,14 +71,10 @@ export type Workflow<TInput = unknown> = {
   inputSchema?: z.ZodType<TInput>;
   /**
    * Per-phase config defaults this workflow expects. Keys are phase names
-   * (e.g. "planner", "triage"). The orchestrator merges these with any
-   * overrides from the project's harny.json into ctx.config.phases.
+   * (e.g. "planner", "triage").
    */
   phaseDefaults: Record<string, ResolvedPhaseConfig>;
-  /**
-   * Optional default run mode when the CLI/file don't specify one. CLI flag
-   * and harny.json defaultMode override this.
-   */
+  /** Optional default run mode when the CLI flag doesn't specify one. */
   defaultMode?: RunMode;
   run: (ctx: WorkflowContext) => Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human" }>;
   /**

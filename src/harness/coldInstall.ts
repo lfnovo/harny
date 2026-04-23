@@ -1,31 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
-function isColdInstallEnabled(primaryCwd: string): boolean {
-  const harnyJsonPath = join(primaryCwd, "harny.json");
-  if (!existsSync(harnyJsonPath)) return true;
-  try {
-    const raw = readFileSync(harnyJsonPath, "utf8");
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return parsed.coldWorktreeInstall !== false;
-  } catch {
-    return true;
-  }
-}
-
 export async function coldInstallWorktree({
   worktreePath,
-  primaryCwd,
 }: {
   worktreePath: string;
   primaryCwd: string;
 }): Promise<void> {
-  if (!isColdInstallEnabled(primaryCwd)) {
-    console.log("[harny:cold-install] disabled via harny.json coldWorktreeInstall=false, skipping");
-    return;
-  }
-
   if (!existsSync(join(worktreePath, "package.json"))) {
     return;
   }

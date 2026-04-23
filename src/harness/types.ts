@@ -36,37 +36,11 @@ export type PhaseConfig = {
   mcpServers?: Record<string, McpServerConfig>;
 };
 
-export type HarnessConfigFile = {
-  /**
-   * Per-phase config overrides. Keys are phase names (e.g. "planner",
-   * "developer", "validator", "triage"). Each entry deep-merges with the
-   * defaults declared by the workflow's `phaseDefaults`.
-   */
-  phases?: Record<string, PhaseConfig>;
-  maxIterationsPerTask?: number;
-  maxIterationsGlobal?: number;
-  maxRetriesBeforeReset?: number;
-  isolation?: IsolationMode;
-  defaultMode?: RunMode;
-  coldWorktreeInstall?: boolean;
-  siblingBranchGuard?: boolean;
-};
-
 export type ResolvedPhaseConfig = Required<
   Omit<PhaseConfig, "mcpServers" | "model">
 > & {
   model: PhaseConfig["model"];
   mcpServers: Record<string, McpServerConfig>;
-};
-
-export type ResolvedHarnessConfig = {
-  /** Resolved per-phase configs after merging workflow defaults + file overrides. */
-  phases: Record<string, ResolvedPhaseConfig>;
-  maxIterationsPerTask: number;
-  maxIterationsGlobal: number;
-  maxRetriesBeforeReset: number;
-  isolation: IsolationMode;
-  mode: RunMode;
 };
 
 export type TaskStatus = "pending" | "in_progress" | "done" | "failed";
