@@ -524,11 +524,18 @@ Example (`commandActor`):
 // Plain async — canonical implementation, probe surface
 export async function runCommand(opts: CommandOpts, signal: AbortSignal): Promise<CommandResult> { ... }
 
-// fromPromise wrapper — XState adapter only
-export const commandActor = fromPromise<CommandResult, CommandOpts>(
+// Actor logic — for setup({ actors }) composition in workflows
+export const commandActorLogic = fromPromise<CommandResult, CommandOpts>(
   ({ input, signal }) => runCommand(input, signal)
 );
+
+// Factory — for direct createActor / probe use
+export function commandActor(options: CommandOpts) {
+  return fromPromise<CommandResult, CommandOpts>(({ signal }) => runCommand(options, signal));
+}
 ```
+
+For workflow composition: `setup({ actors: { commandActor: commandActorLogic } })`. For direct invocation in tests/probes: `createActor(commandActor({ cmd: ["echo", "hi"] }))`.
 
 **Rationale:** XState's `fromPromise` routes abort and timeout rejections through `observer.error()`. Plain `.subscribe(nextCb)` subscribers never receive these — the rejection is invisible at the subscriber level. As a result, probes that need to exercise abort/timeout paths **must call the plain async function directly** with an `AbortController`, not via `createActor(commandActor) + .stop()`. Without this convention, abort and timeout failures are effectively untestable from outside XState.
 

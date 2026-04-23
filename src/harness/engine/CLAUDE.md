@@ -20,6 +20,10 @@ Match import style (relative paths, `.ts` extensions, ordering) from the sibling
 
 The engine module (`src/harness/engine/`) does NOT import from `src/harness/git.ts` or other harness internals. It owns its own subprocess and git plumbing. If you need a git operation inside a dispatcher, implement it inline or add a new file under `src/harness/engine/` — do not reach up into the harness layer.
 
+## Workflow composition rule
+
+XState `setup({ actors })` takes actor *logic*, not factories. Use the `*Logic` exports (`commandActorLogic`, `agentActorLogic`, `humanReviewActorLogic`, `commitLogic`, etc.) when composing in `setup`. The base factory exports (`commandActor(opts)`, etc.) are for direct `createActor` / probe use.
+
 ## Probe template
 
 Each probe scenario is wrapped in `Promise.race` against a 1500ms hard deadline. Total probe wall-clock must stay under 8s. Use `process.exit(1)` if any scenario fails or times out — validators re-run the probe and read the exit code.
