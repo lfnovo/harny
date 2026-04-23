@@ -46,6 +46,7 @@ async function runProbes(): Promise<void> {
           cwd: tmpRepo,
           taskSlug: 'probe-a',
           runId: 'probe-run-a',
+          userPrompt: 'test prompt',
         }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('8000ms scenario deadline exceeded')), 8_000),
@@ -115,6 +116,7 @@ async function runProbes(): Promise<void> {
         cwd: tmpRepo,
         taskSlug: 'probe-c',
         runId: 'probe-run-c',
+        userPrompt: 'test prompt',
         timeoutMs: 200,
       });
       const elapsed = Date.now() - start;
@@ -163,6 +165,7 @@ async function runProbes(): Promise<void> {
           cwd: tmpRepo,
           taskSlug: 'probe-d',
           runId: 'probe-run-d',
+          userPrompt: 'test prompt',
         }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('5000ms deadline exceeded — error did not fast-fail')), 5_000),

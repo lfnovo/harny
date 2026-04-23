@@ -508,6 +508,7 @@ export async function runHarness(args: {
           cwd: phaseCwd,
           taskSlug,
           runId,
+          userPrompt: args.userPrompt,
           log,
           mode: config.mode,
           logMode,
