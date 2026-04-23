@@ -3,6 +3,7 @@
 import { assign, fromPromise, setup } from 'xstate';
 import { defineWorkflow } from '../defineWorkflow.js';
 import { harnyActions } from '../harnyActions.js';
+import { composeCommitMessage } from '../../workflows/composeCommit.js';
 import type { Plan, PlanTask } from '../../types.js';
 
 interface FeatureDevContext {
@@ -17,6 +18,9 @@ interface FeatureDevContext {
   validatorSession?: string;
   devSession?: string;
   lastValidatorVerdict?: 'pass' | 'fail' | 'blocked';
+  lastDevCommitMessage: string;
+  lastValidatorReasons: string[];
+  commitSha?: string;
 }
 
 const machine = setup({
@@ -40,17 +44,25 @@ const machine = setup({
     >(
       async () => { throw new Error('not wired'); },
     ),
+    commitActor: fromPromise<{ sha: string }, { cwd: string; message: string }>(
+      async () => { throw new Error('not wired'); },
+    ),
   },
   actions: {
     // TODO: remove casts when PlanDrivenContext.plan becomes Plan | null
     advanceTask: harnyActions.advanceTask as any,
     bumpAttempts: harnyActions.bumpAttempts as any,
     stashValidator: harnyActions.stashValidator as any,
-    stashDevSession: harnyActions.stashDevSession as any,
+    stashDevOutput: assign(({ event }: { context: FeatureDevContext; event: any }) => ({
+      devSession: event.output?.session_id ?? null,
+      lastDevCommitMessage: event.output?.commit_message ?? '',
+    })),
+    stashValidatorReasons: assign(({ event }: { context: FeatureDevContext; event: any }) => ({
+      lastValidatorReasons: event.output?.reasons ?? [],
+    })),
     assignLastVerdict: assign(({ event }: { context: FeatureDevContext; event: any }) => ({
       lastValidatorVerdict: event.output.verdict as 'pass' | 'fail' | 'blocked',
     })),
-    commit: () => { /* placeholder: real git commit wired in B.2 */ },
   },
 }).createMachine({
   id: 'feature-dev-engine',
@@ -64,6 +76,8 @@ const machine = setup({
     attempts: 0,
     iterationsThisTask: 0,
     iterationsGlobal: 0,
+    lastDevCommitMessage: '',
+    lastValidatorReasons: [],
   }),
   states: {
     planning: {
@@ -94,7 +108,7 @@ const machine = setup({
                 target: 'failed',
               },
               {
-                actions: ['stashDevSession'],
+                actions: ['stashDevOutput'],
                 target: 'validator',
               },
             ],
@@ -112,8 +126,8 @@ const machine = setup({
             onDone: [
               {
                 guard: ({ event }) => event.output.verdict === 'pass',
-                target: 'next',
-                actions: ['stashValidator', 'assignLastVerdict', 'commit'],
+                target: 'committing',
+                actions: ['stashValidator', 'assignLastVerdict', 'stashValidatorReasons'],
               },
               {
                 guard: ({ context, event }) =>
@@ -126,6 +140,25 @@ const machine = setup({
                 actions: ['stashValidator', 'assignLastVerdict'],
               },
             ],
+            onError: { target: 'failed' },
+          },
+        },
+        committing: {
+          invoke: {
+            src: 'commitActor',
+            input: ({ context }) => ({
+              cwd: context.cwd,
+              message: composeCommitMessage({
+                devMessage: context.lastDevCommitMessage,
+                taskId: context.plan!.tasks[context.currentTaskIdx]!.id,
+                role: 'validator',
+                evidence: context.lastValidatorReasons.join('; '),
+              }),
+            }),
+            onDone: {
+              actions: assign({ commitSha: ({ event }) => event.output.sha }),
+              target: 'next',
+            },
             onError: { target: 'failed' },
           },
         },

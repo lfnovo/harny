@@ -7,11 +7,11 @@ import { z } from 'zod';
 import { adaptRunPhase } from '../runtime/runPhaseAdapter.js';
 import type { SessionRunPhase } from '../runtime/runPhaseAdapter.js';
 import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from '../../workflows/featureDev/defaults.js';
-import { PlannerVerdictSchema, DeveloperVerdictSchema, ValidatorVerdictSchema } from '../../workflows/featureDev/verdicts.js';
+import { PlannerVerdictSchema, DeveloperVerdictSchema } from '../../workflows/featureDev/verdicts.js';
+import { gitCommit as defaultGitCommit } from '../harnyActions.js';
 import type { Plan, PlanTask } from '../../types.js';
 
 // Engine-layer adapter schemas — extract only what the machine needs from legacy verdict shapes.
-// ValidatorVerdictSchema only has 'pass'|'fail'; extend to include 'blocked' for engine routing.
 const EngineDeveloperOutputSchema = z.object({
   status: z.enum(['done', 'blocked']),
   commit_message: z.string().default(''),
@@ -22,12 +22,23 @@ const EngineValidatorOutputSchema = z.object({
   reasons: z.array(z.string()).default([]),
 }).passthrough();
 
+// Engine-layer validator schema — includes 'blocked' which the legacy ValidatorVerdictSchema omits.
+// The legacy schema only has 'pass'|'fail'; passing it to the SDK would prevent the model from
+// ever returning 'blocked', silently breaking the engine's blocked→failed routing.
+// The engine owns its own schema; legacy stays untouched.
+const EngineValidatorVerdictSchema = z.object({
+  verdict: z.enum(['pass', 'fail', 'blocked']),
+  reasons: z.array(z.string()).default([]),
+}).passthrough();
+
 export interface BuildFeatureDevActorsDeps {
   cwd: string;
   taskSlug: string;
   runId: string;
   /** Injectable for testing; omit to use the real runPhase from sessionRecorder. */
   sessionRunPhase?: SessionRunPhase;
+  /** Injectable for testing; omit to use the real gitCommit from harnyActions. */
+  gitCommit?: (opts: { cwd: string; message: string }, signal: AbortSignal) => Promise<{ sha: string }>;
 }
 
 export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
@@ -126,7 +137,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     const result = await runPhaseValidator({
       phaseName: 'validator',
       prompt,
-      schema: ValidatorVerdictSchema,
+      schema: EngineValidatorVerdictSchema,
       allowedTools: DEFAULT_VALIDATOR.allowedTools,
       resumeSessionId: input.resumeSessionId,
     });
@@ -138,7 +149,12 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     };
   });
 
-  return { plannerActor, developerActor, validatorActor };
+  const gitCommitFn = deps.gitCommit ?? defaultGitCommit;
+  const commitActor = fromPromise<{ sha: string }, { cwd: string; message: string }>(
+    ({ input, signal }) => gitCommitFn({ cwd: input.cwd, message: input.message }, signal),
+  );
+
+  return { plannerActor, developerActor, validatorActor, commitActor };
 }
 
 function buildDeveloperPrompt(task: PlanTask): string {
