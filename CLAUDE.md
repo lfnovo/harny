@@ -107,8 +107,12 @@ The first publish (v0.1.0 on 2026-04-22) was done manually because the secret wa
 
 ## Operational skills (`.claude/skills/`)
 
-- **`release-management`** — guide for operating as harny release manager: product-vision prompts (NOT architecture-detail), per-run loop with triage ordering, parallelism heuristic, anti-patterns from Phase 1.
-- **`review-run`** — post-mortem of one finished run: 8 steps with parallel sub-agents reading per-phase JSONL transcripts, emits findings classified by `[NOW-blocks | NOW-quick | BACKLOG]` triage tags.
+**Audience rule.** Skills under `.claude/skills/` ship to downstream consumers of harny — devs using harny in their own repos. They must be written in generic, dev-agnostic terms. **Architect-only guidance (conventions for people working ON harny itself: release-management methodology, build-status snapshots, meta-loop internals) goes in `CLAUDE.md`, `RELEASE.md`, `LEARNINGS.md`, `engine-design.md` — never in a skill file.** When editing a skill, ask: "would a user of harny in an unrelated repo need this?" If no, it belongs in architect docs.
+
+Currently installed skills (some still misplaced — slated for migration to architect docs):
+
+- **`release-management`** — architect-only methodology; lives here for convenience during Phase 1 but should migrate to `RELEASE.md`/CLAUDE.md.
+- **`review-run`** — architect-only post-mortem tool; same migration applies.
 - Companion docs: `RELEASE.md` (methodology + Rules 1-6), `LEARNINGS.md` (architect-emitted observations L1-L8).
 
 ## Subtree conventions
