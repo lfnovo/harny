@@ -12,6 +12,7 @@ import { PlannerVerdictSchema, DeveloperVerdictSchema } from './featureDev/share
 import { gitCommit as defaultGitCommit } from '../harnyActions.js';
 import type { LogMode, Plan, PlanTask, RunMode } from '../../types.js';
 import type { StateStore } from '../../state/store.js';
+import { planFilePath, savePlan } from '../../state/plan.js';
 
 // Engine-layer adapter schemas — extract only what the machine needs from legacy verdict shapes.
 const EngineDeveloperOutputSchema = z.object({
@@ -174,7 +175,17 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     ({ input, signal }) => gitCommitFn({ cwd: input.cwd, message: input.message }, signal),
   );
 
-  return { plannerActor, developerActor, validatorActor, commitActor };
+  // Persists the planner's output to .harny/<slug>/plan.json. Called once,
+  // immediately after plannerActor returns, via the machine's persistingPlan
+  // state. Errors route to the machine's failed state so the run terminates
+  // cleanly rather than proceeding with an unpersisted plan.
+  const persistPlanActor = fromPromise<void, { cwd: string; taskSlug: string; plan: Plan }>(
+    async ({ input }) => {
+      await savePlan(planFilePath(input.cwd, input.taskSlug), input.plan);
+    },
+  );
+
+  return { plannerActor, developerActor, validatorActor, commitActor, persistPlanActor };
 }
 
 function buildDeveloperPrompt(task: PlanTask): string {

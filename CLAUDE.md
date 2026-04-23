@@ -37,7 +37,7 @@ Published as `@lfnovo/harny` on npm (the unscoped `harny` name was blocked by np
 
 ## Invariants
 
-- **The TS harness is the sole writer of `plan.json`.** Agents return structured verdicts (Zod-validated) and the harness merges them. Enforced at the SDK layer by the developer's `noPlanWrites` guard (`src/harness/guardHooks.ts`) — any Write/Edit targeting `plan.json` is denied.
+- **The TS harness is the sole writer of `plan.json`.** The `persistPlanActor` in `featureDev` writes the planner's output once, after `planning` and before `loop`. Enforced at the SDK layer by the developer's `noPlanWrites` guard (`src/harness/guardHooks.ts`) — any Write/Edit targeting `plan.json` during the developer phase is denied. File validated via `PlanSchema` on both read and write.
 - **The harness is the sole committer.** The developer proposes a `commit_message` in its verdict but does NOT commit; the harness commits only after the validator passes, with the composed message `<dev>\n\ntask=<id>\nvalidator: <evidence>`. Enforced by the developer's `noGitHistory` guard — `git commit|push|reset|rebase|merge|revert|cherry-pick|tag|am` and `--amend` are denied inside the phase cwd. Escape hatch: `cd /tmp/... && git ...` or `git -C /tmp/... ...` for throwaway test repos.
 - **Validator is read-only on code** (no Edit/Write tools) and runs against the uncommitted working tree. Enforced at the SDK layer by the validator's `readOnly` guard for `Write|Edit|MultiEdit|NotebookEdit`. Bash mutations are NOT blocked (documented gap) — validator legitimately needs Bash to exercise tests.
 - **Retry = resume, reset = fresh.** On fail without reset, the next developer attempt resumes the previous session with only the new validator feedback. On reset, the tree is rewound with `git reset --hard <pre-phase-sha> && git clean -fd` and the next developer starts a brand-new session. `.harny/<slug>/` survives the clean because it is gitignored.
@@ -51,7 +51,7 @@ Published as `@lfnovo/harny` on npm (the unscoped `harny` name was blocked by np
 
 - `~/.harny/assistants.json` (user-global, optional) — named working directories registered for `harny` invocation. With it, `--assistant <name>` resolves to a registered cwd and `harny ls`/`harny ui` see runs across all registered projects. Without it, `harny` operates on `process.cwd()` only. See `assistants.example.json` for schema.
 - `<cwd>/.harny/<slug>/state.json` (per-run, atomic write) — single source of truth for one harness invocation. Schema versioned at `schema_version: 2` (v1 files rejected with a clear error naming the run dir). Holds origin (+ features), environment, lifecycle, phases[], history[], pending_question, workflow_state, workflow_chosen, and (when Phoenix is enabled) `phoenix: {project, trace_id}`.
-- `<cwd>/.harny/<slug>/plan.json` (per-run, feature-dev only) — versioned plan with `tasks: PlanTask[]`, written exclusively by the harness.
+- `<cwd>/.harny/<slug>/plan.json` (per-run, feature-dev only) — versioned plan (`schema_version: 1`) with `tasks: PlanTask[]`, written exclusively by the harness via `persistPlanActor` after the planner phase completes. Validated on both read (`loadPlan`) and write (`savePlan`) via `PlanSchema` in `src/harness/state/plan.ts`. Persisted once per run — plan is the planner's immutable output; execution progress lives in `state.json:phases[]`, not mutated back into plan.json. Unit probe: `scripts/probes/plan/01-persistence.ts`.
 - `harny.json` (target repo root, optional) — per-project overrides: `phases` map, `isolation`, `defaultMode`, `maxIterationsPerTask`, `maxIterationsGlobal`, `maxRetriesBeforeReset`, `coldWorktreeInstall` (boolean, default `true`) — auto `bun install` in fresh worktrees, `siblingBranchGuard` (boolean, default `true`) — post-developer sibling-branch ownership check. See `harny.example.json`.
 
 ## Environment variables
@@ -87,6 +87,7 @@ Set `HARNY_PHOENIX_URL` (e.g. `http://127.0.0.1:6006`) before running. Per-run s
 - **Runtime: Bun ≥ 1.3** (enforced by `engines.bun` in `package.json`). The project runs TypeScript natively — no `tsx`, no build step.
 - `bun run typecheck` after any code change.
 - **If you edit `src/harness/guardHooks.ts`, run `bun scripts/probes/hooks/01-guardhooks.ts`** before committing — the probe covers every matcher + escape hatch and is the only safety net against regressions in the deny logic.
+- **If you edit `src/harness/state/plan.ts` or the `Plan`/`PlanTask` types, run `bun scripts/probes/plan/01-persistence.ts`** — validates savePlan/loadPlan round-trip and the Zod rejection paths.
 - Local dev entry: `bun run harny -- "<prompt>"` (script in `package.json`) or `bun bin/harny.ts "<prompt>"`.
 - Published entry: `bunx @lfnovo/harny "<prompt>"` (defaults to `process.cwd()`, workflow `feature-dev`). Or `bun add -g @lfnovo/harny` then `harny "<prompt>"`.
 - E2E smoke tests live in throwaway `/tmp/harny-e2e-*` dirs: `git init`, `cd` in, run `bun /path/to/harny/bin/harny.ts "<prompt>"`, inspect `.harny/<slug>/state.json`.

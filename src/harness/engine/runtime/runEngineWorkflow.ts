@@ -33,7 +33,7 @@ export async function runEngineWorkflow(
       const machineWithActors = workflow.buildActors
         ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId, mode: ctx.mode ?? 'silent', logMode: ctx.logMode ?? 'compact', store: ctx.store, variant: ctx.variant }) })
         : workflow.machine;
-      const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd, userPrompt: ctx.userPrompt } });
+      const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd, userPrompt: ctx.userPrompt, taskSlug: ctx.taskSlug } });
       actorCleanup.stop = () => actor.stop();
 
       actor.subscribe({

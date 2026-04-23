@@ -8,6 +8,7 @@ import featureDevEngineWorkflow from './featureDev.js';
 
 interface AutoContext {
   cwd: string;
+  taskSlug: string;
   userPrompt: string;
   error: string | null;
 }
@@ -15,11 +16,11 @@ interface AutoContext {
 const machine = setup({
   types: {} as {
     context: AutoContext;
-    input: { cwd: string; userPrompt: string };
+    input: { cwd: string; userPrompt: string; taskSlug: string };
   },
   actors: {
     // Placeholder — replaced at runtime by wired featureDevEngineWorkflow via machine.provide()
-    leafMachine: fromPromise<void, { cwd: string; userPrompt: string }>(
+    leafMachine: fromPromise<void, { cwd: string; userPrompt: string; taskSlug: string }>(
       async () => { throw new Error('leafMachine not wired'); },
     ),
     // §4.2/§4.3 extension point: cleanup, telemetry, meta-improve hooks. Idempotent no-op today.
@@ -32,6 +33,7 @@ const machine = setup({
   initial: 'invoking',
   context: ({ input }) => ({
     cwd: input.cwd,
+    taskSlug: input.taskSlug,
     userPrompt: input.userPrompt,
     error: null,
   }),
@@ -39,7 +41,11 @@ const machine = setup({
     invoking: {
       invoke: {
         src: 'leafMachine',
-        input: ({ context }) => ({ cwd: context.cwd, userPrompt: context.userPrompt }),
+        input: ({ context }) => ({
+          cwd: context.cwd,
+          userPrompt: context.userPrompt,
+          taskSlug: context.taskSlug,
+        }),
         onDone: { target: 'finalize' },
         onError: {
           actions: assign({ error: ({ event }: any) => String(event.error ?? 'leaf workflow failed') }),
