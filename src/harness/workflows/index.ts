@@ -4,12 +4,14 @@ import { featureDev } from "./featureDev/index.js";
 import { issueTriage } from "./issueTriage.js";
 import { docs } from "./docs.js";
 import echoCommit from "../engine/workflows/echoCommit.js";
+import featureDevEngine from "../engine/workflows/featureDev.js";
 
 const registry = new Map<string, Workflow | WorkflowDefinition<any>>([
   [featureDev.id, featureDev as Workflow],
   [issueTriage.id, issueTriage as Workflow],
   [docs.id, docs as Workflow],
   [echoCommit.id, echoCommit],
+  [featureDevEngine.id, featureDevEngine],
 ]);
 
 export function isEngineWorkflow(

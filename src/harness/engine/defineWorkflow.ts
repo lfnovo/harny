@@ -8,6 +8,7 @@ export function defineWorkflow<TMachine extends AnyStateMachine>(def: {
   needsBranch?: boolean;
   needsWorktree?: boolean;
   machine: TMachine;
+  buildActors?: (deps: { cwd: string; taskSlug: string; runId: string }) => Record<string, any>;
 }): WorkflowDefinition<TMachine> {
   if (typeof def.id !== 'string' || def.id.trim().length === 0) {
     throw new Error('defineWorkflow: id must be a non-empty string');
@@ -29,5 +30,6 @@ export function defineWorkflow<TMachine extends AnyStateMachine>(def: {
     needsBranch: def.needsBranch,
     needsWorktree: def.needsWorktree,
     machine: def.machine,
+    buildActors: def.buildActors,
   }) as WorkflowDefinition<TMachine>;
 }

@@ -4,6 +4,7 @@ import { assign, fromPromise, setup } from 'xstate';
 import { defineWorkflow } from '../defineWorkflow.js';
 import { harnyActions } from '../harnyActions.js';
 import { composeCommitMessage } from '../../workflows/composeCommit.js';
+import { buildFeatureDevActors } from './featureDevActors.js';
 import type { Plan, PlanTask } from '../../types.js';
 
 interface FeatureDevContext {
@@ -188,4 +189,5 @@ export default defineWorkflow({
   needsBranch: true,
   needsWorktree: true,
   machine,
+  buildActors: buildFeatureDevActors,
 });
