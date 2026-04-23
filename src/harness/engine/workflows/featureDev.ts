@@ -35,13 +35,13 @@ const machine = setup({
     ),
     developerActor: fromPromise<
       { session_id: string; status: 'done' | 'blocked'; commit_message: string },
-      { task: PlanTask; cwd: string; resumeSessionId?: string }
+      { task: PlanTask; cwd: string; resumeSessionId?: string; attempt?: number }
     >(
       async () => { throw new Error('not wired'); },
     ),
     validatorActor: fromPromise<
       { verdict: 'pass' | 'fail' | 'blocked'; session_id: string; reasons: string[] },
-      { task: PlanTask; cwd: string; resumeSessionId?: string }
+      { task: PlanTask; cwd: string; resumeSessionId?: string; attempt?: number }
     >(
       async () => { throw new Error('not wired'); },
     ),
@@ -102,6 +102,7 @@ const machine = setup({
               task: context.plan!.tasks[context.currentTaskIdx]!,
               cwd: context.cwd,
               resumeSessionId: context.devSession,
+              attempt: context.attempts + 1,
             }),
             onDone: [
               {
@@ -123,6 +124,7 @@ const machine = setup({
               task: context.plan!.tasks[context.currentTaskIdx]!,
               cwd: context.cwd,
               resumeSessionId: context.validatorSession,
+              attempt: context.attempts + 1,
             }),
             onDone: [
               {
