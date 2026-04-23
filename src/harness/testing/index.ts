@@ -9,6 +9,7 @@ import type { PhaseRunResult } from '../sessionRecorder.js';
 import type { ResolvedPhaseConfig } from '../types.js';
 import { StateSchema, type State } from '../state/schema.js';
 import type { WorkflowDefinition } from '../engine/types.js';
+import type { StateStore } from '../state/store.js';
 
 /** Creates a disposable git repo under os.tmpdir(). cleanup() is idempotent. */
 export async function tmpGitRepo(): Promise<{ path: string; cleanup: () => Promise<void> }> {
@@ -36,6 +37,7 @@ export async function tmpGitRepo(): Promise<{ path: string; cleanup: () => Promi
 export function runPhaseWithFixture(
   phaseConfig: ResolvedPhaseConfig,
   fixtureResult: PhaseRunResult<unknown>,
+  store?: StateStore,
 ): (engineArgs: AgentRunOptionsSubset) => Promise<{ output: unknown; session_id: string }> {
   const mockSessionRunPhase: SessionRunPhase = async () => fixtureResult;
   return adaptRunPhase({
@@ -47,6 +49,7 @@ export function runPhaseWithFixture(
     sessionRunPhase: mockSessionRunPhase,
     mode: 'silent',
     logMode: 'quiet',
+    store,
   });
 }
 
@@ -97,7 +100,7 @@ export async function withSyntheticState(
 ): Promise<void> {
   const statePath = join(stateDir, 'state.json');
   const defaults: State = {
-    schema_version: 1,
+    schema_version: 2,
     run_id: 'test-run-id',
     origin: {
       prompt: 'test prompt',
@@ -106,6 +109,7 @@ export async function withSyntheticState(
       started_at: new Date().toISOString(),
       host: 'localhost',
       user: 'test',
+      features: null,
     },
     environment: {
       cwd: '/tmp',
@@ -125,6 +129,7 @@ export async function withSyntheticState(
     history: [],
     pending_question: null,
     workflow_state: {},
+    workflow_chosen: null,
   };
   const merged = deepMerge(
     defaults as Record<string, unknown>,

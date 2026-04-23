@@ -432,7 +432,7 @@ export async function runHarness(args: {
   const store = new FilesystemStateStore(primaryCwd, taskSlug);
   const startedAt = new Date().toISOString();
   const initialState: State = {
-    schema_version: 1,
+    schema_version: 2,
     run_id: runId,
     origin: {
       prompt: args.userPrompt,
@@ -441,6 +441,7 @@ export async function runHarness(args: {
       started_at: startedAt,
       host: hostname(),
       user: userInfo().username,
+      features: null,
     },
     environment: {
       cwd: primaryCwd,
@@ -462,6 +463,7 @@ export async function runHarness(args: {
     ],
     pending_question: null,
     workflow_state: {},
+    workflow_chosen: null,
   };
   await store.createRun(initialState);
 

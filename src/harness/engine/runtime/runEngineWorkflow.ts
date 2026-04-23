@@ -4,6 +4,7 @@ import { createActor } from 'xstate';
 import type { AnyStateMachine } from 'xstate';
 import type { LogMode, RunMode } from '../../types.js';
 import type { WorkflowDefinition } from '../types.js';
+import type { StateStore } from '../../state/store.js';
 
 export async function runEngineWorkflow(
   workflow: WorkflowDefinition<AnyStateMachine>,
@@ -16,6 +17,7 @@ export async function runEngineWorkflow(
     timeoutMs?: number;
     mode?: RunMode;
     logMode?: LogMode;
+    store?: StateStore;
   },
 ): Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }> {
   const log = ctx.log ?? ((_msg: string) => {});
@@ -27,7 +29,7 @@ export async function runEngineWorkflow(
   const actorPromise = new Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }>(
     (resolve) => {
       const machineWithActors = workflow.buildActors
-        ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId, mode: ctx.mode ?? 'silent', logMode: ctx.logMode ?? 'compact' }) })
+        ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId, mode: ctx.mode ?? 'silent', logMode: ctx.logMode ?? 'compact', store: ctx.store }) })
         : workflow.machine;
       const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd, userPrompt: ctx.userPrompt } });
       actorCleanup.stop = () => actor.stop();

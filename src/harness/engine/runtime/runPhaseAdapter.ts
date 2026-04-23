@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { runPhase, type PhaseRunResult } from '../../sessionRecorder.js';
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from '../../types.js';
 import type { AgentRunOptions } from '../types.js';
+import type { StateStore } from '../../state/store.js';
 
 export type AgentRunOptionsSubset = Pick<
   AgentRunOptions,
@@ -37,6 +38,8 @@ export interface AdaptRunPhaseDeps {
   sessionRunPhase?: SessionRunPhase;
   mode?: RunMode;
   logMode?: LogMode;
+  /** When provided, writes phases[] and history[] entries around each phase call. */
+  store?: StateStore;
 }
 
 export function adaptRunPhase(
@@ -51,29 +54,67 @@ export function adaptRunPhase(
       allowedTools: engineArgs.allowedTools,
     };
 
-    const result = await sessionRunPhaseFn({
-      phase: engineArgs.phaseName,
-      phaseConfig,
-      primaryCwd: deps.cwd,
-      phaseCwd: deps.cwd,
-      taskSlug: deps.taskSlug,
-      harnessTaskId: null,
-      prompt: engineArgs.prompt,
-      outputSchema: engineArgs.schema as z.ZodType<unknown>,
-      resumeSessionId: engineArgs.resumeSessionId,
-      workflowId: deps.workflowId,
-      runId: deps.runId,
-      mode: deps.mode ?? 'silent',
-      logMode: deps.logMode ?? 'compact',
-    });
+    const startedAt = new Date().toISOString();
 
-    if (result.status === 'error') {
-      throw new Error(result.error ?? 'phase failed');
-    }
-    if (result.status === 'paused_for_user_input') {
-      throw new Error('phase paused for user input; not supported in engine adapter');
+    if (deps.store) {
+      await deps.store.appendPhase({
+        name: engineArgs.phaseName,
+        attempt: 1,
+        started_at: startedAt,
+        ended_at: null,
+        status: 'running',
+        verdict: null,
+        session_id: null,
+      });
+      await deps.store.appendHistory({ at: startedAt, phase: engineArgs.phaseName, event: 'phase_start' });
     }
 
-    return { output: result.structuredOutput, session_id: result.sessionId };
+    let phaseStatus: 'completed' | 'failed' = 'failed';
+    let phaseSessionId: string | null = null;
+    let phaseVerdict: string | null = null;
+
+    try {
+      const result = await sessionRunPhaseFn({
+        phase: engineArgs.phaseName,
+        phaseConfig,
+        primaryCwd: deps.cwd,
+        phaseCwd: deps.cwd,
+        taskSlug: deps.taskSlug,
+        harnessTaskId: null,
+        prompt: engineArgs.prompt,
+        outputSchema: engineArgs.schema as z.ZodType<unknown>,
+        resumeSessionId: engineArgs.resumeSessionId,
+        workflowId: deps.workflowId,
+        runId: deps.runId,
+        mode: deps.mode ?? 'silent',
+        logMode: deps.logMode ?? 'compact',
+      });
+
+      if (result.status === 'error') {
+        phaseSessionId = result.sessionId;
+        throw new Error(result.error ?? 'phase failed');
+      }
+      if (result.status === 'paused_for_user_input') {
+        phaseSessionId = result.sessionId;
+        throw new Error('phase paused for user input; not supported in engine adapter');
+      }
+
+      phaseStatus = 'completed';
+      phaseSessionId = result.sessionId;
+      phaseVerdict = JSON.stringify(result.structuredOutput);
+
+      return { output: result.structuredOutput, session_id: result.sessionId };
+    } finally {
+      if (deps.store) {
+        const endedAt = new Date().toISOString();
+        await deps.store.updatePhase(engineArgs.phaseName, 1, {
+          ended_at: endedAt,
+          status: phaseStatus,
+          session_id: phaseSessionId,
+          verdict: phaseVerdict,
+        });
+        await deps.store.appendHistory({ at: endedAt, phase: engineArgs.phaseName, event: 'phase_end' });
+      }
+    }
   };
 }
