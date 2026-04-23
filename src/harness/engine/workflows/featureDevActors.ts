@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { adaptRunPhase } from '../runtime/runPhaseAdapter.js';
 import type { SessionRunPhase } from '../runtime/runPhaseAdapter.js';
 import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from '../../workflows/featureDev/defaults.js';
+import { resolvePrompt } from '../promptResolver.js';
 import { PlannerVerdictSchema, DeveloperVerdictSchema } from '../../workflows/featureDev/verdicts.js';
 import { gitCommit as defaultGitCommit } from '../harnyActions.js';
 import type { LogMode, Plan, PlanTask, RunMode } from '../../types.js';
@@ -49,7 +50,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     workflowId: 'feature-dev-engine',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: DEFAULT_PLANNER,
+    phaseConfig: { ...DEFAULT_PLANNER, prompt: resolvePrompt('feature-dev-engine', 'default', 'planner', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
@@ -60,7 +61,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     workflowId: 'feature-dev-engine',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: DEFAULT_DEVELOPER,
+    phaseConfig: { ...DEFAULT_DEVELOPER, prompt: resolvePrompt('feature-dev-engine', 'default', 'developer', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
@@ -71,7 +72,7 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     workflowId: 'feature-dev-engine',
     taskSlug: deps.taskSlug,
     runId: deps.runId,
-    phaseConfig: DEFAULT_VALIDATOR,
+    phaseConfig: { ...DEFAULT_VALIDATOR, prompt: resolvePrompt('feature-dev-engine', 'default', 'validator', deps.cwd) },
     sessionRunPhase: deps.sessionRunPhase,
     mode: deps.mode,
     logMode: deps.logMode,
