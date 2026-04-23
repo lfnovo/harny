@@ -47,6 +47,68 @@ bunx @lfnovo/harny --workflow issue-triage --input issue.json "triage this issue
 bunx @lfnovo/harny --workflow feature-dev-engine "build me X"   # XState-based engine workflow (v0.2.0 preview)
 ```
 
+## Architecture
+
+A quick map of the moving parts. Solid arrows are control flow; dotted arrows are data / observation.
+
+```mermaid
+flowchart TB
+    User(("User / Claude Code"))
+
+    subgraph CLI["harny CLI"]
+        Runner["runner.ts<br/>parse args + subcommands<br/>(ls · show · answer · ui · clean)"]
+    end
+
+    subgraph Core["Core harness"]
+        Orch["orchestrator.ts<br/>git worktree · branch · state init<br/>lifecycle: dispatch · recover · exit"]
+        Engine["engine runtime<br/>runEngineWorkflow<br/>XState createActor + subscribe"]
+        Machine[["Workflow Machine (XState)<br/>feature-dev · auto · echoCommit · custom"]]
+        Dispatchers[["Dispatchers<br/>agentActor · commandActor<br/>humanReviewActor · commitActor"]]
+    end
+
+    subgraph Ext["External effects"]
+        SDK["Claude Agent SDK<br/>runPhase → structured output"]
+        Git[("git worktree / branch / commit")]
+    end
+
+    subgraph Persist[".harny/&lt;slug&gt;/"]
+        StateFile[("state.json<br/>single source of truth")]
+        PlanFile[("plan.json<br/>feature-dev only")]
+    end
+
+    subgraph Obs["Observation"]
+        Viewer["Viewer UI<br/>harny ui"]
+        Phoenix["Phoenix traces<br/>opt-in (HARNY_PHOENIX_URL)"]
+    end
+
+    User --> Runner
+    Runner --> Orch
+    Runner --> Viewer
+    Orch --> Engine
+    Engine --> Machine
+    Machine --> Dispatchers
+    Dispatchers -- "agentActor" --> SDK
+    Dispatchers -- "commitActor · commandActor" --> Git
+    Orch --> Git
+    Orch -. init .-> StateFile
+    Machine -. "phases[] · history[]" .-> StateFile
+    Machine -. write .-> PlanFile
+    Viewer -. read .-> StateFile
+    Viewer -. read .-> PlanFile
+    Orch -. withRunSpan .-> Phoenix
+    Dispatchers -. "phase spans" .-> Phoenix
+```
+
+**Reading the diagram:**
+
+- The **runner** (CLI) is the entrypoint for both run invocations (`harny "..."`) and inspection subcommands (`ls`, `show`, `answer`, `ui`, `clean`).
+- The **orchestrator** owns the run lifecycle: sets up the git worktree/branch, initializes `state.json`, and hands off to the engine runtime. It's also the sole committer after a passing validator.
+- The **engine runtime** is a thin XState executor — it calls `createActor(machine)`, subscribes to `{ next, error }`, and resolves when the machine reaches a final state.
+- A **workflow** is an XState machine plus a `buildActors` factory. Built-in machines: `feature-dev` (planner → loop[developer → validator → committing] → done|failed), `auto` (boundary wrapper), `echoCommit` (minimal example). Custom workflows plug into the registry.
+- **Dispatchers** are the effect primitives: `agentActor` wraps a Claude SDK phase call, `commandActor` wraps `Bun.spawn`, `humanReviewActor` parks for approval, `commitActor` wraps git commit.
+- **`state.json`** is the single source of truth per run — atomic writes, schema-validated, readable any time. `plan.json` is the planner's output for `feature-dev`.
+- The **viewer** is strictly read-only over the state files. **Phoenix** (opt-in) receives one trace per run via OpenInference instrumentation.
+
 ## CLI
 
 ```
