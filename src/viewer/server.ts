@@ -58,19 +58,40 @@ async function findOneRun(cwd: string, slug: string): Promise<State | null> {
   return states.find((s) => s.origin.task_slug === slug) ?? null;
 }
 
+const baseBranchCache = new Map<string, string>();
+
+async function discoverBaseBranch(cwd: string): Promise<string> {
+  const symref = await runGit(["symbolic-ref", "refs/remotes/origin/HEAD"], cwd);
+  if (symref !== null && symref.startsWith("refs/remotes/origin/")) {
+    return symref.slice("refs/remotes/origin/".length);
+  }
+  const configBranch = await runGit(["config", "--get", "init.defaultBranch"], cwd);
+  if (configBranch !== null && configBranch.length > 0) return configBranch;
+  return "main";
+}
+
+async function getBaseBranch(cwd: string): Promise<string> {
+  const cached = baseBranchCache.get(cwd);
+  if (cached !== undefined) return cached;
+  const branch = await discoverBaseBranch(cwd);
+  baseBranchCache.set(cwd, branch);
+  return branch;
+}
+
 function gitLogRaw(
   cwd: string,
   rangeArg: string,
-): Promise<{ commits: { sha: string; date: string; subject: string }[] } | null> {
+): Promise<{ commits: { sha: string; date: string; subject: string }[] } | { stderr: string }> {
   return new Promise((resolve) => {
     const args = ["log", rangeArg, "--pretty=format:%h%x09%aI%x09%s", "-n", "50"];
     const proc = spawn("git", args, { cwd });
     let stdout = "";
+    let stderr = "";
     proc.stdout.on("data", (d) => (stdout += d.toString()));
-    proc.stderr.on("data", () => {});
-    proc.on("error", () => resolve(null));
+    proc.stderr.on("data", (d) => (stderr += d.toString()));
+    proc.on("error", (err) => resolve({ stderr: err.message }));
     proc.on("close", (code) => {
-      if (code !== 0) { resolve(null); return; }
+      if (code !== 0) { resolve({ stderr }); return; }
       const commits = stdout
         .split("\n")
         .filter(Boolean)
@@ -83,15 +104,16 @@ function gitLogRaw(
   });
 }
 
-async function gitLog(
+export async function gitLog(
   cwd: string,
   branch: string,
 ): Promise<{ commits: { sha: string; date: string; subject: string }[]; error?: string }> {
-  const ahead = await gitLogRaw(cwd, `main..${branch}`);
-  if (ahead !== null) return ahead;
-  const fallback = await gitLogRaw(cwd, branch);
-  if (fallback !== null) return fallback;
-  return { commits: [], error: "git log failed" };
+  const baseBranch = await getBaseBranch(cwd);
+  const aheadResult = await gitLogRaw(cwd, `${baseBranch}..${branch}`);
+  if ("commits" in aheadResult) return aheadResult;
+  const fallbackResult = await gitLogRaw(cwd, branch);
+  if ("commits" in fallbackResult) return fallbackResult;
+  return { commits: [], error: "git log failed: " + fallbackResult.stderr };
 }
 
 function runGit(args: string[], cwd: string): Promise<string | null> {
