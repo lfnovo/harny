@@ -7,6 +7,7 @@ import {
   markTaskFailed,
 } from "../state/plan.js";
 import type { PlanTask, ResolvedPhaseConfig } from "../types.js";
+import { composeCommitMessage } from "./composeCommit.js";
 
 // --- Verdict schemas (local — not in core) ----------------------------------
 
@@ -123,17 +124,6 @@ export const DEFAULT_REVIEWER: ResolvedPhaseConfig = {
   model: "sonnet",
   mcpServers: {},
 };
-
-// --- Commit message composer ------------------------------------------------
-
-function composeCommitMessage(
-  taskId: string,
-  writerMessage: string,
-  evidence: string,
-): string {
-  const header = writerMessage.trim() || `docs: ${taskId}`;
-  return `${header}\n\ntask=${taskId}\nreviewer: ${evidence.trim()}`;
-}
 
 // --- Prompt builders --------------------------------------------------------
 
@@ -414,11 +404,12 @@ async function runWriteReviewLoop(
     );
 
     if (reviewerVerdict.verdict === "pass") {
-      const message = composeCommitMessage(
-        task.id,
-        writerVerdict.commit_message,
-        reviewerVerdict.evidence,
-      );
+      const message = composeCommitMessage({
+        devMessage: writerVerdict.commit_message,
+        taskId: task.id,
+        role: "reviewer",
+        evidence: reviewerVerdict.evidence,
+      });
       const sha = await ctx.commit(message);
       await ctx.updatePlan((p) => {
         const t = p.tasks.find((x) => x.id === task.id)!;

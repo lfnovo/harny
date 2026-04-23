@@ -13,6 +13,7 @@ import { applyPlannerVerdict } from "./plan.js";
 import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from "./defaults.js";
 import type { PlanTask } from "../../types.js";
 import type { DeveloperVerdict, ValidatorVerdict } from "./verdicts.js";
+import { composeCommitMessage } from "../composeCommit.js";
 
 export const featureDev = defineWorkflow({
   id: "feature-dev",
@@ -67,16 +68,6 @@ type IterationOutcome =
   | { kind: "reset" }
   | { kind: "failed"; reason: string };
 
-function composeCommitMessage(
-  taskId: string,
-  developerMessage: string,
-  validator: ValidatorVerdict,
-): string {
-  const header = developerMessage.trim() || `feat: ${taskId}`;
-  const evidence = validator.evidence.trim();
-  return `${header}\n\ntask=${taskId}\nvalidator: ${evidence}`;
-}
-
 async function decideAfterValidator(args: {
   ctx: WorkflowContext;
   task: PlanTask;
@@ -88,7 +79,12 @@ async function decideAfterValidator(args: {
   const config = ctx.config;
 
   if (valVerdict.verdict === "pass") {
-    const message = composeCommitMessage(task.id, devVerdict.commit_message, valVerdict);
+    const message = composeCommitMessage({
+      devMessage: devVerdict.commit_message,
+      taskId: task.id,
+      role: "validator",
+      evidence: valVerdict.evidence,
+    });
     const sha = await ctx.commit(message);
     if (!sha) {
       await ctx.audit({ phase: "harness", event: "decision", task_id: task.id, attempt: task.attempts, action: "commit", rationale: "validator pass, no file changes to commit" });
