@@ -17,6 +17,50 @@ A consolidated map of all OPEN/DEFERRED/PROBE items is in §14.
 
 ---
 
+## 0. Build status snapshot — 2026-04-23
+
+Quick overview of what's been built so far against the design. **Updated after each significant epic.**
+
+| Area | Status | Where |
+|---|---|---|
+| **Phase 0 spike** | ✅ DONE | XState probe at `scripts/probes/xstate/01-snapshot-recursion.ts` (kept as regression) |
+| **Engine SDK exports** | 🟡 PARTIAL | See §8 inline markers |
+| **Engine dispatchers (§8.4 convention)** | ✅ DONE | `runCommand` + `commandActorLogic` + `commandActor` (idem agent + humanReview); §8.4 |
+| **harnyActions effect actions** | 🟡 PARTIAL | `commit/resetTree/cleanUntracked` ✅; `advanceTask/bumpAttempts/stashValidator/stashDevSession` still stubs (Epic D) |
+| **defineWorkflow** | 🟡 PARTIAL | Validates + frozen output ✅; full strict generics (D1) ⏳ |
+| **runPhaseAdapter (engine ↔ sessionRecorder)** | ✅ DONE | `src/harness/engine/runtime/runPhaseAdapter.ts`, DI seam |
+| **First end-to-end engine workflow** | ✅ DONE | `echoCommit.ts` — defineWorkflow + commandActor + commit, probe 06 |
+| **Engine wired to orchestrator** | 🚧 IN FLIGHT | Epic A (`wire-engine-orchestrator`) running; routes by `WorkflowDefinition.machine` shape |
+| **`auto.ts` boundary workflow** | ❌ NOT STARTED | Phase 1 item per §12; Epic A is a precursor (direct routing without auto.ts boundary yet) |
+| **Router (§5)** | ❌ NOT STARTED | Lives inside `auto.ts:routing`, gated on auto.ts |
+| **state.json v2 schema** (`features`, `workflow_chosen`, `human_review` events) | ❌ NOT STARTED | Phase 1 item per §9.2 |
+| **humanReview production parking** (state.json:pending_question + resume) | ❌ NOT STARTED | Phase 3 in §12; current humanReviewActor uses DI provider only |
+| **L1 prompt overlays + variants** (§10.1) | ❌ NOT STARTED | Phase 2 |
+| **`.extend()` for L3** (§10.2) | ❌ NOT STARTED | Phase 2 |
+| **Stately Studio integration** | ⏭️ DEFERRED | Phase 4 |
+| **meta-improve post-node** | ⏭️ DEFERRED | Phase 5 |
+
+**Infrastructure improvements landed alongside engine work** (not in original design but proven valuable):
+- `LEARNINGS.md` — architect-emitted observation log with cost reference table
+- `.claude/skills/review-run/` — skill that runs post-mortem on harny runs (8-step bottom-up review with parallel sub-agents per phase)
+- `RELEASE.md` — methodology + Rule 4 (merge after each run) + step 6.5 (counterfactual test for promoting findings to durable infra)
+- `src/harness/coldInstall.ts` + `harny.json:coldWorktreeInstall` — auto bun install on cold worktrees (L4 permanent fix)
+- `assertNoSiblingBranchOwnsTouchedPaths` in `src/harness/git.ts` + orchestrator wiring + `harny.json:siblingBranchGuard` — mechanical L6 fix
+- `composeCommitMessage` helper — L1 (dup `task=N` trailer) permanent fix
+- `harny show <runId> --tail [--since=<dur>]` — live transcript viewer (CLI)
+- Viewer "Sibling branches" panel — visual safety net for L6 (with `^(harny|harness)/` filter + O(S) git query)
+- Folder-scoped CLAUDE.md pattern — top-level pointer + `src/harness/engine/CLAUDE.md` for subtree-specific conventions
+- Planner short-circuit on high-spec prompts — `featureDev/defaults.ts` PLANNER_PROMPT additions
+
+**Remaining for v0.2.0 to be USABLE** (engine actually substituting legacy in production):
+1. **Epic A** — wire `WorkflowDefinition.machine` → orchestrator routing (in flight)
+2. **Epic D** — implement remaining `harnyActions` XState assigns (advanceTask/bumpAttempts/stash*)
+3. **Epic B** — port `feature-dev` to engine as `feature-dev` machine using harnyActions
+
+**For full v0.2.0 per §12 Phase 1:** also need auto.ts + router + state.json v2 schema + humanReview real parking + delete legacy workflows. ~6-10 more harness runs after A/D/B.
+
+---
+
 ## 1. The pain
 
 Today's `Workflow.run(ctx)` is unconstrained TS code per workflow. It works, but blocks where harny actually wants to go:
@@ -408,11 +452,17 @@ Combined with `state.json:origin.features` (per-run) and `workflow_file_hash`, t
 
 ```ts
 import {
-  defineWorkflow,        // wraps setup+createMachine + harny metadata; STRICTLY typed
-  agentActor,            // fromPromise wrapping runPhase (Anthropic SDK)
-  commandActor,          // fromPromise wrapping Bun.spawn
-  humanReviewActor,      // fromPromise wrapping the parking mechanism
-  harnyActions,          // spread into setup({ actions }) — provides commit/resetTree/etc placeholders
+  defineWorkflow,        // ✅ DONE — validates id + machine, returns frozen WorkflowDefinition. Strict generics (D1) ⏳ pending.
+  agentActor,            // ✅ DONE — fromPromise wrapping runAgent (DI runPhase callback); production wiring via runPhaseAdapter
+  commandActor,          // ✅ DONE — fromPromise factory; runCommand is the canonical async fn (§8.4)
+  humanReviewActor,      // 🟡 PARTIAL — DI askProvider works in probes; production parking via state.json:pending_question NOT yet
+  harnyActions,          // 🟡 PARTIAL — commit/resetTree/cleanUntracked ✅; advanceTask/bumpAttempts/stashValidator/stashDevSession still throw stubs (Epic D)
+  commandActorLogic,     // ✅ DONE — actor logic for setup({ actors }) composition
+  agentActorLogic,       // ✅ DONE — idem
+  humanReviewActorLogic, // ✅ DONE — idem
+  commitLogic,           // ✅ DONE — fromPromise wrapper around gitCommit
+  resetTreeLogic,        // ✅ DONE — idem
+  cleanUntrackedLogic,   // ✅ DONE — idem
   // re-exports from xstate for convenience:
   setup, assign, fromPromise,
 } from "@lfnovo/harny";
@@ -788,7 +838,7 @@ All four use the same SDK (`defineWorkflow`, `agentActor`, `commandActor`, `huma
 
 ## 12. Implementation order
 
-### Phase 0 — Spike (1-2 days, single branch, no merge)
+### Phase 0 — Spike ✅ DONE
 
 Validate XState v5 fits before committing. Specifically:
 
@@ -799,24 +849,26 @@ Validate XState v5 fits before committing. Specifically:
 - Run end-to-end against external test repo.
 - **Decision gate:** continue with Phase 1, or pivot. If integration surprises with hidden friction, recover without dívida.
 
-### Phase 1 — Engine foundation + `auto.ts`
+### Phase 1 — Engine foundation + `auto.ts` 🚧 IN PROGRESS
 
-- harny SDK exports finalized: `defineWorkflow`, `agentActor`, `commandActor`, `humanReviewActor`, `harnyActions`.
-- Orchestrator loads and runs XState machines via `auto.ts` boundary.
-- Built-in `auto.ts` shipped with router (LLM-only) + invoke leaf + cleanup post-node.
-- state.json schema bumped to v2 (additions per §9.2).
-- `humanReviewActor` ALPHA — interactive mode only (no async park yet).
-- Delete `docs.ts` and `issueTriage.ts`.
-- Bump to **0.2.0** — breaking change. Schema_version refusal for older runs.
+- ✅ harny SDK exports finalized: `defineWorkflow`, `agentActor`, `commandActor`, `humanReviewActor`, `harnyActions` (effect actions partial — Epic D pending).
+- 🚧 Orchestrator loads and runs XState machines — Epic A in flight; routes by `WorkflowDefinition.machine` shape directly. `auto.ts` boundary NOT yet shipped.
+- ❌ Built-in `auto.ts` shipped with router (LLM-only) + invoke leaf + cleanup post-node.
+- ❌ state.json schema bumped to v2 (additions per §9.2).
+- 🟡 `humanReviewActor` ALPHA — DI provider works in probes; interactive mode (TTY) NOT yet wired in production.
+- ❌ Delete `docs.ts` and `issueTriage.ts`.
+- ❌ Bump to **0.2.0** — breaking change. Schema_version refusal for older runs.
 
-### Phase 2 — Plugin loading + project workflows
+**Foundation is solid; the production-replacement work (Epic B — port feature-dev to engine, plus auto.ts + router + v2 schema) is the remaining bulk of Phase 1.**
+
+### Phase 2 — Plugin loading + project workflows ❌ NOT STARTED
 
 - `<cwd>/.harny/workflows/<id>.ts` resolver (including `auto.ts` override).
 - `harny --workflow <id>` honors project-first lookup.
 - Document the SDK contract for workflow authors.
 - (Optional) `harny workflows ls`.
 
-### Phase 3 — Async park for humanReview
+### Phase 3 — Async park for humanReview ❌ NOT STARTED
 
 - XState snapshot persistence on park signal (recursive — captures child actor states).
 - Restore on resume (parent + child snapshots).
@@ -824,13 +876,13 @@ Validate XState v5 fits before committing. Specifically:
 - `harny show <runId>` renders friendly review prompt + copy-paste commands.
 - Rich `human_review` history events.
 
-### Phase 4 — Stately Studio + viewer integration
+### Phase 4 — Stately Studio + viewer integration ⏭️ DEFERRED
 
 - `harny ui` adds per-run graph visualization (current state highlighted, transitions traced from history).
 - Workflow file → graph rendering at "load time" so authors see their workflow before running.
 - Toggle "show only leaf workflow" (hide auto.ts boundary states) for cognitive load reduction.
 
-### Phase 5 — Meta-improve as post-node
+### Phase 5 — Meta-improve as post-node ⏭️ DEFERRED
 
 - New built-in workflow: `meta-improve.ts`.
 - `auto.ts` post-node optionally triggers `meta-improve` after successful runs.
