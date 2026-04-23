@@ -146,9 +146,10 @@
       stopPoll();
       const draw = async () => {
         try {
-          const [{ state, plan }, { commits, error: gitErr }] = await Promise.all([
+          const [{ state, plan }, { commits, error: gitErr }, { siblingBranches }] = await Promise.all([
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}`),
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/git-log`),
+            fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/sibling-branches`).catch(() => ({ siblingBranches: [] })),
           ]);
 
           // The detail API pre-bakes phoenix.url server-side (Phoenix has no
@@ -233,6 +234,19 @@
                 </li>
               `).join('')}</ul>`;
 
+          let siblingHtml = '';
+          if (Array.isArray(siblingBranches) && siblingBranches.length === 0) {
+            siblingHtml = `<div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6"><p class="text-sm text-slate-500">No sibling branches touch the same files. Safe to merge.</p></div>`;
+          } else if (Array.isArray(siblingBranches) && siblingBranches.length > 0) {
+            const entries = siblingBranches.map(s => `
+              <div class="mb-3 last:mb-0">
+                <div class="font-mono text-sm font-medium text-amber-900">${escapeHtml(s.branch)}</div>
+                <ul class="ml-4 mt-1 list-disc text-xs text-amber-800 space-y-0.5">${s.files.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
+              </div>
+            `).join('');
+            siblingHtml = `<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">${entries}</div>`;
+          }
+
           let pendingHtml = '';
           if (state.pending_question) {
             const pq = state.pending_question;
@@ -297,6 +311,9 @@
                 <tbody class="divide-y divide-slate-200">${phasesRows || '<tr><td colspan="5" class="px-3 py-2 text-xs text-slate-400">No phases yet.</td></tr>'}</tbody>
               </table>
             </div>
+
+            <h2 class="text-sm font-semibold mb-2 text-slate-700">Sibling branches</h2>
+            ${siblingHtml}
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div class="bg-white border border-slate-200 rounded-lg p-4">

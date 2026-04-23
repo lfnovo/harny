@@ -90,6 +90,17 @@ function gitLog(cwd: string, branch: string): Promise<{ commits: { sha: string; 
   });
 }
 
+function runGit(args: string[], cwd: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const proc = spawn("git", args, { cwd });
+    let stdout = "";
+    proc.stdout.on("data", (d) => (stdout += d.toString()));
+    proc.stderr.on("data", () => {});
+    proc.on("error", () => resolve(null));
+    proc.on("close", (code) => resolve(code === 0 ? stdout.trim() : null));
+  });
+}
+
 async function loadHtml(): Promise<string> {
   // Bun resolves __dirname-equivalent at runtime; read sibling index.html.
   const here = new URL("./index.html", import.meta.url);
@@ -228,6 +239,47 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
           : run;
 
         return jsonRes({ state: enrichedRun, plan, state_path: statePathFor(cwd, slug) });
+      }
+
+      const siblingMatch = path.match(/^\/api\/runs\/([^/]+)\/([^/]+)\/sibling-branches$/);
+      if (siblingMatch) {
+        const cwd = cwdFromHash(siblingMatch[1]!);
+        const slug = siblingMatch[2]!;
+        const run = await findOneRun(cwd, slug);
+        if (!run) return jsonRes({ error: "not found" }, 404);
+        const branch = run.environment.branch;
+        if (!branch) return jsonRes({ siblingBranches: [] });
+
+        // Get files modified by the run's latest commit.
+        let filesOutput = await runGit(["diff", "--name-only", `${branch}~1`, branch], cwd);
+        if (filesOutput === null) {
+          // Fallback: branch may be the very first commit with no parent.
+          filesOutput = await runGit(["diff-tree", "--no-commit-id", "-r", "--name-only", branch], cwd);
+        }
+        const modifiedFiles = (filesOutput ?? "").split("\n").map((f) => f.trim()).filter(Boolean);
+        if (modifiedFiles.length === 0) return jsonRes({ siblingBranches: [] });
+
+        // Unmerged local branches are the candidate siblings.
+        const branchesOutput = await runGit(["branch", "--no-merged", branch], cwd);
+        const siblingNames = (branchesOutput ?? "")
+          .split("\n")
+          .map((b) => b.replace(/^\*?\s+/, "").trim())
+          .filter(Boolean);
+
+        // For each sibling, find which modified files it also touches.
+        const siblingMap = new Map<string, string[]>();
+        for (const sibling of siblingNames) {
+          for (const file of modifiedFiles) {
+            const overlap = await runGit(["log", sibling, "--not", branch, "--", file], cwd);
+            if (overlap) {
+              if (!siblingMap.has(sibling)) siblingMap.set(sibling, []);
+              siblingMap.get(sibling)!.push(file);
+            }
+          }
+        }
+
+        const siblingBranches = Array.from(siblingMap.entries()).map(([b, files]) => ({ branch: b, files }));
+        return jsonRes({ siblingBranches });
       }
 
       const logMatch = path.match(/^\/api\/runs\/([^/]+)\/([^/]+)\/git-log$/);
