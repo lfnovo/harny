@@ -483,29 +483,52 @@ export async function runHarness(args: {
   // ENGINE PATH: WorkflowDefinition-shaped workflows run via XState createActor.
   // No plan skeleton, no buildCtx, no commitComposed — the engine commits via harnyActions.
   if (isEngineWorkflow(workflow)) {
-    const engineResult = await runEngineWorkflow(workflow, {
-      cwd: phaseCwd,
-      taskSlug,
+    const phoenix = setupPhoenix({
+      workflowId: workflow.id,
       runId,
-      log,
+      taskSlug,
+      cwd: primaryCwd,
     });
 
-    await handleCleanupWorktree(engineResult.status);
+    return await withRunSpan(
+      phoenix,
+      taskSlug,
+      {
+        "harny.workflow": workflow.id,
+        "harny.run_id": runId,
+        "harny.task_slug": taskSlug,
+        "harny.cwd": primaryCwd,
+      },
+      async (traceId) => {
+        if (traceId && phoenix.projectName) {
+          await store.setPhoenix({ project: phoenix.projectName, trace_id: traceId });
+        }
 
-    await store.updateLifecycle({
-      status: engineResult.status === "done" ? "done" : "failed",
-      ended_at: new Date().toISOString(),
-      ended_reason: engineResult.status,
-      current_phase: null,
-    });
+        const engineResult = await runEngineWorkflow(workflow, {
+          cwd: phaseCwd,
+          taskSlug,
+          runId,
+          log,
+        });
 
-    if (engineResult.status === "failed") {
-      log(`[harny] engine workflow failed: ${engineResult.error ?? "(no error message)"}`);
-    } else {
-      log(`[harny] engine workflow done`);
-    }
+        await handleCleanupWorktree(engineResult.status);
 
-    return { status: engineResult.status, planPath, branch };
+        await store.updateLifecycle({
+          status: engineResult.status === "done" ? "done" : "failed",
+          ended_at: new Date().toISOString(),
+          ended_reason: engineResult.status,
+          current_phase: null,
+        });
+
+        if (engineResult.status === "failed") {
+          log(`[harny] engine workflow failed: ${engineResult.error ?? "(no error message)"}`);
+        } else {
+          log(`[harny] engine workflow done`);
+        }
+
+        return { status: engineResult.status, planPath, branch };
+      },
+    );
   }
 
   // LEGACY PATH: Workflow-shaped workflows with a .run(ctx) method.
