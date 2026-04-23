@@ -142,4 +142,57 @@ let failures = 0;
   }
 }
 
+// Scenario 5: commit-stages-before
+{
+  const name = 'commit-stages-before';
+  const cwd = makeTmpRepo();
+  try {
+    writeFileSync(join(cwd, 'untracked.txt'), 'auto-staged\n');
+    const controller = new AbortController();
+    const result = await Promise.race([
+      gitCommit({ cwd, message: 'auto stage' }, controller.signal),
+      hardDeadline(),
+    ]);
+    const showOut = await git(['show', '--name-only', '--format=%H', 'HEAD'], cwd);
+    if (showOut.includes('untracked.txt')) {
+      console.log(`PASS ${name}`);
+    } else {
+      console.log(`FAIL ${name}: untracked.txt not in commit (sha=${result.sha}); show output: ${showOut}`);
+      failures++;
+    }
+  } catch (e: any) {
+    console.log(`FAIL ${name}: ${e.message}`);
+    failures++;
+  } finally {
+    rmSync(cwd, { recursive: true });
+  }
+}
+
+// Scenario 6: commit-empty-fails
+{
+  const name = 'commit-empty-fails';
+  const cwd = makeTmpRepo();
+  try {
+    const controller = new AbortController();
+    await Promise.race([
+      gitCommit({ cwd, message: 'empty' }, controller.signal),
+      hardDeadline(),
+    ]);
+    console.log(`FAIL ${name}: should have thrown`);
+    failures++;
+  } catch (e: any) {
+    if (e.message.includes('hard deadline')) {
+      console.log(`FAIL ${name}: hard deadline exceeded`);
+      failures++;
+    } else if (e.message.includes('nothing staged')) {
+      console.log(`PASS ${name}`);
+    } else {
+      console.log(`FAIL ${name}: threw but wrong message — ${e.message}`);
+      failures++;
+    }
+  } finally {
+    rmSync(cwd, { recursive: true });
+  }
+}
+
 process.exit(failures > 0 ? 1 : 0);

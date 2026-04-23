@@ -42,6 +42,11 @@ export async function gitCommit(
   { cwd, message }: { cwd: string; message: string },
   signal: AbortSignal,
 ): Promise<{ sha: string }> {
+  await spawnGit(['-C', cwd, 'add', '-A'], signal);
+  const staged = await spawnGit(['-C', cwd, 'diff', '--cached', '--name-only'], signal);
+  if (staged.trim().length === 0) {
+    throw new Error('gitCommit: nothing staged after add -A; refusing empty commit');
+  }
   await spawnGit(['-C', cwd, 'commit', '-m', message], signal);
   const sha = await spawnGit(['-C', cwd, 'rev-parse', 'HEAD'], signal);
   return { sha: sha.trim() };
