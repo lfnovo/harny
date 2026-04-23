@@ -8,7 +8,11 @@ import type {
   ResolvedPhaseConfig,
   RunMode,
 } from "./types.js";
-import type { Workflow } from "./workflow.js";
+
+interface WorkflowConfigLike {
+  phaseDefaults?: Record<string, ResolvedPhaseConfig>;
+  defaultMode?: RunMode;
+}
 
 /**
  * Generic harness-level defaults (apply regardless of workflow).
@@ -64,7 +68,7 @@ export function resolveRunMode(
 
 export async function loadHarnessConfig(
   cwd: string,
-  workflow: Workflow,
+  workflow: WorkflowConfigLike,
   cliMode?: RunMode,
 ): Promise<ResolvedHarnessConfig> {
   const path = join(cwd, "harny.json");
@@ -82,7 +86,7 @@ export async function loadHarnessConfig(
 
   // Merge per-phase: start from workflow's phaseDefaults, overlay file overrides.
   const phases: Record<string, ResolvedPhaseConfig> = {};
-  for (const [name, defaultConfig] of Object.entries(workflow.phaseDefaults)) {
+  for (const [name, defaultConfig] of Object.entries(workflow.phaseDefaults ?? {})) {
     phases[name] = mergePhase(defaultConfig, parsed.phases?.[name]);
   }
   // Allow file overrides for phases the workflow didn't declare (rare, but

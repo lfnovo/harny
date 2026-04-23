@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join, isAbsolute, basename } from "node:path";
 import { runHarness, resumeHarness } from "./harness/orchestrator.js";
 import { cleanRun } from "./harness/clean.js";
-import { getWorkflow } from "./harness/workflows/index.js";
+import { getWorkflow, isEngineWorkflow } from "./harness/workflows/index.js";
 import { listAllRuns, findRun, statePathFor } from "./harness/state/filesystem.js";
 import type { PendingQuestion } from "./harness/state/schema.js";
 import {
@@ -602,9 +602,9 @@ async function main() {
     } catch (err) {
       throw new Error(`Invalid JSON in --input file "${inputPath}": ${(err as Error).message}`);
     }
-    // Validate against workflow's inputSchema if present.
+    // Validate against workflow's inputSchema if present (legacy workflows only).
     const wf = getWorkflow(workflowId);
-    if (wf.inputSchema) {
+    if (!isEngineWorkflow(wf) && wf.inputSchema) {
       const result = wf.inputSchema.safeParse(input);
       if (!result.success) {
         throw new Error(`--input validation failed for workflow "${workflowId}": ${result.error.message}`);
