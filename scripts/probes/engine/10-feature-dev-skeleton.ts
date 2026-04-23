@@ -225,7 +225,7 @@ try {
   await Promise.race([
     (async () => {
       const name = 'real-planner-shape';
-      const actors = buildFeatureDevActors({ cwd: '/tmp', taskSlug: 'probe', runId: 'probe-uuid' });
+      const actors = buildFeatureDevActors({ cwd: '/tmp', taskSlug: 'probe', runId: 'probe-uuid', mode: 'silent' as const, logMode: 'compact' as const });
 
       if (!actors.plannerActor || typeof actors.plannerActor !== 'object') {
         throw new Error('plannerActor is not an object');
@@ -266,6 +266,8 @@ try {
         taskSlug: 'probe',
         runId: 'probe-uuid',
         sessionRunPhase: mockSessionRunPhase as any,
+        mode: 'silent' as const,
+        logMode: 'compact' as const,
       });
 
       const provided = machine.provide({
@@ -355,6 +357,8 @@ try {
         runId: 'probe-uuid',
         sessionRunPhase: mockSessionRunPhase as any,
         gitCommit: async (_opts: { cwd: string; message: string }, _signal: AbortSignal) => ({ sha: 'mock-sha' }),
+        mode: 'silent' as const,
+        logMode: 'compact' as const,
       });
 
       const provided = machine.provide({ actors } as any);
@@ -432,6 +436,8 @@ try {
         taskSlug: 'probe',
         runId: 'probe-uuid',
         sessionRunPhase: mockSessionRunPhase as any,
+        mode: 'silent' as const,
+        logMode: 'compact' as const,
       });
 
       const provided = machine.provide({ actors } as any);
@@ -512,6 +518,8 @@ try {
         runId: 'probe-uuid',
         sessionRunPhase: mockSessionRunPhase as any,
         gitCommit: mockGitCommit,
+        mode: 'silent' as const,
+        logMode: 'compact' as const,
       });
 
       const provided = machine.provide({ actors } as any);

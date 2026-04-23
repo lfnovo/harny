@@ -9,7 +9,7 @@ import type { SessionRunPhase } from '../runtime/runPhaseAdapter.js';
 import { DEFAULT_PLANNER, DEFAULT_DEVELOPER, DEFAULT_VALIDATOR } from '../../workflows/featureDev/defaults.js';
 import { PlannerVerdictSchema, DeveloperVerdictSchema } from '../../workflows/featureDev/verdicts.js';
 import { gitCommit as defaultGitCommit } from '../harnyActions.js';
-import type { Plan, PlanTask } from '../../types.js';
+import type { LogMode, Plan, PlanTask, RunMode } from '../../types.js';
 
 // Engine-layer adapter schemas — extract only what the machine needs from legacy verdict shapes.
 const EngineDeveloperOutputSchema = z.object({
@@ -39,6 +39,8 @@ export interface BuildFeatureDevActorsDeps {
   sessionRunPhase?: SessionRunPhase;
   /** Injectable for testing; omit to use the real gitCommit from harnyActions. */
   gitCommit?: (opts: { cwd: string; message: string }, signal: AbortSignal) => Promise<{ sha: string }>;
+  mode?: RunMode;
+  logMode?: LogMode;
 }
 
 export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
@@ -49,6 +51,8 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     runId: deps.runId,
     phaseConfig: DEFAULT_PLANNER,
     sessionRunPhase: deps.sessionRunPhase,
+    mode: deps.mode,
+    logMode: deps.logMode,
   });
 
   const runPhaseDev = adaptRunPhase({
@@ -58,6 +62,8 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     runId: deps.runId,
     phaseConfig: DEFAULT_DEVELOPER,
     sessionRunPhase: deps.sessionRunPhase,
+    mode: deps.mode,
+    logMode: deps.logMode,
   });
 
   const runPhaseValidator = adaptRunPhase({
@@ -67,6 +73,8 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
     runId: deps.runId,
     phaseConfig: DEFAULT_VALIDATOR,
     sessionRunPhase: deps.sessionRunPhase,
+    mode: deps.mode,
+    logMode: deps.logMode,
   });
 
   const plannerActor = fromPromise<Plan, { prompt: string; cwd: string }>(

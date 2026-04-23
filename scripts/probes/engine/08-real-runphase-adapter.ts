@@ -54,6 +54,8 @@ const mockDeps = {
     model: 'sonnet' as const,
     mcpServers: {},
   },
+  mode: 'silent' as const,
+  logMode: 'compact' as const,
 };
 
 const validEngineArgs: AgentRunOptionsSubset = {
