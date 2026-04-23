@@ -1,14 +1,12 @@
 import type { Workflow } from "../workflow.js";
 import type { WorkflowDefinition } from "../engine/types.js";
-import { featureDev } from "./featureDev/index.js";
 import echoCommit from "../engine/workflows/echoCommit.js";
-import featureDevEngine from "../engine/workflows/featureDev.js";
+import featureDev from "../engine/workflows/featureDev.js";
 import auto from "../engine/workflows/auto.js";
 
 const registry = new Map<string, Workflow | WorkflowDefinition<any>>([
-  [featureDev.id, featureDev as Workflow],
   [echoCommit.id, echoCommit],
-  [featureDevEngine.id, featureDevEngine],
+  [featureDev.id, featureDev],
   [auto.id, auto],
 ]);
 

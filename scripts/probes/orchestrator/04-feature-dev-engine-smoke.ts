@@ -109,7 +109,7 @@ async function runLiveMode(): Promise<void> {
       runHarness({
         cwd: tmpDir,
         userPrompt: 'Add a file CONTRIBUTING.md with one line: Hello world.',
-        workflowId: 'feature-dev-engine',
+        workflowId: 'feature-dev',
         isolation: 'inline',
         mode: 'silent',
         taskSlug: 'smoke-e2e',

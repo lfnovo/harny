@@ -66,7 +66,7 @@ const machine = setup({
     })),
   },
 }).createMachine({
-  id: 'feature-dev-engine',
+  id: 'feature-dev',
   initial: 'planning',
   context: ({ input }) => ({
     cwd: input.cwd,
@@ -89,7 +89,7 @@ const machine = setup({
           actions: assign({ plan: ({ event }) => event.output }),
           target: 'loop',
         },
-        onError: { target: '#feature-dev-engine.failed' },
+        onError: { target: '#feature-dev.failed' },
       },
     },
     loop: {
@@ -171,13 +171,13 @@ const machine = setup({
             {
               guard: ({ context }) =>
                 context.currentTaskIdx >= (context.plan?.tasks.length ?? 0),
-              target: '#feature-dev-engine.done',
+              target: '#feature-dev.done',
             },
             { target: 'developer' },
           ],
         },
         failed: {
-          always: { target: '#feature-dev-engine.failed' },
+          always: { target: '#feature-dev.failed' },
         },
       },
     },
@@ -187,7 +187,7 @@ const machine = setup({
 });
 
 export default defineWorkflow({
-  id: 'feature-dev-engine',
+  id: 'feature-dev',
   needsBranch: true,
   needsWorktree: true,
   machine,

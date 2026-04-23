@@ -32,7 +32,7 @@ try {
       const name = 'bundled-default-fallback';
       const repo = await tmpGitRepo();
       try {
-        const result = resolvePrompt('feature-dev-engine', 'default', 'planner', repo.path);
+        const result = resolvePrompt('feature-dev', 'default', 'planner', repo.path);
         if (!result.includes('You are the PLANNER')) {
           throw new Error(`expected bundled planner content, got: ${result.slice(0, 80)}`);
         }
@@ -55,7 +55,7 @@ try {
       const name = 'bundled-variant-beats-default';
       const repo = await tmpGitRepo();
       try {
-        const result = resolvePrompt('feature-dev-engine', '_test-variant', 'planner', repo.path);
+        const result = resolvePrompt('feature-dev', '_test-variant', 'planner', repo.path);
         if (!result.includes('TEST-VARIANT-PLANNER-UNIQUE-CONTENT')) {
           throw new Error(`expected test-variant content, got: ${result.slice(0, 80)}`);
         }
@@ -78,11 +78,11 @@ try {
       const name = 'project-default-beats-bundled';
       const repo = await tmpGitRepo();
       try {
-        const promptDir = join(repo.path, '.harny', 'prompts', 'feature-dev-engine', 'default');
+        const promptDir = join(repo.path, '.harny', 'prompts', 'feature-dev', 'default');
         await mkdir(promptDir, { recursive: true });
         await writeFile(join(promptDir, 'planner.md'), 'PROJECT-DEFAULT-PLANNER', 'utf8');
 
-        const result = resolvePrompt('feature-dev-engine', 'default', 'planner', repo.path);
+        const result = resolvePrompt('feature-dev', 'default', 'planner', repo.path);
         if (result !== 'PROJECT-DEFAULT-PLANNER') {
           throw new Error(`expected project-default content, got: ${result.slice(0, 80)}`);
         }
@@ -105,14 +105,14 @@ try {
       const name = 'project-variant-beats-project-default';
       const repo = await tmpGitRepo();
       try {
-        const defaultDir = join(repo.path, '.harny', 'prompts', 'feature-dev-engine', 'default');
-        const variantDir = join(repo.path, '.harny', 'prompts', 'feature-dev-engine', 'my-variant');
+        const defaultDir = join(repo.path, '.harny', 'prompts', 'feature-dev', 'default');
+        const variantDir = join(repo.path, '.harny', 'prompts', 'feature-dev', 'my-variant');
         await mkdir(defaultDir, { recursive: true });
         await mkdir(variantDir, { recursive: true });
         await writeFile(join(defaultDir, 'planner.md'), 'PROJECT-DEFAULT-PLANNER', 'utf8');
         await writeFile(join(variantDir, 'planner.md'), 'PROJECT-VARIANT-PLANNER', 'utf8');
 
-        const result = resolvePrompt('feature-dev-engine', 'my-variant', 'planner', repo.path);
+        const result = resolvePrompt('feature-dev', 'my-variant', 'planner', repo.path);
         if (result !== 'PROJECT-VARIANT-PLANNER') {
           throw new Error(`expected project-variant content, got: ${result.slice(0, 80)}`);
         }
@@ -135,12 +135,12 @@ try {
       const name = 'missing-variant-falls-back-to-project-default';
       const repo = await tmpGitRepo();
       try {
-        const defaultDir = join(repo.path, '.harny', 'prompts', 'feature-dev-engine', 'default');
+        const defaultDir = join(repo.path, '.harny', 'prompts', 'feature-dev', 'default');
         await mkdir(defaultDir, { recursive: true });
         await writeFile(join(defaultDir, 'planner.md'), 'PROJECT-DEFAULT-FALLBACK', 'utf8');
         // no my-variant dir — variant file absent
 
-        const result = resolvePrompt('feature-dev-engine', 'my-variant', 'planner', repo.path);
+        const result = resolvePrompt('feature-dev', 'my-variant', 'planner', repo.path);
         if (result !== 'PROJECT-DEFAULT-FALLBACK') {
           throw new Error(`expected project-default fallback, got: ${result.slice(0, 80)}`);
         }
