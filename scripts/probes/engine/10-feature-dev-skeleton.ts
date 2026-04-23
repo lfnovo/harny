@@ -225,7 +225,7 @@ try {
   await Promise.race([
     (async () => {
       const name = 'real-planner-shape';
-      const actors = buildFeatureDevActors({ cwd: '/tmp', taskSlug: 'probe', runId: 'probe-uuid', mode: 'silent' as const, logMode: 'compact' as const });
+      const actors = buildFeatureDevActors({ cwd: '/tmp', taskSlug: 'probe', runId: 'probe-uuid', mode: 'silent' as const, logMode: 'compact' as const, variant: 'default' });
 
       if (!actors.plannerActor || typeof actors.plannerActor !== 'object') {
         throw new Error('plannerActor is not an object');
@@ -268,6 +268,7 @@ try {
         sessionRunPhase: mockSessionRunPhase as any,
         mode: 'silent' as const,
         logMode: 'compact' as const,
+        variant: 'default',
       });
 
       const provided = machine.provide({
@@ -359,6 +360,7 @@ try {
         gitCommit: async (_opts: { cwd: string; message: string }, _signal: AbortSignal) => ({ sha: 'mock-sha' }),
         mode: 'silent' as const,
         logMode: 'compact' as const,
+        variant: 'default',
       });
 
       const provided = machine.provide({ actors } as any);
@@ -438,6 +440,7 @@ try {
         sessionRunPhase: mockSessionRunPhase as any,
         mode: 'silent' as const,
         logMode: 'compact' as const,
+        variant: 'default',
       });
 
       const provided = machine.provide({ actors } as any);
@@ -520,6 +523,7 @@ try {
         gitCommit: mockGitCommit,
         mode: 'silent' as const,
         logMode: 'compact' as const,
+        variant: 'default',
       });
 
       const provided = machine.provide({ actors } as any);

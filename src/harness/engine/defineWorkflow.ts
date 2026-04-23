@@ -3,13 +3,14 @@
 import type { AnyStateMachine } from 'xstate';
 import type { WorkflowDefinition } from './types.js';
 import type { StateStore } from '../state/store.js';
+import type { LogMode, RunMode } from '../types.js';
 
 export function defineWorkflow<TMachine extends AnyStateMachine>(def: {
   id: string;
   needsBranch?: boolean;
   needsWorktree?: boolean;
   machine: TMachine;
-  buildActors?: (deps: { cwd: string; taskSlug: string; runId: string; store?: StateStore }) => Record<string, any>;
+  buildActors?: (deps: { cwd: string; taskSlug: string; runId: string; mode?: RunMode; logMode?: LogMode; store?: StateStore; variant: string }) => Record<string, any>;
 }): WorkflowDefinition<TMachine> {
   if (typeof def.id !== 'string' || def.id.trim().length === 0) {
     throw new Error('defineWorkflow: id must be a non-empty string');

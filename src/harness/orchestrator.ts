@@ -337,6 +337,7 @@ export async function runHarness(args: {
   userPrompt: string;
   taskSlug?: string;
   workflowId?: string;
+  variant?: string;
   isolation?: IsolationMode;
   mode?: RunMode;
   logMode?: LogMode;
@@ -348,11 +349,8 @@ export async function runHarness(args: {
   const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
   const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
 
-  const workflowArg = args.workflowId ?? "feature-dev";
-  const workflowArgParts = workflowArg.split(':');
-  const baseWorkflowId = workflowArgParts[0] ?? 'feature-dev';
-  const variant = workflowArgParts[1] ?? 'default';
-  const workflow = getWorkflow(baseWorkflowId);
+  const workflow = getWorkflow(args.workflowId ?? "feature-dev");
+  const variant = args.variant ?? "default";
   const workflowDefaultMode = isEngineWorkflow(workflow) ? undefined : workflow.defaultMode;
   const mode: RunMode = args.mode ?? workflowDefaultMode ?? (process.stdin.isTTY ? "interactive" : "silent");
   const isolation: IsolationMode = args.isolation ?? "worktree";

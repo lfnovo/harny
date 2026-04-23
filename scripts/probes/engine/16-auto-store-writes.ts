@@ -97,6 +97,7 @@ try {
         mode: 'silent' as const,
         logMode: 'quiet' as const,
         store: fakeStore,
+        variant: 'default',
       });
 
       const machineWithActors = autoWorkflow.machine.provide({ actors });

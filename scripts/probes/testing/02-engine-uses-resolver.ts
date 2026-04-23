@@ -73,6 +73,7 @@ try {
           gitCommit: async () => ({ sha: 'mock-sha' }),
           mode: 'silent' as const,
           logMode: 'compact' as const,
+          variant: 'default',
         });
 
         const { machine } = featureDevWorkflow;

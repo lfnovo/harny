@@ -18,7 +18,7 @@ export async function runEngineWorkflow(
     mode?: RunMode;
     logMode?: LogMode;
     store?: StateStore;
-    variant?: string;
+    variant: string;
   },
 ): Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }> {
   const log = ctx.log ?? ((_msg: string) => {});
@@ -31,7 +31,7 @@ export async function runEngineWorkflow(
   const actorPromise = new Promise<{ status: 'done' | 'failed'; finalContext: any; error?: string }>(
     (resolve) => {
       const machineWithActors = workflow.buildActors
-        ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId, mode: ctx.mode ?? 'silent', logMode: ctx.logMode ?? 'compact', store: ctx.store, variant: ctx.variant ?? 'default' }) })
+        ? workflow.machine.provide({ actors: workflow.buildActors({ cwd: ctx.cwd, taskSlug: ctx.taskSlug, runId: ctx.runId, mode: ctx.mode ?? 'silent', logMode: ctx.logMode ?? 'compact', store: ctx.store, variant: ctx.variant }) })
         : workflow.machine;
       const actor = createActor(machineWithActors, { input: { cwd: ctx.cwd, userPrompt: ctx.userPrompt } });
       actorCleanup.stop = () => actor.stop();

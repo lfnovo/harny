@@ -93,6 +93,7 @@ try {
         mode: 'silent' as const,
         logMode: 'compact' as const,
         store: fakeStore,
+        variant: 'default',
       });
 
       const snapshot = await runEngineWorkflowDry(
