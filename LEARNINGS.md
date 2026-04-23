@@ -108,6 +108,7 @@ Use these as anomaly anchors. A future similar-shape run that takes >2x its base
 | cheap-validator-infra | ~12m | 1 | 0 | #15: src/harness/testing/ helpers + template + probe; **validator ran in <1s using its own infra (dogfood)** |
 | l1-prompt-overlays-redux | ~11m30s | 1 | 0 | 4-level prompt resolver + bundled defaults + wire-up; **validator 40s vs 45min+ on original attempt** (67x speedup, first cheap-infra use on a real task) |
 | state-json-v2-redux | ~20m | 2 | 0 | schema v2 + engine store write-through + 3 probes. Both validators <2m (cheap infra held even with larger diff +122/-38 across 11 files). First 2-task plan under cheap-validator discipline. |
+| auto-workflow-skeleton | ~9m | 1 | 0 | `auto` boundary workflow (XState sub-actor wrapping feature-dev-engine). Validator included probe 01 as cross-cutting regression guard — first run with that pattern (formalized after probe 01 broke silently on state-json-v2 merge). |
 
 ---
 

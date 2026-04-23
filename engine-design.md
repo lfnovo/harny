@@ -35,7 +35,7 @@ Quick overview of what's been built so far against the design. **Updated after e
 | **First end-to-end engine workflow (echoCommit)** | ✅ DONE | `src/harness/engine/workflows/echoCommit.ts` — defineWorkflow + commandActor + commit, probe 06. |
 | **Engine wired to orchestrator (Epic A)** | ✅ DONE | `runEngineWorkflow` runtime helper detects `WorkflowDefinition.machine` shape, calls `machine.provide({ actors: workflow.buildActors(deps) })` then `createActor`. Wrapped in `setupPhoenix + withRunSpan` matching legacy. |
 | **`feature-dev-engine` workflow (Epic B)** | ✅ DONE | `src/harness/engine/workflows/featureDev.ts` + `featureDevActors.ts`. Machine: `planning → loop[developer → validator → committing → next] → done|failed`. All three phase actors wired via `runPhaseAdapter` reusing legacy `DEFAULT_PLANNER/DEVELOPER/VALIDATOR` + `PlannerVerdictSchema/DeveloperVerdictSchema/EngineValidatorVerdictSchema`. Probe 10 (9 scenarios with mocked SDK) + smoke probe 04 (real CLI E2E). |
-| **`auto.ts` boundary workflow** | ❌ NOT STARTED | Phase 1 item per §12. Epic A is a direct-routing precursor; auto.ts adds router + cleanup graph states + meta-improve hook. |
+| **`auto.ts` boundary workflow** | 🟡 SKELETON | `src/harness/engine/workflows/auto.ts` ships the XState sub-actor topology (`invoking → finalize[cleanup] → done\|failed`) wrapping `feature-dev-engine`. `buildAutoActors` → `buildFeatureDevActors` → `machine.provide({actors})` threads StateStore through the boundary. Finalize is a no-op stub marked as extension point for §4.2/§4.3. Probes 16/17 lock topology + store passthrough. **Remaining:** router pre-node (§5), real cleanup/telemetry/meta-improve bodies. Default CLI still resolves to `feature-dev`; `--workflow auto` is opt-in. |
 | **Router (§5)** | ❌ NOT STARTED | Lives inside `auto.ts:routing`. Gated on auto.ts. |
 | **state.json v2 schema** (`features`, `workflow_chosen`, `human_review` events) | ✅ DONE | `schema_version: 2` with v1 rejection (no migration). `origin.features`, `workflow_chosen`, and `human_review` history entry kind all added as optional/defaulted. Engine path now writes `phases[]` + `history[]` via `StateStore` threaded through `runEngineWorkflow` → `buildActors` → `runPhaseAdapter` (state-json-v2-redux, 2026-04-23). Three zero-Claude probes (14/15/03) lock the behavior. |
 | **humanReview production parking** (state.json:pending_question + resume via XState snapshot) | ❌ NOT STARTED | Phase 3 in §12. Current `humanReviewActor` uses DI askProvider; production parking (snapshot persist + restore) still missing. |
@@ -75,7 +75,7 @@ The smoke test on Epic B.5 surfaced 4 bugs that mocked probes hadn't caught — 
 
 After Epic B-smoke milestone:
 
-1. **`auto.ts` boundary workflow** + router (§4 + §5).
+1. **`auto.ts` boundary workflow** + router (§4 + §5) — `auto.ts` SKELETON landed 2026-04-23 (sub-actor invoke + finalize stub). Router pre-node still pending.
 2. ~~**state.json v2 schema** (§9.2): `features`, `workflow_chosen`, `human_review` events. Engine path currently writes minimal lifecycle.~~ DONE (2026-04-23, `state-json-v2-redux`). Schema_version=2 with v1 rejection; engine path writes phases[]/history[] via StateStore threading.
 3. **humanReview production parking** (§7, §9.3) — replace DI askProvider with snapshot-persist provider.
 4. ~~**L1 prompt overlays + variants** (§10.1) — engine currently hardcodes legacy `DEFAULT_*` prompts.~~ MOSTLY DONE (2026-04-23, `l1-prompt-overlays-redux`). Default variant is file-backed; variant selection requires router.
