@@ -1,6 +1,6 @@
 // engine-design.md §8.2
 
-import { assign } from 'xstate';
+import { assign, fromPromise } from 'xstate';
 
 async function spawnGit(args: string[], signal: AbortSignal): Promise<string> {
   const proc = Bun.spawn(['git', ...args], { stdout: 'pipe', stderr: 'pipe' });
@@ -59,6 +59,19 @@ export async function gitCleanUntracked(
 ): Promise<void> {
   await spawnGit(['-C', cwd, 'clean', '-fd'], signal);
 }
+
+// Actor logic constants — for setup({ actors }) composition in workflows.
+export const commitLogic = fromPromise<{ sha: string }, { cwd: string; message: string }>(
+  ({ input, signal }) => gitCommit(input, signal),
+);
+
+export const resetTreeLogic = fromPromise<void, { cwd: string; sha: string }>(
+  ({ input, signal }) => gitResetTree(input, signal),
+);
+
+export const cleanUntrackedLogic = fromPromise<void, { cwd: string }>(
+  ({ input, signal }) => gitCleanUntracked(input, signal),
+);
 
 export const harnyActions = {
   commit: async (opts: { cwd: string; message: string }, signal: AbortSignal) =>

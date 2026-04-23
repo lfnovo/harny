@@ -32,3 +32,6 @@ export async function runHumanReview(
 export const humanReviewActor = fromPromise<HumanReviewOutput, HumanReviewRunOptions>(
   ({ input, signal }) => runHumanReview(input, signal),
 );
+
+// Actor logic — for setup({ actors }) composition in workflows.
+export const humanReviewActorLogic = humanReviewActor;

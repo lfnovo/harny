@@ -42,3 +42,6 @@ export const agentActor = fromPromise<
   { output: unknown; session_id: string },
   AgentRunOptions
 >(({ input, signal }) => runAgent(input, signal));
+
+// Actor logic — for setup({ actors }) composition in workflows.
+export const agentActorLogic = agentActor;

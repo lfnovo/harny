@@ -1,10 +1,9 @@
 // engine-design.md §8, §11 — end-to-end echo-commit workflow
 
-import { fromPromise, setup, assign, createMachine } from 'xstate';
-import { runCommand } from '../dispatchers/command.js';
-import { gitCommit } from '../harnyActions.js';
+import { setup, assign, createMachine } from 'xstate';
+import { commandActorLogic } from '../dispatchers/command.js';
+import { commitLogic } from '../harnyActions.js';
 import { defineWorkflow } from '../defineWorkflow.js';
-import type { CommandActorOptions } from '../types.js';
 
 type CommandOutput = { exit_code: number; stdout: string; stderr: string; duration_ms: number };
 
@@ -14,22 +13,14 @@ interface EchoCommitContext {
   commitSha?: string;
 }
 
-const commandActorDef = fromPromise<CommandOutput, CommandActorOptions>(
-  ({ input, signal }) => runCommand(input, signal),
-);
-
-const commitActorDef = fromPromise<{ sha: string }, { cwd: string; message: string }>(
-  ({ input, signal }) => gitCommit(input, signal),
-);
-
 const machine = setup({
   types: {} as {
     context: EchoCommitContext;
     input: { cwd: string };
   },
   actors: {
-    commandActor: commandActorDef,
-    commitActor: commitActorDef,
+    commandActor: commandActorLogic,
+    commitActor: commitLogic,
   },
 }).createMachine({
   id: 'echo-commit',

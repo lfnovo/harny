@@ -60,6 +60,12 @@ export async function runCommand(
   }
 }
 
+// Actor logic — for setup({ actors }) composition in workflows.
+export const commandActorLogic = fromPromise<
+  { exit_code: number; stdout: string; stderr: string; duration_ms: number },
+  CommandActorOptions
+>(({ input, signal }) => runCommand(input, signal));
+
 // Wraps Bun.spawn as an XState fromPromise actor.
 // advisory: true causes onError to be caught internally so post-nodes don't fail the run (§4.4).
 // idempotent: false causes the runtime to refuse re-invocation after snapshot restore (§9.1.1).
