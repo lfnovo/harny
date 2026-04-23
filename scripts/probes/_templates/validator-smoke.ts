@@ -55,7 +55,7 @@ try {
           // Literal equality:
           await assertStateField(stateDir, 'lifecycle.status', 'done');
           // Predicate form:
-          await assertStateField(stateDir, 'schema_version', (v) => v === 1);
+          await assertStateField(stateDir, 'schema_version', (v) => v === 2);
           // TODO: add assertions specific to your task here.
         },
       );

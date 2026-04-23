@@ -81,7 +81,7 @@
         return 'planner done';
       }
       if (phase.startsWith('developer')) {
-        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && p.attempt === e.attempt);
+        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && (e.attempt == null || p.attempt === e.attempt));
         if (entry && entry.verdict) {
           try {
             const v = JSON.parse(entry.verdict);
@@ -92,7 +92,7 @@
         return 'developer done';
       }
       if (phase.startsWith('validator')) {
-        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && p.attempt === e.attempt);
+        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && (e.attempt == null || p.attempt === e.attempt));
         if (entry && entry.verdict) {
           try {
             const v = JSON.parse(entry.verdict);

@@ -153,7 +153,7 @@ try {
           await assertStateField(stateDir, 'lifecycle.status', 'done');
 
           // Predicate match
-          await assertStateField(stateDir, 'schema_version', (v) => v === 1);
+          await assertStateField(stateDir, 'schema_version', (v) => v === 2);
 
           // Mismatch should throw
           let threw = false;
