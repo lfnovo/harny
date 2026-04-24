@@ -439,6 +439,15 @@ export async function main() {
           }
         }
       }
+
+      if (run.phases.length > 0) {
+        console.log(`\nPhases:`);
+        for (const phase of run.phases) {
+          const verdict = phase.verdict ? ` → ${phase.verdict.slice(0, 40)}` : '';
+          const noop = phase.no_op ? ' [no-op]' : '';
+          console.log(`  ${phase.name} #${phase.attempt} (${phase.status})${verdict}${noop}`);
+        }
+      }
       return;
     }
 

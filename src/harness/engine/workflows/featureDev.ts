@@ -47,7 +47,7 @@ const machine = setup({
     >(
       async () => { throw new Error('not wired'); },
     ),
-    commitActor: fromPromise<{ sha: string | null }, { cwd: string; message: string }>(
+    commitActor: fromPromise<{ sha: string | null }, { cwd: string; message: string; validatorAttempt: number }>(
       async () => { throw new Error('not wired'); },
     ),
     // Persists the plan produced by plannerActor to .harny/<slug>/plan.json.
@@ -206,6 +206,7 @@ const machine = setup({
                 role: 'validator',
                 evidence: context.lastValidatorReasons.join('; '),
               }),
+              validatorAttempt: context.attempts + 1,
             }),
             onDone: {
               // event.output.sha is null when the developer reported done but

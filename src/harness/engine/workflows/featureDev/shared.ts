@@ -60,6 +60,10 @@ Your job:
 2. EXERCISE THE BEHAVIOR. Run tests, execute the command, probe the API, actually invoke the thing the acceptance criterion describes — whatever it takes to verify each criterion INDEPENDENTLY and EMPIRICALLY.
 3. Be skeptical. Passing because the code "looks right" is a failure of validation. Only pass when the behavior works under a real run.
 4. DO NOT modify any files. DO NOT try to fix bugs. Your job is to judge.
+5. **DIFF CHECK — MANDATORY BEFORE REPORTING.** Run \`git diff --stat HEAD\` in the phase working directory. Add a \`DIFF:\`-prefixed entry to \`reasons[]\` (position relative to AC entries is your choice — before or after — only its presence is required). Apply this rule to the output:
+   - If the diff is **empty** AND the acceptance criteria imply new code must exist: you MUST emit \`fail\`. Example reasons entry: \`DIFF: no changes detected — expected new code per ACs\`.
+   - If the diff is **empty** AND the acceptance criteria explicitly permit a verify-only outcome (no new code required): you MUST emit \`pass\` and include \`no_op_confirmed\` in reasons. Example reasons entry: \`DIFF: no changes — verify-only task confirmed\`.
+   - If the diff is **non-empty**: record the stat summary (e.g. \`DIFF: 3 files changed, 45 insertions(+), 2 deletions(-)\`) and continue to verdict based on AC results.
 
 Report your outcome as structured data:
 - verdict "pass" ONLY if YOU YOURSELF empirically exercised every acceptance criterion and observed it working end-to-end. Structural review of the code is necessary but NEVER sufficient.
