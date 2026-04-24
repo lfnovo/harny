@@ -40,18 +40,19 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 - `src/viewer/` — read-only HTTP + SPA, booted via `harny ui`.
 - `src/harness/workflows/composeCommit.ts` — commit-message composer.
 - `src/harness/guardHooks.ts` — `PhaseGuards` (`readOnly` blocks `Write|Edit|MultiEdit|NotebookEdit`; Bash not blocked — validator needs it).
-- `src/harness/coldInstall.ts` — cold-worktree `bun install` (toggle: `harny.json:coldWorktreeInstall`).
+- `src/harness/coldInstall.ts` — cold-worktree `bun install`.
 
 ## Config
 
-- **`harny.json`** (target repo root, optional) — per-project overrides: `phases` map, `isolation`, `defaultMode`, `maxIterationsPerTask`, `maxIterationsGlobal`, `maxRetriesBeforeReset`, `coldWorktreeInstall`, `siblingBranchGuard`. See `harny.example.json`.
 - **`~/.harny/assistants.json`** (user-global, optional) — named cwds for `--assistant <name>` resolution and cross-project `ls`/`ui`.
 - **`HARNY_PHOENIX_URL`** — opt-in Phoenix observability (details in `src/harness/observability/CLAUDE.md`).
 - **`HARNY_UI_PORT`** — overrides viewer port (default 4123).
 
+No per-project config file — `harny.json` was removed end-to-end (commit `8c33798`). Workflow defaults live in each workflow's `phaseDefaults`; CLI flags (`--mode`, `--isolation`) are the only per-run overrides.
+
 ## Run modes
 
-`RunMode = "interactive" | "silent" | "async"`. Precedence: `--mode` CLI > `harny.json:defaultMode` > `Workflow.defaultMode` > auto (TTY → interactive, else silent).
+`RunMode = "interactive" | "silent" | "async"`. Precedence: `--mode` CLI > `Workflow.defaultMode` > auto (TTY → interactive, else silent).
 
 - **interactive:** TTY readline for `ctx.askUser` and SDK `AskUserQuestion`.
 - **silent:** `AskUserQuestion` stripped from `allowedTools`; `ctx.askUser` throws `SilentModeError`.
