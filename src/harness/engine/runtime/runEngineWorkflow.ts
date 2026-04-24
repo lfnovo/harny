@@ -65,12 +65,14 @@ export async function runEngineWorkflow(
     },
   );
 
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
       () => reject(new Error(`engine workflow "${workflow.id}" timed out after ${timeoutMs}ms`)),
       timeoutMs,
-    ),
-  );
+    );
+  });
 
   try {
     return await Promise.race([actorPromise, timeoutPromise]);
@@ -82,5 +84,6 @@ export async function runEngineWorkflow(
     };
   } finally {
     actorCleanup.stop?.();
+    clearTimeout(timeoutId!);
   }
 }
