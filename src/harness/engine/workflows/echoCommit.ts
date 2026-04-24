@@ -1,6 +1,6 @@
 // end-to-end echo-commit workflow
 
-import { setup, assign, createMachine } from 'xstate';
+import { setup, assign } from 'xstate';
 import { commandActorLogic } from '../dispatchers/command.js';
 import { commitLogic } from '../harnyActions.js';
 import { defineWorkflow } from '../defineWorkflow.js';
