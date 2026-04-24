@@ -45,6 +45,9 @@ Your job:
 5. DO NOT edit the harness plan file. The harness owns it. DO NOT commit or run \`git\` commands that change history. The harness will commit on your behalf if the validator passes.
 6. When your implementation is complete, run any relevant tests or smoke checks to confirm.
 
+**EDIT VS WRITE — prefer Edit for existing files; reserve Write for new files or ≥60% rewrites.**
+When modifying a file that already exists, use the Edit tool rather than Write. Write replaces the entire file; that produces unnecessarily large diffs, silently discards nearby comments that could reveal DRY opportunities, and drops any concurrent changes nearby. Reserve Write for: (a) genuinely new files that do not yet exist, or (b) cases where ≥60% of the file content is changing — at that scale the diff-hygiene argument inverts and a clean rewrite is clearer.
+
 Report your outcome as structured data:
 - status "done" when the implementation is finished (even if you suspect there may be bugs — let the validator judge).
 - status "blocked" ONLY if you truly cannot proceed (missing dependency, infeasible request, etc.). Blocked is treated by the harness as a fatal plan failure requiring human intervention — use it sparingly.
@@ -79,6 +82,13 @@ Report your outcome as structured data:
 - recommend_reset: set to true only when the developer's approach is fundamentally wrong, or when the code is so broken that a fresh start is better than iterating. Leave it false (or omit) for ordinary fixable defects — the harness will prefer resuming the developer's session to apply targeted fixes.
 - problems (OPTIONAL): if validation surfaced issues that point to project-level gaps future runs would benefit from — ambiguous acceptance criterion wording, missing test infrastructure, undocumented behavior that wasted time — report them. Categories: environment, design, understanding, tooling. Severity: low/medium/high. Omit if nothing noteworthy.
 - You cannot modify files; the harness enforces read-only invariants via hooks. If you want to "fix" something, return fail with reasons instead.
+
+**EMPIRICAL EXERCISE — TEMP BUN SCRIPT PATTERN.**
+When you need to exercise a TypeScript module's behavior and there is no existing test command or CLI to drive it, write a short probe script:
+- Name it \`/tmp/harny-probe-<slug>.ts\` (e.g., \`/tmp/harny-probe-schema-roundtrip.ts\`).
+- Canonical shape: import the subject → exercise the behavior → assert the outcome → \`process.exit(0)\` on success, \`process.exit(1)\` on failure.
+- Run it with \`bun /tmp/harny-probe-<slug>.ts\` and treat the exit code as the verdict for that AC.
+- Static inspection of the source is the fallback when import or exercise is not possible (e.g., side-effect module, missing runtime dep). Document why you fell back.
 
 **REASONS FORMAT — MANDATORY FOR AUDITABILITY.**
 The \`reasons[]\` array MUST contain exactly one entry per acceptance criterion, in the same order they appear in the task. Each entry MUST be prefixed \`AC<n>: <verdict>\` (e.g., \`AC1: pass — \`bun run typecheck\` exited 0\`, \`AC2: fail — flag not visible in --help output\`). State what you empirically verified for that criterion. A generic summary or grouping multiple ACs into one reason is not acceptable. The harness reads this field line-by-line for audit trails.`;

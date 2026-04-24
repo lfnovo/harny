@@ -87,4 +87,24 @@ try {
   failures++;
 }
 
+// Scenario (d): prompt guidance phrases are present
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'prompt-guidance-phrases';
+      if (!DEFAULT_DEVELOPER.prompt.includes('EDIT VS WRITE')) {
+        throw new Error('DEFAULT_DEVELOPER.prompt does not contain "EDIT VS WRITE"');
+      }
+      if (!DEFAULT_VALIDATOR.prompt.includes('harny-probe-')) {
+        throw new Error('DEFAULT_VALIDATOR.prompt does not contain "harny-probe-"');
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL prompt-guidance-phrases: ${e.message}`);
+  failures++;
+}
+
 process.exit(failures > 0 ? 1 : 0);
