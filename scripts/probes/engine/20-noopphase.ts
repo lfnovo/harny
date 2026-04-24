@@ -6,11 +6,13 @@
  *   bun scripts/probes/engine/20-noopphase.ts
  */
 
-import { createActor } from 'xstate';
+import { createActor, fromPromise } from 'xstate';
 import { tmpGitRepo } from '../../../src/harness/testing/index.ts';
 import { buildFeatureDevActors } from '../../../src/harness/engine/workflows/featureDevActors.ts';
 import type { StateStore } from '../../../src/harness/state/store.ts';
 import type { PhaseEntry, State, HistoryEntry, PendingQuestion } from '../../../src/harness/state/schema.ts';
+import featureDevWorkflow from '../../../src/harness/engine/workflows/featureDev.ts';
+import type { SessionRunPhase } from '../../../src/harness/engine/runtime/runPhaseAdapter.ts';
 
 const DEADLINE_MS = 1500;
 
@@ -158,6 +160,124 @@ try {
 } catch (e: unknown) {
   const msg = e instanceof Error ? e.message : String(e);
   console.log(`FAIL non-null-sha-skips-no_op: ${msg}`);
+  failures++;
+}
+
+// Scenario (c): full machine cycle — verifies { sha: null } from gitCommit causes
+// store.updatePhase('validator', 1, { no_op: true }) via the real feature-dev XState machine
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'full-cycle-no_op-reaches-validator-phase';
+      const repo = await tmpGitRepo();
+      try {
+        const capturedPatches: { name: string; attempt: number; patch: Partial<PhaseEntry> }[] = [];
+
+        const mockStore: StateStore = {
+          statePath: '/dev/null',
+          createRun: async (_initial: State) => {},
+          getState: async () => null,
+          updateLifecycle: async () => {},
+          appendPhase: async (_phase: PhaseEntry) => {},
+          updatePhase: async (name: string, attempt: number, patch: Partial<PhaseEntry>) => {
+            capturedPatches.push({ name, attempt, patch });
+          },
+          appendHistory: async (_entry: HistoryEntry) => {},
+          setPendingQuestion: async (_q: PendingQuestion | null) => {},
+          patchWorkflowState: async () => {},
+          setPhoenix: async () => {},
+        };
+
+        const mockGitCommit = async () => ({ sha: null as null });
+
+        const mockSessionRunPhase: SessionRunPhase = async (args) => {
+          if (args.phase === 'planner') {
+            return {
+              sessionId: 'planner-session',
+              status: 'completed' as const,
+              error: null,
+              structuredOutput: {
+                summary: 'probe plan',
+                tasks: [{ id: 't1', title: 'probe task', description: 'probe', acceptance: ['check it'] }],
+              },
+              resultSubtype: null,
+              events: [],
+            };
+          }
+          if (args.phase === 'developer') {
+            return {
+              sessionId: 'dev-session',
+              status: 'completed' as const,
+              error: null,
+              structuredOutput: { status: 'done', commit_message: 'test: probe commit' },
+              resultSubtype: null,
+              events: [],
+            };
+          }
+          if (args.phase === 'validator') {
+            return {
+              sessionId: 'validator-session',
+              status: 'completed' as const,
+              error: null,
+              structuredOutput: { verdict: 'pass', reasons: ['all good'] },
+              resultSubtype: null,
+              events: [],
+            };
+          }
+          throw new Error('unexpected phase: ' + args.phase);
+        };
+
+        const actors = buildFeatureDevActors({
+          cwd: repo.path,
+          variant: 'default',
+          taskSlug: 'probe',
+          runId: 'probe',
+          sessionRunPhase: mockSessionRunPhase,
+          gitCommit: mockGitCommit,
+          store: mockStore,
+        });
+
+        const providedMachine = featureDevWorkflow.machine.provide({
+          actors: { ...actors, persistPlanActor: fromPromise(async () => {}) },
+        });
+
+        await new Promise<void>((resolve, reject) => {
+          const actor = createActor(providedMachine, {
+            input: { cwd: repo.path, userPrompt: 'probe', taskSlug: 'probe', maxRetries: 0 },
+          });
+          actor.subscribe({
+            next: (snapshot) => {
+              if (snapshot.status === 'done') {
+                if (snapshot.context.error) {
+                  reject(new Error(`machine reached failed: ${snapshot.context.error}`));
+                } else {
+                  resolve();
+                }
+              }
+            },
+            error: (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))),
+          });
+          actor.start();
+        });
+
+        const hasNoOpPatch = capturedPatches.some(
+          (p) => p.name === 'validator' && p.attempt === 1 && p.patch.no_op === true,
+        );
+        if (!hasNoOpPatch) {
+          throw new Error(
+            `expected updatePhase('validator', 1, { no_op: true }) — got: ${JSON.stringify(capturedPatches)}`,
+          );
+        }
+        console.log(`PASS ${name}`);
+      } finally {
+        await repo.cleanup();
+      }
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  console.log(`FAIL full-cycle-no_op-reaches-validator-phase: ${msg}`);
   failures++;
 }
 
