@@ -99,7 +99,7 @@ let failures = 0;
     ]);
     const countT1 = countOccurrences(result, "task=t1");
     const countT999 = countOccurrences(result, "task=t999");
-    if (countT1 === 1 && countT999 === 1) {
+    if (countT1 === 1 && countT999 === 0) {
       console.log(`PASS ${name}`);
     } else {
       console.log(`FAIL ${name}: task=t1 count=${countT1} task=t999 count=${countT999} result=${JSON.stringify(result)}`);
