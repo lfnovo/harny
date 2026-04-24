@@ -2,6 +2,10 @@ import { describe, test, expect } from "bun:test";
 import { fromPromise } from "xstate";
 import featureDevWorkflow from "./featureDev.js";
 import { runEngineWorkflowDry } from "../../testing/index.js";
+import {
+  scripted,
+  capturingScripted,
+} from "../../testing/scriptedActor.js";
 import type { Plan, PlanTask } from "../../types.js";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -39,20 +43,6 @@ function plan(tasks: PlanTask[]): Plan {
   };
 }
 
-// Builds a fromPromise actor that pops scripted outputs from a queue per call.
-// Throws on exhaustion — catches off-by-one in test scripts rather than silently
-// repeating the last result.
-function scripted<TOut, TIn = unknown>(outputs: TOut[]) {
-  const queue = [...outputs];
-  return fromPromise<TOut, TIn>(async () => {
-    const next = queue.shift();
-    if (next === undefined) {
-      throw new Error("scripted actor: script exhausted");
-    }
-    return next;
-  });
-}
-
 // spyCommit — records every (cwd, message, attempt) and returns a fake sha.
 // Inline here; promote to testing/ if a use emerges outside this file.
 function spyCommit(sha: string | null = "sha-fake") {
@@ -87,23 +77,6 @@ function spyPersist() {
       calls.push(input);
     },
   );
-  return { actor, calls };
-}
-
-// Captures each input on calls[] then pops the queued output. Throws on
-// exhaustion. Used for retry/session-propagation assertions where we need to
-// observe what the machine passed in, not just check state after the fact.
-function capturingScripted<TOut>(outputs: TOut[]) {
-  const queue = [...outputs];
-  const calls: any[] = [];
-  const actor = fromPromise<TOut, any>(async ({ input }) => {
-    calls.push({ ...input });
-    const next = queue.shift();
-    if (next === undefined) {
-      throw new Error("capturingScripted: script exhausted");
-    }
-    return next;
-  });
   return { actor, calls };
 }
 
