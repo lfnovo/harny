@@ -90,16 +90,15 @@ describe("resolvePrompt: canonical prompts are non-empty strings", () => {
   }
 });
 
-// Parity between bundled .md files and DEFAULT_* constants is currently
-// broken — see issue #68. Unskip after the single-source-of-truth fix lands
-// via harny.
-describe("resolvePrompt: content parity bundled .md vs DEFAULT_* constants (bug lockdown, see #68)", () => {
+// Parity between bundled .md files and DEFAULT_* constants — single source of
+// truth is the .md files, loaded at module init in shared.ts. Fixed in #68.
+describe("resolvePrompt: content parity bundled .md vs DEFAULT_* constants", () => {
   for (const [actor, constant] of [
     ["planner", DEFAULT_PLANNER],
     ["developer", DEFAULT_DEVELOPER],
     ["validator", DEFAULT_VALIDATOR],
   ] as const) {
-    test.skip(`${actor} bundled file equals the exported prompt constant`, () => {
+    test(`${actor} bundled file equals the exported prompt constant`, () => {
       const fromFile = resolvePrompt(
         "feature-dev",
         "default",
