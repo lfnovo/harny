@@ -172,13 +172,33 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
   });
 
   const gitCommitFn = deps.gitCommit ?? defaultGitCommit;
-  const commitActor = fromPromise<{ sha: string | null }, { cwd: string; message: string; validatorAttempt: number }>(
+  const commitActor = fromPromise<{ sha: string | null }, { cwd: string; message: string; attempt: number }>(
     async ({ input, signal }) => {
-      const result = await gitCommitFn({ cwd: input.cwd, message: input.message }, signal);
-      if (result.sha === null) {
-        await deps.store?.updatePhase('validator', input.validatorAttempt, { no_op: true });
+      const { attempt } = input;
+      await deps.store?.appendPhase({
+        name: 'committing',
+        attempt,
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        status: 'running',
+        verdict: null,
+        session_id: null,
+      });
+      let phaseStatus: 'completed' | 'failed' = 'failed';
+      let sha: string | null = null;
+      try {
+        const result = await gitCommitFn({ cwd: input.cwd, message: input.message }, signal);
+        sha = result.sha;
+        phaseStatus = 'completed';
+        return result;
+      } finally {
+        await deps.store?.updatePhase('committing', attempt, {
+          ended_at: new Date().toISOString(),
+          status: phaseStatus,
+          verdict: sha ?? null,
+          ...(sha === null ? { no_op: true as const } : {}),
+        });
       }
-      return result;
     },
   );
 

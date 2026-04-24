@@ -442,10 +442,17 @@ export async function main() {
 
       if (run.phases.length > 0) {
         console.log(`\nPhases:`);
-        for (const phase of run.phases) {
+        for (let i = 0; i < run.phases.length; i++) {
+          const phase = run.phases[i]!;
+          const next = run.phases[i + 1];
+          const commitSkipped =
+            phase.name === 'developer' &&
+            next?.name === 'committing' &&
+            next.no_op === true;
           const verdict = phase.verdict ? ` → ${phase.verdict.slice(0, 40)}` : '';
           const noop = phase.no_op ? ' [no-op]' : '';
-          console.log(`  ${phase.name} #${phase.attempt} (${phase.status})${verdict}${noop}`);
+          const suffix = commitSkipped ? ' [commit skipped — no-op]' : noop;
+          console.log(`  ${phase.name} #${phase.attempt} (${phase.status})${verdict}${suffix}`);
         }
       }
       return;
