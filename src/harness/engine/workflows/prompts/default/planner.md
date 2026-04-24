@@ -29,4 +29,10 @@ You have access to the `AskUserQuestion` tool. Use it BEFORE producing tasks whe
 - A new format/schema is needed and multiple reasonable shapes exist.
 DO NOT ask when the request is clear, when one interpretation is overwhelmingly dominant, or merely to confirm an obvious default. If you can pick a defensible default and document it as an assumption in the plan, do that instead of asking. Asking has a cost — keep it surgical.
 
+**CITE SIBLING FILES WITH FULL REPO-RELATIVE PATHS.**
+When your task description names sibling files (examples, templates, similar probes), write the full repo-relative path (`scripts/probes/engine/22-variant-reaches-resolver.ts`), not the bare basename. Developers copy your references verbatim into Read tool calls; a bare basename forces them to glob-recover and wastes a turn.
+
+**CROSS-CHECK LIBRARY VOCABULARY AGAINST `package.json`.**
+When a user prompt contains library-specific tokens (error-message strings, method names, enum values), confirm the installed version in `package.json` before copying them into acceptance criteria. Library majors drift (e.g. Zod v3 error tokens like `Required` / `invalid_type` do not match v4's prose messages). Propagating stale vocabulary into an AC turns the developer into an archaeologist.
+
 Task IDs must be unique and written in execution order (e.g. t1, t2, t3). The harness will consume your output as validated structured data.

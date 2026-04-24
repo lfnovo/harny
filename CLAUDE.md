@@ -61,7 +61,8 @@ No per-project config file — `harny.json` was removed end-to-end (commit `8c33
 
 ## Gotchas
 
-- **macOS has no `timeout(1)`.** Use in-script `Promise.race` hard deadlines, not outer `timeout N` wrappers.
+- **macOS has no `timeout(1)`.** Use in-script `Promise.race` hard deadlines for code. For shell smoke tests, use `cmd & PID=$! ; sleep N ; kill $PID` — do not reach for `timeout N cmd`.
+- **Don't use `as const` on arrays passed to SDK `query()` options.** SDK option types are mutable (`SettingSource[]`, not `readonly [...]`). `as const` produces a `readonly` tuple that fails `TS2322`. Annotate with the mutable type instead, e.g. `settingSources: ["project", "user"] as ("project" | "user")[]`.
 - **Sibling unmerged branches silently regress on merge.** Before creating a brand-new file path, run `git branch -a` and `git log --all --oneline -- <path>`. A sibling harness branch may already own that path.
 - **Harness-managed branches always prefix `harny/`** (legacy: `harness/`). Features introspecting "other harness branches" must filter by `^(harny|harness)/` — unfiltered set includes main, feature/*, stale locals.
 - **`noUncheckedIndexedAccess` is enabled.** Array/string index access returns `T | undefined`. Use `?? ''` or explicit guards.
