@@ -39,7 +39,8 @@
   "scripts": {
     "harny": "bun bin/harny.ts",
     "run": "bun bin/harny.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "probes": "bun scripts/run-probes.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.111",
@@ -50,7 +51,6 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "bun-types": "^1.3.9",
-    "surrealdb": "^2.0.3",
     "typescript": "^5.7.2",
     "xstate": "^5"
   }

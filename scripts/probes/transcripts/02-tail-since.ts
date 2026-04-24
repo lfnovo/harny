@@ -126,7 +126,7 @@ async function scenarioIntegration(): Promise<void> {
     await writeFile(transcriptFile, [...oldLines, ...recentLines].join("\n") + "\n");
 
     const state = {
-      schema_version: 1,
+      schema_version: 2,
       run_id: "probe-run-tail-since",
       origin: {
         prompt: "test",
@@ -135,6 +135,7 @@ async function scenarioIntegration(): Promise<void> {
         started_at: new Date().toISOString(),
         host: "localhost",
         user: "test",
+        features: null,
       },
       environment: {
         cwd: tmpBase,

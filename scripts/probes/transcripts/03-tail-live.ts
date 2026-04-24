@@ -67,7 +67,7 @@ async function scenarioLiveTail(): Promise<void> {
         sessionId: string;
       }>;
     }) => ({
-      schema_version: 1,
+      schema_version: 2,
       run_id: "probe-run-tail-live",
       origin: {
         prompt: "test",
@@ -76,6 +76,7 @@ async function scenarioLiveTail(): Promise<void> {
         started_at: new Date(t0).toISOString(),
         host: "localhost",
         user: "test",
+        features: null,
       },
       environment: {
         cwd: tmpBase,

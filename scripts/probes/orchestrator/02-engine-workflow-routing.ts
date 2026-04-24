@@ -11,11 +11,6 @@ import { tmpdir } from 'node:os';
 import { setup, fromPromise } from 'xstate';
 import { runEngineWorkflow } from '../../../src/harness/engine/runtime/runEngineWorkflow.ts';
 import echoCommit from '../../../src/harness/engine/workflows/echoCommit.ts';
-import { isEngineWorkflow } from '../../../src/harness/workflows/index.ts';
-
-// Synthetic non-engine workflow stubs for isEngineWorkflow discrimination tests.
-const legacyWorkflowStub = { id: 'stub-legacy', needsBranch: false, needsWorktree: false, phaseDefaults: {}, run: async () => ({ status: 'done' as const }) };
-const anotherLegacyStub = { id: 'stub-legacy-2', needsBranch: false, needsWorktree: false, phaseDefaults: {}, run: async () => ({ status: 'done' as const }) };
 
 function makeTmpRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'harny-probe-'));
@@ -69,33 +64,6 @@ async function runProbes(): Promise<void> {
       failures++;
     } finally {
       rmSync(tmpRepo, { recursive: true });
-    }
-  }
-
-  // Scenario (b): detection
-  {
-    const name = 'detection';
-    try {
-      await Promise.race([
-        (async () => {
-          if (!isEngineWorkflow(echoCommit)) {
-            throw new Error('isEngineWorkflow(echoCommit) returned false, expected true');
-          }
-          if (isEngineWorkflow(legacyWorkflowStub as any)) {
-            throw new Error('isEngineWorkflow(legacyWorkflowStub) returned true, expected false');
-          }
-          if (isEngineWorkflow(anotherLegacyStub as any)) {
-            throw new Error('isEngineWorkflow(anotherLegacyStub) returned true, expected false');
-          }
-        })(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('8000ms scenario deadline exceeded')), 8_000),
-        ),
-      ]);
-      console.log(`PASS ${name}`);
-    } catch (e: any) {
-      console.log(`FAIL ${name}: ${e.message}`);
-      failures++;
     }
   }
 

@@ -98,7 +98,7 @@ try {
 
       const snapshot = await runEngineWorkflowDry(
         featureDevWorkflow,
-        { cwd: '/tmp', userPrompt: 'test' },
+        { cwd: '/tmp', taskSlug: 'probe', userPrompt: 'test' },
         actors,
       );
 

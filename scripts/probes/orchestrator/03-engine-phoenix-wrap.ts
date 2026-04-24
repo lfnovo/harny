@@ -34,21 +34,21 @@ async function runProbes(): Promise<void> {
           );
           const source = await readFile(orchestratorPath, 'utf8');
 
-          const engineCheckIdx = source.indexOf('if (isEngineWorkflow(workflow))');
-          if (engineCheckIdx === -1) {
-            throw new Error('Could not find if (isEngineWorkflow(workflow)) in orchestrator.ts');
+          const anchorIdx = source.indexOf('setupPhoenix({');
+          if (anchorIdx === -1) {
+            throw new Error('Could not find setupPhoenix({ in orchestrator.ts');
           }
 
-          const window = source.slice(engineCheckIdx, engineCheckIdx + 2000);
+          const window = source.slice(anchorIdx, anchorIdx + 2000);
 
           if (!window.includes('withRunSpan')) {
             throw new Error(
-              'withRunSpan not found within 2000 chars of isEngineWorkflow(workflow) in orchestrator.ts',
+              'withRunSpan not found within 2000 chars after setupPhoenix({ in orchestrator.ts',
             );
           }
-          if (!window.includes('setupPhoenix')) {
+          if (!window.includes('runEngineWorkflow')) {
             throw new Error(
-              'setupPhoenix not found within 2000 chars of isEngineWorkflow(workflow) in orchestrator.ts',
+              'runEngineWorkflow not found within 2000 chars after setupPhoenix({ in orchestrator.ts',
             );
           }
         })(),

@@ -80,7 +80,7 @@ try {
         const provided = machine.provide({ actors } as any);
 
         const snapshot = await new Promise<any>((resolve, reject) => {
-          const actor = createActor(provided, { input: { cwd: repo.path, userPrompt: 'test', maxRetries: 3 } });
+          const actor = createActor(provided, { input: { cwd: repo.path, taskSlug: 'probe', userPrompt: 'test', maxRetries: 3 } });
           actor.subscribe({
             next: (s) => { if (s.status === 'done' || s.status === 'error') resolve(s); },
             error: (err) => reject(err instanceof Error ? err : new Error(String(err))),

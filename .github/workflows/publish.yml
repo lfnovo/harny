@@ -29,6 +29,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Probes
+        run: bun run probes
+
       - name: Verify package version matches tag
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
