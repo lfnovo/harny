@@ -102,7 +102,6 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
       const now = new Date().toISOString();
 
       return {
-        schema_version: 1 as const,
         task_slug: deps.taskSlug,
         primary_cwd: deps.cwd,
         user_prompt: input.prompt,

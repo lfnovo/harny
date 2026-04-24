@@ -51,7 +51,6 @@ const PlanRunStatusSchema = z.enum([
 ]);
 
 export const PlanSchema = z.object({
-  schema_version: z.literal(1),
   task_slug: z.string(),
   user_prompt: z.string(),
   branch: z.string(),
@@ -81,7 +80,7 @@ export async function loadPlan(path: string): Promise<Plan> {
   const parsed = PlanSchema.safeParse(json);
   if (!parsed.success) {
     throw new Error(
-      `plan.json at ${path} failed schema validation (schema_version mismatch or corrupt). ` +
+      `plan.json at ${path} failed schema validation (corrupt or unexpected shape). ` +
         `Delete the run dir or re-run with a new task slug. ` +
         `Details: ${parsed.error.message}`,
     );
