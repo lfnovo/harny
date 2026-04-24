@@ -121,7 +121,7 @@ try {
       const now = new Date().toISOString();
       // Build a minimal stub plan. Replace tasks with your actual task structure.
       const stubPlan = {
-        schema_version: 1 as const,
+        schema_version: 1 as const, // Plan schema is v1; State schema is v2 — independently versioned, not a bug
         task_slug: 'test',
         primary_cwd: '/tmp',
         user_prompt: 'test',

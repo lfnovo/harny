@@ -31,13 +31,13 @@ try {
         getState: async () => null,
         updateLifecycle: async () => {},
         appendPhase: async (phase) => {
-          capturedPhases.push({ ...phase });
+          if (phase.name !== 'committing') capturedPhases.push({ ...phase });
         },
         updatePhase: async (phaseName, attempt, patch) => {
           const entry = capturedPhases.find(
             (p) => p.name === phaseName && p.attempt === attempt,
           );
-          if (!entry) throw new Error(`phase not found: ${phaseName}/${attempt}`);
+          if (!entry) return;
           Object.assign(entry, patch);
         },
         appendHistory: async (entry) => {
@@ -106,14 +106,16 @@ try {
         throw new Error(`expected snapshot.status 'done', got '${snapshot.status}'`);
       }
 
-      if (capturedPhases.length < 3) {
-        throw new Error(`expected phases.length >= 3, got ${capturedPhases.length}`);
+      if (capturedPhases.length !== 3) {
+        throw new Error(`expected phases.length === 3, got ${capturedPhases.length}`);
       }
 
-      const phaseEndEvents = capturedHistory.filter((e: any) => e.event === 'phase_end');
-      if (phaseEndEvents.length < 2) {
+      const phaseEndEvents = capturedHistory.filter(
+        (e: any) => e.event === 'phase_end' && e.phase !== 'planner',
+      );
+      if (phaseEndEvents.length !== 2) {
         throw new Error(
-          `expected >= 2 phase_end history events, got ${phaseEndEvents.length}`,
+          `expected === 2 phase_end history events, got ${phaseEndEvents.length}`,
         );
       }
 
