@@ -79,6 +79,180 @@ function formatAskUserInputError(err: z.ZodError): string {
   return `AskUserQuestion input invalid: ${path || "input"} — ${issue.message}`;
 }
 
+// ---------------------------------------------------------------------------
+// Helper 1: buildQueryOptions
+// ---------------------------------------------------------------------------
+
+function buildQueryOptions<T>(args: {
+  phaseConfig: ResolvedPhaseConfig;
+  guardHooks: ReturnType<typeof buildGuardHooks>;
+  mode: RunMode;
+  outputSchema: z.ZodType<T>;
+  additionalDirectories: string[];
+  phaseCwd: string;
+  resumeSessionId: string | null | undefined;
+  phase: PhaseName;
+  setParkState: (state: { askUserInput: AskUserQuestionInput; toolUseId: string | null }) => void;
+}) {
+  const {
+    phaseConfig,
+    guardHooks,
+    mode,
+    outputSchema,
+    additionalDirectories,
+    phaseCwd,
+    resumeSessionId,
+    phase: _phase,
+    setParkState,
+  } = args;
+
+  // In silent mode, the agent never sees AskUserQuestion at all — strip it
+  // before the SDK is told what tools are available. This is cleaner than
+  // exposing the tool and denying every call (which burns tokens).
+  const effectiveAllowedTools =
+    mode === "silent"
+      ? phaseConfig.allowedTools.filter((t) => t !== "AskUserQuestion")
+      : phaseConfig.allowedTools;
+
+  return {
+    cwd: phaseCwd,
+    ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
+    allowedTools: effectiveAllowedTools,
+    permissionMode: phaseConfig.permissionMode,
+    maxTurns: phaseConfig.maxTurns,
+    effort: phaseConfig.effort,
+    settingSources: ["project", "user"] as ("project" | "user")[],
+    systemPrompt: {
+      type: "preset" as const,
+      preset: "claude_code" as const,
+      append: phaseConfig.prompt,
+    },
+    outputFormat: {
+      type: "json_schema" as const,
+      schema: toJsonSchema(outputSchema),
+    },
+    ...(Object.keys(guardHooks).length > 0 ? { hooks: guardHooks } : {}),
+    canUseTool: async (
+      toolName: string,
+      input: Record<string, unknown>,
+      ctx: { signal: AbortSignal; toolUseID?: string },
+    ) => {
+      if (toolName === "AskUserQuestion") {
+        if (mode === "silent") {
+          // Belt-and-suspenders: the tool is stripped from allowedTools
+          // already; this deny only fires if the SDK routes anyway.
+          return {
+            behavior: "deny" as const,
+            message:
+              "AskUserQuestion is disabled in silent mode. Pick a defensible default and document the assumption.",
+          };
+        }
+        const parsed = AskUserQuestionInputSchema.safeParse(input);
+        if (!parsed.success) {
+          return {
+            behavior: "deny" as const,
+            message: formatAskUserInputError(parsed.error),
+          };
+        }
+        if (mode === "async") {
+          // Park: stash the input, return deny+interrupt, the SDK's
+          // for-await loop will throw with subtype=error_during_execution.
+          // The outer catch converts parkState into PhaseRunResult with
+          // status=paused_for_user_input.
+          setParkState({
+            askUserInput: parsed.data,
+            toolUseId: ctx.toolUseID ?? null,
+          });
+          return {
+            behavior: "deny" as const,
+            message: "Parked for async review; harness will exit waiting_human.",
+            interrupt: true,
+          };
+        }
+        // interactive
+        return await runAskUserQuestionTTY(parsed.data);
+      }
+      return { behavior: "allow" as const, updatedInput: input };
+    },
+    ...(resumeSessionId ? { resume: resumeSessionId } : {}),
+    ...(phaseConfig.model ? { model: phaseConfig.model } : {}),
+    ...(Object.keys(phaseConfig.mcpServers).length > 0
+      ? { mcpServers: phaseConfig.mcpServers }
+      : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Helper 2: handleSDKEvent
+// ---------------------------------------------------------------------------
+
+type SDKEventCtx = {
+  phase: PhaseName;
+  logMode: LogMode | undefined;
+  setSessionId: (id: string) => void;
+  setStructuredRaw: (v: unknown) => void;
+  setResultSubtype: (v: string) => void;
+};
+
+export type SDKEventOutcome = "continue" | "park" | "done" | "error";
+
+export function handleSDKEvent(
+  message: SDKMessage,
+  ctx: SDKEventCtx,
+): SDKEventOutcome {
+  let outcome: SDKEventOutcome = "continue";
+
+  if (message.type === "system" && message.subtype === "init") {
+    ctx.setSessionId(message.session_id);
+    if (ctx.logMode !== "quiet") {
+      console.log(`[harny:${ctx.phase}] session=${message.session_id}`);
+    }
+  } else if (message.type === "result") {
+    ctx.setResultSubtype(message.subtype);
+    if (message.subtype === "error_during_execution") {
+      outcome = "park";
+    } else if (
+      message.subtype === "success" &&
+      "structured_output" in message &&
+      message.structured_output !== undefined
+    ) {
+      ctx.setStructuredRaw(message.structured_output);
+      outcome = "done";
+    }
+  }
+
+  if (ctx.logMode === "verbose") {
+    console.log(`[harny:${ctx.phase}] event: ${message.type}`);
+    console.dir(message, { depth: null, colors: true });
+  }
+
+  return outcome;
+}
+
+// ---------------------------------------------------------------------------
+// Helper 3: validateStructuredOutput
+// ---------------------------------------------------------------------------
+
+type ValidateResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+function validateStructuredOutput<T>(
+  outputSchema: z.ZodType<T>,
+  structuredRaw: unknown,
+): ValidateResult<T> {
+  const parsed = outputSchema.safeParse(structuredRaw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: `structured_output failed schema validation: ${parsed.error.message}`,
+    };
+  }
+  return { ok: true, data: parsed.data };
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
 export async function runPhase<T>(args: {
   phase: PhaseName;
   phaseConfig: ResolvedPhaseConfig;
@@ -120,6 +294,10 @@ export async function runPhase<T>(args: {
   }
   throw new Error("unreachable: retry loop exited without returning");
 }
+
+// ---------------------------------------------------------------------------
+// Thin orchestrator skeleton
+// ---------------------------------------------------------------------------
 
 async function runPhaseAttempt<T>(args: {
   phase: PhaseName;
@@ -200,13 +378,19 @@ async function runPhaseAttempt<T>(args: {
     taskSlug,
   });
 
-  // In silent mode, the agent never sees AskUserQuestion at all — strip it
-  // before the SDK is told what tools are available. This is cleaner than
-  // exposing the tool and denying every call (which burns tokens).
-  const effectiveAllowedTools =
-    mode === "silent"
-      ? phaseConfig.allowedTools.filter((t) => t !== "AskUserQuestion")
-      : phaseConfig.allowedTools;
+  const queryOptions = buildQueryOptions({
+    phaseConfig,
+    guardHooks,
+    mode,
+    outputSchema,
+    additionalDirectories,
+    phaseCwd,
+    resumeSessionId,
+    phase,
+    setParkState: (state) => {
+      parkState = state;
+    },
+  });
 
   // Attach phase name to the OTel context so the rename processor relabels
   // the SDK's "ClaudeAgent.query" span to "harny.<phase>". No extra wrapping
@@ -216,104 +400,23 @@ async function runPhaseAttempt<T>(args: {
     phase,
     async () => {
       try {
-        for await (const message of query({
-          prompt,
-          options: {
-        cwd: phaseCwd,
-        ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
-        allowedTools: effectiveAllowedTools,
-        permissionMode: phaseConfig.permissionMode,
-        maxTurns: phaseConfig.maxTurns,
-        effort: phaseConfig.effort,
-        settingSources: ["project", "user"],
-        systemPrompt: {
-          type: "preset",
-          preset: "claude_code",
-          append: phaseConfig.prompt,
-        },
-        outputFormat: {
-          type: "json_schema",
-          schema: toJsonSchema(outputSchema),
-        },
-        ...(Object.keys(guardHooks).length > 0 ? { hooks: guardHooks } : {}),
-        canUseTool: async (
-          toolName: string,
-          input: Record<string, unknown>,
-          ctx: { signal: AbortSignal; toolUseID?: string },
-        ) => {
-          if (toolName === "AskUserQuestion") {
-            if (mode === "silent") {
-              // Belt-and-suspenders: the tool is stripped from allowedTools
-              // already; this deny only fires if the SDK routes anyway.
-              return {
-                behavior: "deny",
-                message:
-                  "AskUserQuestion is disabled in silent mode. Pick a defensible default and document the assumption.",
-              };
-            }
-            const parsed = AskUserQuestionInputSchema.safeParse(input);
-            if (!parsed.success) {
-              return {
-                behavior: "deny",
-                message: formatAskUserInputError(parsed.error),
-              };
-            }
-            if (mode === "async") {
-              // Park: stash the input, return deny+interrupt, the SDK's
-              // for-await loop will throw with subtype=error_during_execution.
-              // The outer catch converts parkState into PhaseRunResult with
-              // status=paused_for_user_input.
-              parkState = {
-                askUserInput: parsed.data,
-                toolUseId: ctx.toolUseID ?? null,
-              };
-              return {
-                behavior: "deny",
-                message: "Parked for async review; harness will exit waiting_human.",
-                interrupt: true,
-              };
-            }
-            // interactive
-            return await runAskUserQuestionTTY(parsed.data);
-          }
-          return { behavior: "allow", updatedInput: input };
-        },
-        ...(resumeSessionId ? { resume: resumeSessionId } : {}),
-        ...(phaseConfig.model ? { model: phaseConfig.model } : {}),
-        ...(Object.keys(phaseConfig.mcpServers).length > 0
-          ? { mcpServers: phaseConfig.mcpServers }
-          : {}),
-      },
-    })) {
-      record.events.push(message);
-
-      if (
-        record.session_id == null &&
-        message.type === "system" &&
-        message.subtype === "init"
-      ) {
-        record.session_id = message.session_id;
-        if (logMode !== "quiet") {
-          console.log(`[harny:${phase}] session=${message.session_id}`);
+        for await (const message of query({ prompt, options: queryOptions })) {
+          record.events.push(message);
+          const outcome = handleSDKEvent(message, {
+            phase,
+            logMode,
+            setSessionId: (id) => {
+              if (record.session_id == null) record.session_id = id;
+            },
+            setStructuredRaw: (v) => {
+              structuredRaw = v;
+            },
+            setResultSubtype: (v) => {
+              resultSubtype = v;
+            },
+          });
+          if (outcome === "park") break;
         }
-      }
-
-      if (message.type === "result") {
-        resultSubtype = message.subtype;
-        if (
-          message.subtype === "success" &&
-          "structured_output" in message &&
-          message.structured_output !== undefined
-        ) {
-          structuredRaw = message.structured_output;
-        }
-      }
-
-      if (logMode === "verbose") {
-        console.log(`[harny:${phase}] event: ${message.type}`);
-        console.dir(message, { depth: null, colors: true });
-      }
-    }
 
         record.status = "completed";
       } catch (err) {
@@ -392,27 +495,26 @@ async function runPhaseAttempt<T>(args: {
     };
   }
 
-  const parsed = outputSchema.safeParse(structuredRaw);
-  if (!parsed.success) {
-    const msg = `structured_output failed schema validation: ${parsed.error.message}`;
-    logBlock("output (error)", msg);
+  const validated = validateStructuredOutput(outputSchema, structuredRaw);
+  if (!validated.ok) {
+    logBlock("output (error)", validated.error);
     return {
       sessionId: record.session_id,
       status: "error",
-      error: msg,
+      error: validated.error,
       structuredOutput: null,
       resultSubtype,
       events: record.events,
     };
   }
 
-  logBlock("output", JSON.stringify(parsed.data, null, 2));
+  logBlock("output", JSON.stringify(validated.data, null, 2));
 
   return {
     sessionId: record.session_id,
     status: "completed",
     error: null,
-    structuredOutput: parsed.data,
+    structuredOutput: validated.data,
     resultSubtype,
     events: record.events,
   };
