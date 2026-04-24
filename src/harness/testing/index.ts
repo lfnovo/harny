@@ -11,13 +11,40 @@ import { StateSchema, type State } from '../state/schema.js';
 import type { WorkflowDefinition } from '../engine/types.js';
 import type { StateStore } from '../state/store.js';
 
-/** Creates a disposable git repo under os.tmpdir(). cleanup() is idempotent. */
-export async function tmpGitRepo(): Promise<{ path: string; cleanup: () => Promise<void> }> {
+/**
+ * Creates a disposable git repo under os.tmpdir(). cleanup() is idempotent.
+ *
+ * By default the repo has no user.name/email and no commits — cheap for tests
+ * that just need a valid cwd. Pass `seed: {}` (or with overrides) to get:
+ *   - user.email / user.name configured (defaults "test@harny.local" /
+ *     "harny test"), required before any commit;
+ *   - an initial empty commit (opt-out via seed.initialCommit=false), required
+ *     by anything that calls git operations expecting HEAD to exist.
+ */
+export async function tmpGitRepo(opts?: {
+  seed?: { name?: string; email?: string; initialCommit?: boolean };
+}): Promise<{ path: string; cleanup: () => Promise<void> }> {
   const path = await mkdtemp(join(tmpdir(), 'harny-test-'));
-  const proc = Bun.spawn(['git', 'init', path], { stdout: 'ignore', stderr: 'ignore' });
-  await proc.exited;
-  if (proc.exitCode !== 0) {
-    throw new Error(`git init failed in ${path} (exit ${proc.exitCode})`);
+  const run = async (args: string[]) => {
+    const proc = Bun.spawn(['git', ...args], {
+      cwd: path,
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    await proc.exited;
+    if (proc.exitCode !== 0) {
+      throw new Error(`git ${args.join(' ')} failed in ${path} (exit ${proc.exitCode})`);
+    }
+  };
+  await run(['init']);
+  if (opts?.seed) {
+    const email = opts.seed.email ?? 'test@harny.local';
+    const name = opts.seed.name ?? 'harny test';
+    await run(['config', 'user.email', email]);
+    await run(['config', 'user.name', name]);
+    if (opts.seed.initialCommit !== false) {
+      await run(['commit', '--allow-empty', '-m', 'seed']);
+    }
   }
   let cleaned = false;
   return {
