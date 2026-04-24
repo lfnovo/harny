@@ -7,8 +7,9 @@
  *   bun scripts/probes/engine/16-auto-store-writes.ts
  */
 
-import { createActor } from 'xstate';
-import { buildAutoActors } from '../../../src/harness/engine/workflows/auto.ts';
+import { createActor, fromPromise } from 'xstate';
+import { buildFeatureDevActors } from '../../../src/harness/engine/workflows/featureDevActors.ts';
+import featureDevEngineWorkflow from '../../../src/harness/engine/workflows/featureDev.ts';
 import autoWorkflow from '../../../src/harness/engine/workflows/auto.ts';
 import type { StateStore } from '../../../src/harness/state/store.ts';
 import type { PhaseEntry, HistoryEntry } from '../../../src/harness/state/schema.ts';
@@ -88,7 +89,7 @@ try {
         }
       };
 
-      const actors = buildAutoActors({
+      const leafActors = buildFeatureDevActors({
         cwd: '/tmp',
         taskSlug: 'probe-auto',
         runId: 'probe-auto-run-id',
@@ -99,8 +100,15 @@ try {
         store: fakeStore,
         variant: 'default',
       });
-
-      const machineWithActors = autoWorkflow.machine.provide({ actors });
+      const wiredLeafMachine = featureDevEngineWorkflow.machine.provide({
+        actors: { ...leafActors, persistPlanActor: fromPromise(async () => {}) },
+      });
+      const machineWithActors = autoWorkflow.machine.provide({
+        actors: {
+          leafMachine: wiredLeafMachine,
+          cleanupActor: fromPromise(async () => {}),
+        },
+      });
 
       await new Promise<void>((resolve, reject) => {
         const actor = createActor(machineWithActors, {
