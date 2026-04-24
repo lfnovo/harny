@@ -5,7 +5,7 @@
  *   (a) savePlan writes an atomically-renamed file.
  *   (b) loadPlan round-trips a valid Plan.
  *   (c) loadPlan rejects non-JSON with a clear error.
- *   (d) loadPlan rejects schema-mismatched JSON with a clear error.
+ *   (d) loadPlan rejects JSON missing required fields with a clear error.
  *   (e) savePlan rejects a structurally-invalid Plan (caught at write boundary).
  *   (f) PlanSchema accepts the shape produced by the planner today.
  *
@@ -24,7 +24,6 @@ import type { Plan } from '../../../src/harness/types.ts';
 function validPlan(): Plan {
   const now = new Date().toISOString();
   return {
-    schema_version: 1,
     task_slug: 'probe-slug',
     user_prompt: 'do the thing',
     branch: 'harny/probe-slug',
@@ -100,10 +99,10 @@ async function main() {
     }
   });
 
-  // (d) schema mismatch rejection — wrong schema_version, missing required fields
+  // (d) schema mismatch rejection — missing required fields
   await run('loadPlan rejects schema mismatch', async () => {
     const badPath = join(dir, 'wrongshape.json');
-    writeFileSync(badPath, JSON.stringify({ schema_version: 99, foo: 'bar' }));
+    writeFileSync(badPath, JSON.stringify({ task_slug: 'x' }));
     try {
       await loadPlan(badPath);
       throw new Error('expected loadPlan to throw');
@@ -116,7 +115,7 @@ async function main() {
 
   // (e) savePlan refuses invalid plan
   await run('savePlan refuses invalid plan', async () => {
-    const bogus = { ...validPlan(), schema_version: 99 as unknown as 1 };
+    const bogus = { ...validPlan(), status: 'invalid-status' as unknown as 'planning' };
     try {
       await savePlan(join(dir, 'shouldnotexist.json'), bogus as Plan);
       throw new Error('expected savePlan to throw');
@@ -132,7 +131,6 @@ async function main() {
   await run('schema accepts a rich plan with metadata + multiple tasks', async () => {
     const now = new Date().toISOString();
     const plan: Plan = {
-      schema_version: 1,
       task_slug: 'rich',
       user_prompt: 'complex thing',
       branch: 'harny/rich',
@@ -181,6 +179,22 @@ async function main() {
     // passthrough on history should retain the extra field
     if ((loaded.tasks[0]!.history[0] as any).extra !== 42) {
       throw new Error('history passthrough');
+    }
+  });
+
+  // (g) loadPlan error names the missing field — verifies the descriptive error
+  // contains enough context for the operator to diagnose without reading source.
+  await run('loadPlan error names missing required field', async () => {
+    const badPath = join(dir, 'missingtaskslug.json');
+    const { task_slug: _, ...withoutSlug } = validPlan();
+    writeFileSync(badPath, JSON.stringify(withoutSlug));
+    try {
+      await loadPlan(badPath);
+      throw new Error('expected loadPlan to throw');
+    } catch (err: any) {
+      if (!String(err.message).includes('task_slug')) {
+        throw new Error(`error did not mention task_slug: ${err.message}`);
+      }
     }
   });
 }
