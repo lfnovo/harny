@@ -73,6 +73,7 @@ try {
           developerActor: fromPromise(async () => ({ session_id: 'dev' })) as any,
           validatorActor: fromPromise(async () => ({ verdict: 'pass' as const, session_id: 'val' })) as any,
           commitActor: fromPromise(async () => ({ sha: 'mock-sha' })) as any,
+          persistPlanActor: fromPromise(async () => {}) as any,
         },
       });
 
@@ -116,6 +117,7 @@ try {
             return { verdict: valCallCount === 1 ? ('fail' as const) : ('pass' as const), session_id: 'val' };
           }) as any,
           commitActor: fromPromise(async () => ({ sha: 'mock-sha' })) as any,
+          persistPlanActor: fromPromise(async () => {}) as any,
         },
       });
 
@@ -154,7 +156,8 @@ try {
         actors: {
           plannerActor: fromPromise(async () => plan) as any,
           developerActor: fromPromise(async () => ({ session_id: 'dev' })) as any,
-          validatorActor: fromPromise(async () => ({ verdict: 'fail' as const, session_id: 'val' })) as any,
+          validatorActor: fromPromise(async () => ({ verdict: 'fail' as const, session_id: 'val', reasons: [] })) as any,
+          persistPlanActor: fromPromise(async () => {}) as any,
         },
       });
 
@@ -193,7 +196,8 @@ try {
             devCallCount++;
             return { session_id: 'dev' };
           }) as any,
-          validatorActor: fromPromise(async () => ({ verdict: 'blocked' as const, session_id: 'val' })) as any,
+          validatorActor: fromPromise(async () => ({ verdict: 'blocked' as const, session_id: 'val', reasons: [] })) as any,
+          persistPlanActor: fromPromise(async () => {}) as any,
         },
       });
 
@@ -277,6 +281,7 @@ try {
           developerActor: fromPromise(async () => ({ session_id: 'dev' })) as any,
           validatorActor: fromPromise(async () => ({ verdict: 'pass' as const, session_id: 'val' })) as any,
           commitActor: fromPromise(async () => ({ sha: 'mock-sha' })) as any,
+          persistPlanActor: fromPromise(async () => {}) as any,
         },
       });
 
@@ -363,7 +368,7 @@ try {
         variant: 'default',
       });
 
-      const provided = machine.provide({ actors } as any);
+      const provided = machine.provide({ actors: { ...actors, persistPlanActor: fromPromise(async () => {}) } } as any);
 
       const snapshot = await new Promise<any>((resolve) => {
         const actor = createActor(provided, { input: { cwd: '/tmp', userPrompt: 'build something', maxRetries: 3 } });
@@ -443,7 +448,7 @@ try {
         variant: 'default',
       });
 
-      const provided = machine.provide({ actors } as any);
+      const provided = machine.provide({ actors: { ...actors, persistPlanActor: fromPromise(async () => {}) } } as any);
 
       const snapshot = await new Promise<any>((resolve) => {
         const actor = createActor(provided, { input: { cwd: '/tmp', userPrompt: 'build something', maxRetries: 3 } });
@@ -526,7 +531,7 @@ try {
         variant: 'default',
       });
 
-      const provided = machine.provide({ actors } as any);
+      const provided = machine.provide({ actors: { ...actors, persistPlanActor: fromPromise(async () => {}) } } as any);
 
       const snapshot = await new Promise<any>((resolve) => {
         const actor = createActor(provided, { input: { cwd: '/tmp', userPrompt: 'build something', maxRetries: 3 } });

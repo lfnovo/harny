@@ -7,7 +7,7 @@
  *   bun scripts/probes/engine/18-canonical-id.ts
  */
 
-import { getWorkflow, isEngineWorkflow } from '../../../src/harness/workflows/index.ts';
+import { getWorkflow } from '../../../src/harness/workflows/index.ts';
 
 const DEADLINE_MS = 1500;
 
@@ -25,9 +25,7 @@ try {
     (async () => {
       const name = 'feature-dev-is-engine';
       const wf = getWorkflow('feature-dev');
-      if (!isEngineWorkflow(wf)) {
-        throw new Error(`getWorkflow('feature-dev') is not an engine workflow — missing .machine or has .run`);
-      }
+      // isEngineWorkflow removed from workflows/index.ts — check shape directly
       if (!('machine' in wf)) {
         throw new Error(`getWorkflow('feature-dev') has no .machine property`);
       }
