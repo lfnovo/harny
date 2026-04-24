@@ -1,0 +1,265 @@
+import { describe, test, expect } from "bun:test";
+import { fromPromise } from "xstate";
+import featureDevWorkflow from "./featureDev.js";
+import { runEngineWorkflowDry } from "../../testing/index.js";
+import type { Plan, PlanTask } from "../../types.js";
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+function task(id: string, overrides: Partial<PlanTask> = {}): PlanTask {
+  return {
+    id,
+    title: `Task ${id}`,
+    description: `do ${id}`,
+    acceptance: [`${id} works`],
+    status: "pending",
+    attempts: 0,
+    commit_sha: null,
+    history: [],
+    ...overrides,
+  };
+}
+
+function plan(tasks: PlanTask[]): Plan {
+  const now = "2026-01-01T00:00:00.000Z";
+  return {
+    task_slug: "t",
+    user_prompt: "do stuff",
+    branch: "",
+    primary_cwd: "/tmp",
+    isolation: "inline",
+    worktree_path: null,
+    created_at: now,
+    updated_at: now,
+    status: "in_progress",
+    summary: "test plan",
+    iterations_global: 0,
+    tasks,
+    metadata: {},
+  };
+}
+
+// Builds a fromPromise actor that pops scripted outputs from a queue per call.
+// Throws on exhaustion — catches off-by-one in test scripts rather than silently
+// repeating the last result.
+function scripted<TOut, TIn = unknown>(outputs: TOut[]) {
+  const queue = [...outputs];
+  return fromPromise<TOut, TIn>(async () => {
+    const next = queue.shift();
+    if (next === undefined) {
+      throw new Error("scripted actor: script exhausted");
+    }
+    return next;
+  });
+}
+
+// spyCommit — records every (cwd, message, attempt) and returns a fake sha.
+// Inline here; promote to testing/ if a use emerges outside this file.
+function spyCommit(sha: string | null = "sha-fake") {
+  const calls: { cwd: string; message: string; attempt: number }[] = [];
+  const actor = fromPromise<
+    { sha: string | null },
+    { cwd: string; message: string; attempt: number }
+  >(async ({ input }) => {
+    calls.push(input);
+    return { sha };
+  });
+  return { actor, calls };
+}
+
+function failingCommit(err: Error) {
+  return fromPromise<
+    { sha: string | null },
+    { cwd: string; message: string; attempt: number }
+  >(async () => {
+    throw err;
+  });
+}
+
+const noopPersist = fromPromise<void, { primaryCwd: string; taskSlug: string; plan: Plan }>(
+  async () => {},
+);
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe("feature-dev commit-gate: validator pass", () => {
+  test("validator pass → commitActor called once with task= and validator: reasons", async () => {
+    const spy = spyCommit();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "feat: t1" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "pass", session_id: "val-1", reasons: ["checklist ok"] },
+        ]),
+        commitActor: spy.actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("done");
+    expect(spy.calls).toHaveLength(1);
+    expect(spy.calls[0]!.message).toContain("task=t1");
+    expect(spy.calls[0]!.message).toContain("validator: checklist ok");
+    expect(spy.calls[0]!.cwd).toBe("/tmp");
+  });
+});
+
+describe("feature-dev commit-gate: retry path does not commit", () => {
+  test("validator fail with attempts<maxRetries → no commit, developer re-invoked", async () => {
+    const spy = spyCommit();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 2 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "feat: t1 a1" },
+          { session_id: "dev-1", status: "done", commit_message: "feat: t1 a2" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "val-1", reasons: ["missing X"] },
+          { verdict: "pass", session_id: "val-1", reasons: ["checklist ok"] },
+        ]),
+        commitActor: spy.actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("done");
+    expect(spy.calls).toHaveLength(1);
+    expect(spy.calls[0]!.message).toContain("validator: checklist ok");
+    expect(spy.calls[0]!.message).not.toContain("missing X");
+  });
+});
+
+describe("feature-dev commit-gate: exhausted retries do not commit", () => {
+  test("validator fail with attempts=maxRetries → no commit, machine failed", async () => {
+    const spy = spyCommit();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 1 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "m1" },
+          { session_id: "dev-1", status: "done", commit_message: "m2" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "val-1", reasons: ["r1"] },
+          { verdict: "fail", session_id: "val-1", reasons: ["r2"] },
+        ]),
+        commitActor: spy.actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("failed");
+    expect(spy.calls).toHaveLength(0);
+  });
+});
+
+describe("feature-dev commit-gate: validator blocked does not commit", () => {
+  test("validator verdict=blocked → no commit, machine failed", async () => {
+    const spy = spyCommit();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "m" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "blocked", session_id: "val-1", reasons: ["env missing"] },
+        ]),
+        commitActor: spy.actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("failed");
+    expect(spy.calls).toHaveLength(0);
+  });
+});
+
+describe("feature-dev commit-gate: developer blocked does not commit", () => {
+  test("developer status=blocked → validator skipped, no commit, machine failed", async () => {
+    const spy = spyCommit();
+    // Validator must NOT be called — if it is, scripted() throws on empty queue.
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "blocked", commit_message: "" },
+        ]),
+        validatorActor: scripted([]),
+        commitActor: spy.actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("failed");
+    expect(spy.calls).toHaveLength(0);
+  });
+});
+
+describe("feature-dev commit-gate: commitActor failure", () => {
+  test("commitActor throws → machine failed", async () => {
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "m" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "pass", session_id: "val-1", reasons: ["ok"] },
+        ]),
+        commitActor: failingCommit(new Error("git write locked")),
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("failed");
+  });
+});
+
+describe("feature-dev commit-gate: per-task reasons are fresh, not stale", () => {
+  test("two tasks pass → each commit message carries its own validator reasons", async () => {
+    const spy = spyCommit();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1"), task("t2")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "feat: t1" },
+          { session_id: "dev-2", status: "done", commit_message: "feat: t2" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "pass", session_id: "val-1", reasons: ["reason-a"] },
+          { verdict: "pass", session_id: "val-2", reasons: ["reason-b"] },
+        ]),
+        commitActor: spy.actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("done");
+    expect(spy.calls).toHaveLength(2);
+    expect(spy.calls[0]!.message).toContain("task=t1");
+    expect(spy.calls[0]!.message).toContain("validator: reason-a");
+    expect(spy.calls[0]!.message).not.toContain("reason-b");
+    expect(spy.calls[1]!.message).toContain("task=t2");
+    expect(spy.calls[1]!.message).toContain("validator: reason-b");
+    expect(spy.calls[1]!.message).not.toContain("reason-a");
+  });
+});

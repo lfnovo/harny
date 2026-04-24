@@ -179,7 +179,7 @@ export async function withSyntheticState(
  */
 export async function runEngineWorkflowDry(
   workflow: WorkflowDefinition<AnyStateMachine>,
-  input: { cwd: string; userPrompt: string },
+  input: { cwd: string; userPrompt: string } & Record<string, unknown>,
   fixtures: Record<string, unknown>,
 ): Promise<any> {
   const DEADLINE_MS = 5_000;
