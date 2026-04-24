@@ -44,7 +44,7 @@ export interface WorkflowDefinition<TMachine extends AnyStateMachine> {
   needsWorktree?: boolean;
   machine: TMachine;
   // Optional. When set, runEngineWorkflow calls machine.provide({ actors: buildActors(deps) }) before createActor.
-  buildActors?: (deps: { cwd: string; taskSlug: string; runId: string; mode?: RunMode; logMode?: LogMode; store?: StateStore; variant: string }) => Record<string, any>;
+  buildActors?: (deps: { cwd: string; primaryCwd: string; taskSlug: string; runId: string; mode?: RunMode; logMode?: LogMode; store?: StateStore; variant: string }) => Record<string, any>;
 }
 
 // Runtime context passed to actor factories; populated by the harny runtime
@@ -53,6 +53,7 @@ export interface ActorContext {
   runId: string;
   taskSlug: string;
   cwd: string;
+  primaryCwd?: string;
   features?: FeatureSet;
 }
 

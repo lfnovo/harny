@@ -9,6 +9,7 @@ import type { Plan, PlanTask } from '../../types.js';
 
 interface FeatureDevContext {
   cwd: string;
+  primaryCwd: string;
   taskSlug: string;
   userPrompt: string;
   maxRetries: number;
@@ -29,7 +30,7 @@ interface FeatureDevContext {
 const machine = setup({
   types: {} as {
     context: FeatureDevContext;
-    input: { cwd: string; userPrompt: string; taskSlug: string; maxRetries?: number };
+    input: { cwd: string; primaryCwd?: string; userPrompt: string; taskSlug: string; maxRetries?: number };
   },
   actors: {
     plannerActor: fromPromise<Plan, { prompt: string; cwd: string }>(
@@ -53,7 +54,7 @@ const machine = setup({
     // Persists the plan produced by plannerActor to .harny/<slug>/plan.json.
     // Separate state because it's a disk write that can fail and we want that
     // failure to cleanly route to 'failed' without corrupting in-memory state.
-    persistPlanActor: fromPromise<void, { cwd: string; taskSlug: string; plan: Plan }>(
+    persistPlanActor: fromPromise<void, { primaryCwd: string; taskSlug: string; plan: Plan }>(
       async () => { throw new Error('not wired'); },
     ),
   },
@@ -89,6 +90,7 @@ const machine = setup({
   initial: 'planning',
   context: ({ input }) => ({
     cwd: input.cwd,
+    primaryCwd: input.primaryCwd ?? input.cwd,
     taskSlug: input.taskSlug,
     userPrompt: input.userPrompt,
     maxRetries: input.maxRetries ?? 3,
@@ -119,7 +121,7 @@ const machine = setup({
       invoke: {
         src: 'persistPlanActor',
         input: ({ context }) => ({
-          cwd: context.cwd,
+          primaryCwd: context.primaryCwd,
           taskSlug: context.taskSlug,
           plan: context.plan!,
         }),
