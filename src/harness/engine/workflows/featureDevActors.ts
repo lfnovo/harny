@@ -84,9 +84,14 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
 
   const plannerActor = fromPromise<Plan, { prompt: string; cwd: string }>(
     async ({ input }) => {
+      const checklistCount = (input.prompt.match(/^- \[[ x]\]/gm) ?? []).length;
+      const prompt =
+        checklistCount > 0
+          ? `${input.prompt}\n\nThe prompt contains ${checklistCount} checklist item${checklistCount === 1 ? '' : 's'}. Unless the user explicitly requests consolidation, produce ${checklistCount} task${checklistCount === 1 ? '' : 's'} — one per item, in order.`
+          : input.prompt;
       const result = await runPhasePlanner({
         phaseName: 'planner',
-        prompt: input.prompt,
+        prompt,
         schema: PlannerVerdictSchema,
         allowedTools: DEFAULT_PLANNER.allowedTools,
         attempt: 1,
