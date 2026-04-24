@@ -206,9 +206,9 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
   // immediately after plannerActor returns, via the machine's persistingPlan
   // state. Errors route to the machine's failed state so the run terminates
   // cleanly rather than proceeding with an unpersisted plan.
-  const persistPlanActor = fromPromise<void, { cwd: string; taskSlug: string; plan: Plan }>(
+  const persistPlanActor = fromPromise<void, { primaryCwd: string; taskSlug: string; plan: Plan }>(
     async ({ input }) => {
-      await savePlan(planFilePath(input.cwd, input.taskSlug), input.plan);
+      await savePlan(planFilePath(input.primaryCwd, input.taskSlug), input.plan);
     },
   );
 

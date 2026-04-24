@@ -180,6 +180,7 @@ export async function runHarness(args: {
 
       const engineResult = await runEngineWorkflow(workflow, {
         cwd: phaseCwd,
+        primaryCwd,
         taskSlug,
         runId,
         userPrompt: args.userPrompt,
