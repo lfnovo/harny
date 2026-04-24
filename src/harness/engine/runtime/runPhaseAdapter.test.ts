@@ -2,6 +2,8 @@ import { describe, test, expect } from "bun:test";
 import { z } from "zod";
 import { runPhaseWithFixture } from "../../testing/index.js";
 import { MockStateStore } from "../../testing/mockStateStore.js";
+import { adaptRunPhase } from "./runPhaseAdapter.js";
+import type { SessionRunPhase } from "./runPhaseAdapter.js";
 import type { PhaseRunResult } from "../../sessionRecorder.js";
 import type { State } from "../../state/schema.js";
 
@@ -61,6 +63,53 @@ const phaseConfig = {
   mcpServers: {},
   guards: {},
 };
+
+describe("adaptRunPhase: translates engineArgs → SessionRunPhase args", () => {
+  test("phase, primaryCwd, phaseCwd, taskSlug, workflowId, prompt, outputSchema, allowedTools are threaded correctly", async () => {
+    let captured: any = null;
+    const capturingFn: SessionRunPhase = async (args) => {
+      captured = args;
+      return {
+        sessionId: "s-cap",
+        status: "completed",
+        error: null,
+        structuredOutput: { ok: true },
+        resultSubtype: "success",
+        events: [],
+      };
+    };
+    const runner = adaptRunPhase({
+      cwd: "/tmp/test-cwd",
+      workflowId: "test-workflow",
+      taskSlug: "test-task",
+      runId: "run-001",
+      phaseConfig,
+      sessionRunPhase: capturingFn,
+      mode: "silent",
+      logMode: "compact",
+    });
+    const schema = z.object({}).passthrough();
+    const result = await runner({
+      phaseName: "developer",
+      prompt: "do the thing",
+      schema,
+      allowedTools: ["Bash", "Read"],
+    });
+    expect(captured).not.toBeNull();
+    expect(captured.phase).toBe("developer");
+    expect(captured.primaryCwd).toBe("/tmp/test-cwd");
+    expect(captured.phaseCwd).toBe("/tmp/test-cwd");
+    expect(captured.taskSlug).toBe("test-task");
+    expect(captured.workflowId).toBe("test-workflow");
+    expect(captured.prompt).toBe("do the thing");
+    expect(captured.outputSchema).toBe(schema);
+    // engine allowedTools win over phaseConfig's
+    expect(captured.phaseConfig.allowedTools).toEqual(["Bash", "Read"]);
+    // result: session_id + output passthrough
+    expect(result.session_id).toBe("s-cap");
+    expect(result.output).toEqual({ ok: true });
+  });
+});
 
 describe("adaptRunPhase: non-happy statuses", () => {
   test("paused_for_user_input → throws 'not supported' (RFC #20)", async () => {

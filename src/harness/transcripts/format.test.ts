@@ -61,3 +61,22 @@ test("text block in assistant message is rendered with 💬 prefix", () => {
   expect(line).toContain("💬");
   expect(line).toContain("hello world");
 });
+
+test("tool_result with isError:true is marked '(error:' in the rendering", () => {
+  const line = formatEvent(
+    userEvent([
+      {
+        type: "tool_result",
+        tool_use_id: "tu_01",
+        content: "Permission denied",
+        isError: true,
+      },
+    ]),
+  );
+  expect(line).not.toBeNull();
+  expect(line).toContain("(error:");
+});
+
+test("unknown event type (e.g. 'attachment') returns null to skip rendering", () => {
+  expect(formatEvent({ type: "attachment", data: "some hook data" })).toBeNull();
+});
