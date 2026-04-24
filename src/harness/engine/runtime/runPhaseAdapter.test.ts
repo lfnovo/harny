@@ -62,6 +62,54 @@ const phaseConfig = {
   guards: {},
 };
 
+describe("adaptRunPhase: non-happy statuses", () => {
+  test("paused_for_user_input → throws 'not supported' (RFC #20)", async () => {
+    const store = new MockStateStore(minimalState());
+    const parkedFixture: PhaseRunResult<unknown> = {
+      sessionId: "s-paused",
+      status: "paused_for_user_input",
+      error: null,
+      structuredOutput: null,
+      resultSubtype: null,
+      events: [],
+      parked: {
+        askUserInput: { questions: [] } as any,
+        toolUseId: null,
+      },
+    };
+    const runner = runPhaseWithFixture(phaseConfig, parkedFixture, store);
+    await expect(
+      runner({
+        phaseName: "planner",
+        prompt: "p",
+        schema: z.object({}).passthrough(),
+        allowedTools: [],
+      }),
+    ).rejects.toThrow(/paused for user input|not supported/);
+  });
+
+  test("status=error → throws with the error string preserved", async () => {
+    const store = new MockStateStore(minimalState());
+    const errorFixture: PhaseRunResult<unknown> = {
+      sessionId: "s-err",
+      status: "error",
+      error: "SDK blew up",
+      structuredOutput: null,
+      resultSubtype: null,
+      events: [],
+    };
+    const runner = runPhaseWithFixture(phaseConfig, errorFixture, store);
+    await expect(
+      runner({
+        phaseName: "planner",
+        prompt: "p",
+        schema: z.object({}).passthrough(),
+        allowedTools: [],
+      }),
+    ).rejects.toThrow(/SDK blew up/);
+  });
+});
+
 describe("adaptRunPhase: StateStore writes", () => {
   test("single phase call writes phases[] entry and 2 history events", async () => {
     const store = new MockStateStore(minimalState());

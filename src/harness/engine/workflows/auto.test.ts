@@ -126,6 +126,67 @@ describe("auto workflow: store writes cross the boundary", () => {
   });
 });
 
+describe("auto workflow: leaf + cleanup transitions", () => {
+  test("leaf done + cleanup pass → 'done' final state", async () => {
+    const snapshot = await runEngineWorkflowDry(
+      autoWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        leafMachine: fromPromise(async () => {}),
+        cleanupActor: fromPromise(async () => {}),
+      },
+    );
+    expect(snapshot.value).toBe("done");
+  });
+
+  test("leaf error → finalize still runs cleanup → 'failed' final state (error preserved)", async () => {
+    let cleanupCalled = false;
+    const snapshot = await runEngineWorkflowDry(
+      autoWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        leafMachine: fromPromise(async () => {
+          throw new Error("leaf blew up");
+        }),
+        cleanupActor: fromPromise(async () => {
+          cleanupCalled = true;
+        }),
+      },
+    );
+    expect(snapshot.value).toBe("failed");
+    expect(cleanupCalled).toBe(true);
+    expect(snapshot.context.error).toContain("leaf blew up");
+  });
+
+  test("leaf done BUT cleanup errors → 'failed' final state", async () => {
+    const snapshot = await runEngineWorkflowDry(
+      autoWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        leafMachine: fromPromise(async () => {}),
+        cleanupActor: fromPromise(async () => {
+          throw new Error("cleanup blew up");
+        }),
+      },
+    );
+    expect(snapshot.value).toBe("failed");
+  });
+
+  test("leaf error + cleanup pass → still 'failed' (cleanup does not rescue)", async () => {
+    const snapshot = await runEngineWorkflowDry(
+      autoWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        leafMachine: fromPromise(async () => {
+          throw new Error("leaf err");
+        }),
+        cleanupActor: fromPromise(async () => {}),
+      },
+    );
+    expect(snapshot.value).toBe("failed");
+  });
+});
+
 describe("auto workflow: machine config topology", () => {
   const config = (autoWorkflow.machine as any).config;
   const states = config?.states ?? {};
