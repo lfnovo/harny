@@ -11,6 +11,7 @@ function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
 import { buildGuardHooks, type PhaseGuards } from "./guardHooks.js";
 import {
   runAskUserQuestionTTY,
+  AskUserQuestionInputSchema,
   type AskUserQuestionInput,
 } from "./askUser.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from "./types.js";
@@ -65,6 +66,17 @@ function isTransientApiError(msg: string | null | undefined): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function formatAskUserInputError(err: z.ZodError): string {
+  const issue = err.issues[0];
+  if (!issue) return "AskUserQuestion input invalid";
+  const path = issue.path.reduce<string>((acc, seg) => {
+    if (typeof seg === "number") return `${acc}[${seg}]`;
+    const s = String(seg);
+    return acc ? `${acc}.${s}` : s;
+  }, "");
+  return `AskUserQuestion input invalid: ${path || "input"} — ${issue.message}`;
 }
 
 export async function runPhase<T>(args: {
@@ -239,13 +251,20 @@ async function runPhaseAttempt<T>(args: {
                   "AskUserQuestion is disabled in silent mode. Pick a defensible default and document the assumption.",
               };
             }
+            const parsed = AskUserQuestionInputSchema.safeParse(input);
+            if (!parsed.success) {
+              return {
+                behavior: "deny",
+                message: formatAskUserInputError(parsed.error),
+              };
+            }
             if (mode === "async") {
               // Park: stash the input, return deny+interrupt, the SDK's
               // for-await loop will throw with subtype=error_during_execution.
               // The outer catch converts parkState into PhaseRunResult with
               // status=paused_for_user_input.
               parkState = {
-                askUserInput: input as unknown as AskUserQuestionInput,
+                askUserInput: parsed.data,
                 toolUseId: ctx.toolUseID ?? null,
               };
               return {
@@ -255,9 +274,7 @@ async function runPhaseAttempt<T>(args: {
               };
             }
             // interactive
-            return await runAskUserQuestionTTY(
-              input as unknown as AskUserQuestionInput,
-            );
+            return await runAskUserQuestionTTY(parsed.data);
           }
           return { behavior: "allow", updatedInput: input };
         },
