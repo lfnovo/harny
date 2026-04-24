@@ -69,19 +69,19 @@ let failures = 0;
   const cwd = makeTmpRepo();
   try {
     const controller = new AbortController();
-    await Promise.race([
+    const result = await Promise.race([
       gitCommit({ cwd, message: 'nothing' }, controller.signal),
       hardDeadline(),
     ]);
-    console.log(`FAIL ${name}: should have thrown`);
-    failures++;
-  } catch (e: any) {
-    if (e.message.includes('hard deadline')) {
-      console.log(`FAIL ${name}: hard deadline exceeded`);
-      failures++;
-    } else {
+    if (result.sha === null) {
       console.log(`PASS ${name}`);
+    } else {
+      console.log(`FAIL ${name}: expected sha null for no-op, got ${result.sha}`);
+      failures++;
     }
+  } catch (e: any) {
+    console.log(`FAIL ${name}: unexpected throw — ${e.message}`);
+    failures++;
   } finally {
     rmSync(cwd, { recursive: true });
   }
@@ -174,22 +174,19 @@ let failures = 0;
   const cwd = makeTmpRepo();
   try {
     const controller = new AbortController();
-    await Promise.race([
+    const result = await Promise.race([
       gitCommit({ cwd, message: 'empty' }, controller.signal),
       hardDeadline(),
     ]);
-    console.log(`FAIL ${name}: should have thrown`);
-    failures++;
-  } catch (e: any) {
-    if (e.message.includes('hard deadline')) {
-      console.log(`FAIL ${name}: hard deadline exceeded`);
-      failures++;
-    } else if (e.message.includes('nothing staged')) {
+    if (result.sha === null) {
       console.log(`PASS ${name}`);
     } else {
-      console.log(`FAIL ${name}: threw but wrong message — ${e.message}`);
+      console.log(`FAIL ${name}: expected sha null for empty commit, got ${result.sha}`);
       failures++;
     }
+  } catch (e: any) {
+    console.log(`FAIL ${name}: unexpected throw — ${e.message}`);
+    failures++;
   } finally {
     rmSync(cwd, { recursive: true });
   }
