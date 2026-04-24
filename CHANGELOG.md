@@ -4,6 +4,73 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-04-24
+
+**Engine rewrite on XState v5.** The entire orchestration layer was rebuilt from a hand-rolled TypeScript loop into a declarative XState v5 machine with typed actors for each phase. The engine path is now canonical — the legacy TS loop is gone. Along the way the config surface was simplified (no more `harny.json`), the on-disk state schema was bumped, and the committing step was promoted to a first-class PhaseEntry. Testing infrastructure migrated from ad-hoc probes to `bun:test` with a documented testing constitution (`src/harness/testing/CLAUDE.md`).
+
+### Changed (breaking)
+- **`harny.json` config removed end-to-end** (`8c33798`). Per-project config file is gone. Workflow defaults live in each workflow's `phaseDefaults`; CLI flags (`--mode`, `--isolation`, `--workflow`) are the only per-run overrides. Any `harny.json` in a target repo is now ignored. Deep-merge loader and associated runtime config plumbing deleted.
+- **Legacy TypeScript-loop `feature-dev` workflow deleted** (`2ea713d`, `e92abed`). The hand-written `planner → loop(dev, validator)` orchestration in `src/harness/workflows/featureDev/` was retired in favor of the XState engine. `--workflow feature-dev` now routes exclusively through the engine path. Any external code importing from the old workflow path breaks.
+- **`state.json` schema bumped to v2** (`2b8bdfc`). New `workflow_state: Record<string, unknown>` field (engine scratchpad), `workflow_chosen: {id, variant} | null` (for future router), `phoenix: {project, trace_id}` lifted to top-level. `pending_question.phase_name` added, `phases[].no_op` flag added (records verified-only tasks that commit with `sha: null`). Stale v1 `state.json` files fail Zod validation — run `harny clean <slug>` to discard and retry. `plan.json` shares this lifecycle key; no independent `plan.json` schema version anymore (`08b4e15`).
+- **Committing phase promoted to first-class PhaseEntry** (`add56e6`). The engine machine now emits **4 PhaseEntry values per attempt** (`planner`, `developer`, `validator`, `committing`), not 3. `committing` is a transient git step recorded via `appendPhase`/`updatePhase` with no corresponding `phase_end` history event, but is visible in `harny show` and the viewer. Probes and downstream consumers that asserted `phases.length === 3` must expect 4.
+- **`plan.json` `schema_version` field removed** (`08b4e15`). Plan shares the lifecycle key of `state.json` v2. Code reading the plan no longer checks its own version field.
+
+### Added
+- **XState v5 engine layer** (`src/harness/engine/`). New module implementing the orchestration as a declarative state machine. Shipped in composable pieces:
+  - `defineWorkflow()` — wraps `setup() + createMachine()` with harny metadata; enforces strict typing on action/actor references (`ddde230`).
+  - Three dispatcher actors, each exporting a canonical async function for probes plus a thin XState wrapper: `agentActor` (`dispatchers/agent.ts`, wraps SDK `runPhase` with `resumeSessionId` threading — `b887179`), `commandActor` (`dispatchers/command.ts`, `Bun.spawn` with `advisory` and `idempotent` flags — `858f8bf`), `humanReviewActor` (`dispatchers/humanReview.ts`, DI-friendly `askProvider` seam — `cbb0320`).
+  - `harnyActions.ts` — effect actions (`commitLogic`, `resetTreeLogic`, `cleanUntrackedLogic`) wrapping git subprocess with `AbortSignal` + `SIGKILL + await proc.exited`; pure-state assigns (`advanceTask`, `bumpAttempts`, `stashValidator`, `stashDevSession`) operating on `PlanDrivenContext` (`8dd0274`, `e3d4048`).
+  - `runPhaseAdapter.ts` — bridges the engine's generic `runPhase` contract to the existing `sessionRecorder.runPhase` (`2939cad`).
+  - `runEngineWorkflow()` runtime executor — materializes actors via `workflow.buildActors()`, creates the actor, subscribes, resolves on `done`/`failed`, races against a 30-minute default timeout (bumped from 10 min — `5442aa6`).
+- **`feature-dev` machine reimplemented on the engine** (`2eecdc8` → `c823e18`). Five-state machine: `planning → persistingPlan → loop.{developer, validator, committing, next, failed} → done/failed`. Validator fail with attempts < maxRetries retries developer with `resumeSessionId`; validator pass commits; blocked is fatal. Incremental milestones: scaffold + mock actors (B.1), real planner (B.2), real dev + validator (B.3), commit + schema fix (B.4), registry + buildActors + CLI smoke (B.5).
+- **`echo-commit` workflow** (`bc974a3`). First trivial engine workflow — runs `sh -c 'echo hi > note.txt && git add note.txt'`, then commits. Serves as smoke test and minimal integration example.
+- **`auto` boundary workflow** (`33297b9`). XState sub-actor wrapper around a leaf workflow with pre/post cleanup extension points (engine-design §4). Ships the structural skeleton; router logic deferred to future RFC (#18). `auto` is now the default wrapper around `feature-dev`.
+- **CLI `--workflow <id>:<variant>` syntax** (`2ceb8a0`, `3d2dabd`). Variant string threads from CLI through the orchestrator and engine actor chain, available to `buildActors` for future variant-specific wiring. Default `<variant>` is `"default"`.
+- **`harny clean` live-process guard** (`4809e41`). Refuses to clean a running run unless `--force` or `--kill` is passed. `--kill` terminates the pid before cleanup. Prevents accidentally stomping an active harness run.
+- **`harny show --tail [--since=<duration>]`** (`ce2cf80`, `3d79e86`, `e00cd1a`). Streaming transcript viewer. `--since=5m` backfills the last 5 minutes before streaming. Durations accept `s`/`m`/`h` suffixes.
+- **Viewer sibling-branches panel** (`b5652ec`, `088754f`, `03a6c5e`). The viewer lists other `harny/*` / `harness/*` branches alongside the current run. Filtered to harness-managed prefixes (skips `main`, `feature/*`, stale locals); degrades silently when empty or when `git` errors.
+- **`PhaseGuards` end-to-end** (`46d29bf`). `readOnly`, `noPlanWrites`, `noGitHistory` guards are now honored by the engine workflow path (the legacy path already had them). Validator phase runs with `readOnly` — SDK `Write/Edit/MultiEdit/NotebookEdit` tools are denied via `PreToolUse` hook. Bash is not blocked because validators need it to run tests.
+- **Cold-worktree `bun install`** (`0f26a6d`, `fdfd872`). Fresh worktrees with no `node_modules/` get `bun install` before phase dispatch. Fall-back to primary cwd when worktree install fails. Eliminates the "worktree can't resolve deps" failure mode for cold clones.
+- **Prompt overlay resolver** (`31d1275`, `bd1d134`). Phase prompts load from co-located `.md` files at module init (single source of truth — no runtime re-reads). Each workflow's `prompts/` directory is the canonical location.
+- **Sibling-branch ownership guard** (`e5b1f78`). Post-dev precondition check: before creating a new file path, detect if a sibling `harny/*` branch already owns that path. Prevents the "sibling branches silently regress on merge" failure mode documented in CLAUDE.md.
+- **Dead-pid detection in rerun guard** (`80154c4`). Reruns for a slug that reports `running` but whose pid is dead now error with a clear message pointing to `harny clean <slug>`, instead of the prior hang.
+- **Zod-parsed `AskUserQuestion` input** in `canUseTool` (`b979fd7`). Schema validation of the SDK's tool input before the harness acts on it — earlier malformed inputs silently park-errored.
+- **Dynamic default branch discovery** in the viewer (`d97a9e6`). No longer hardcoded to `main` — detects the repo's default branch, preserves git stderr in API responses for debugging.
+- **CI workflow** (`.github/workflows/ci.yml`, `718df8d`). Runs `bun install --frozen-lockfile`, `bun run typecheck`, `bun test`, and `bun run probes` on every PR and push to `main`.
+- **Testing primitives and constitution** (`src/harness/testing/`, `d624ca3`). Reusable harness testing primitives: `MockStateStore`, `MockGitOps`, `fakeSessionRunner`, `scripted`/`capturingScripted` session runners. Extensive migration of probes to `bun:test`: composeCommit, git-actions, guardHooks, plan + state schema, harnyActions assigns, featureDevActors, runner, auto workflow transitions, echoCommit, plannerPrompt, session, runtime, workflow registry, dispatchers, promptResolver. `src/harness/testing/CLAUDE.md` documents the testing constitution (unit-first, probes only for integration observability boundaries).
+- **Probe `_template.ts`** (`aec307f`). Canonical starting point for new probes: `Promise.race` against 1500ms deadlines, PASS/FAIL format, `process.exit(1)` on failure. Underscore prefix keeps the template itself out of the CI runner (`scripts/run-probes.ts` filters by `/^\d+[a-z]?-.+\.ts$/`).
+- **Architect skills reorganized**: `harny-release` (release cycle orchestration, cheap-validator patterns), `harny-review` (per-run post-mortem with leaves-to-trunk analysis), `harny-learnings` (capture + drain local inbox into issues/CLAUDE.md edits) (`4efc742`, `f5a7004`).
+- **GitHub issue and discussion templates** (`40b7930`) — `.github/ISSUE_TEMPLATE/`, `.github/DISCUSSION_TEMPLATE/`.
+
+### Changed
+- **Default engine timeout raised 600s → 1800s** (30 min, `5442aa6`). Real planner + multiple dev/validator attempts on larger tasks were hitting the 10-minute cap.
+- **`VALIDATOR_PROMPT` requires `AC<n>:` prefix** in `reasons[]` (`670d17f`). Mandatory auditability format — one entry per acceptance criterion, in order, prefixed `AC1: pass — <evidence>` / `AC2: fail — <reason>`. Generic summaries or grouping multiple ACs are rejected. Harness reads the field line-by-line.
+- **`VALIDATOR_PROMPT` mandates diff check** (`46a56c3`). Validator must read the uncommitted diff before validating any AC. Closes the loophole where validators passed tasks based on static inspection alone.
+- **`PLANNER_PROMPT` checklist-count constraint** (`1dde577`, `42d4a27`). Planner prompt now carries an explicit checklist-count regex; probe scenarios extended to catch drift.
+- **`PLANNER_PROMPT` short-circuit on high-spec intent** (`4bb23d2`). When the user prompt is already a detailed spec, the planner skips the "think harder about scope" preamble and goes directly to task generation.
+- **`composeCommitMessage` strips any existing `task=` trailer** (`a907e31`). Previously only the current task's trailer was deduped; now any `task=` trailer is stripped before composition. Prevents double-trailers when a dev re-proposes a commit message copied from prior output.
+- **`gitCommit` handles no-diff tasks as `sha: null`** (`5c5434f`, `7041abe`). Verified-only tasks (developer reports done but produces no staged diff) now return `{sha: null}` and record `phases[].no_op = true`, rather than erroring. Task advances normally.
+- **`DEVELOPER_PROMPT` Edit-vs-Write + temp-script guidance** (`0d897ed`). Prompt distinguishes `Edit` (modify existing file) from `Write` (create new file), and instructs use of `/tmp/` for throwaway verification scripts.
+- **`canUseTool` input validation made strict** (`b979fd7`). Malformed `AskUserQuestion` payloads fail with a Zod error instead of silently degrading.
+- **Engine-path observability parity with legacy path** (`9c9b031`, `108ab8f`). Phoenix spans, actor cleanup, error channel wiring, configurable timeouts. Engine runs produce the same span tree as the legacy path did.
+- **`PLANNER_TOOLS` includes `AskUserQuestion`** (documented but always-shipped). Planner can ask the user for scope clarification before producing tasks. Disabled in silent mode, parked in async mode, TTY prompt in interactive mode.
+- **`tsconfig` enables `noUnusedLocals` and `noUnusedParameters`** (`c4c005e`).
+- **Subtree CLAUDE.md files** for `src/harness/engine/`, `src/harness/observability/`, `src/harness/testing/`. Each captures conventions local to that module (dispatcher contract, sibling-mirror rule, Phoenix workarounds, testing constitution). Root CLAUDE.md points to them.
+
+### Fixed
+- **`devSession`/`validatorSession` leak across tasks** (`efef855`). `advanceTask` now resets both session fields. Prior behavior: task N+1's developer resumed task N's session, conflating context.
+- **Prompts no longer re-read on every run** (`bd1d134`). Phase prompt `.md` files load once at module init, not per-phase-invocation. Single-source-of-truth + faster startup.
+- **`plan.json` written to correct dir when primaryCwd differs from phaseCwd** (`cf270d9`). `persistPlanActor` now receives `primaryCwd` explicitly instead of inferring from the worktree path.
+- **`runEngineWorkflow` clears timeout in `finally`** (`54f5c3e`). Prior: on early `done` the setTimeout lingered until it fired, burning a stale `setTimeout` callback.
+- **Viewer sibling-branches panel suppresses section on empty/errored state** (`03a6c5e`). Prior: empty section rendered with a misleading header.
+- **`listRunsInCwd` warns on malformed `state.json` instead of crashing** (`217bb88`). One bad state.json no longer takes the viewer offline.
+- **Package files list** (this release): `harny.example.json` removed from `package.json:files` — the file was deleted with the harny.json config removal but the reference lingered.
+
+### Removed
+- `harny.json` config file support and `harny.example.json` template (both byproducts of the config-removal change above).
+- Legacy TS-loop `feature-dev` workflow and all of its phase files.
+- Plan schema_version field and validation.
+
 ## [0.1.1] — 2026-04-22
 
 ### Changed
