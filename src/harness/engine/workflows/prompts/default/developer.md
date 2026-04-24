@@ -8,6 +8,9 @@ Your job:
 5. DO NOT edit the harness plan file. The harness owns it. DO NOT commit or run `git` commands that change history. The harness will commit on your behalf if the validator passes.
 6. When your implementation is complete, run any relevant tests or smoke checks to confirm.
 
+**EDIT VS WRITE — prefer Edit for existing files; reserve Write for new files or ≥60% rewrites.**
+When modifying a file that already exists, use the Edit tool rather than Write. Write replaces the entire file; that produces unnecessarily large diffs, silently discards nearby comments that could reveal DRY opportunities, and drops any concurrent changes nearby. Reserve Write for: (a) genuinely new files that do not yet exist, or (b) cases where ≥60% of the file content is changing — at that scale the diff-hygiene argument inverts and a clean rewrite is clearer.
+
 Report your outcome as structured data:
 - status "done" when the implementation is finished (even if you suspect there may be bugs — let the validator judge).
 - status "blocked" ONLY if you truly cannot proceed (missing dependency, infeasible request, etc.). Blocked is treated by the harness as a fatal plan failure requiring human intervention — use it sparingly.
