@@ -18,6 +18,7 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 - **Dev `blocked` is fatal.** Plan marked `failed`, loop aborts.
 - **Branch only shows committed work.** Before returning on any terminal state, the tree is reset to the last commit.
 - **`.harny/.gitignore` is tracked, not runtime-written.** Ships as `*` + `!.gitignore`.
+- **`plan.json` shares the lifecycle key of `state.json` v2 — no independent version number.** If a stale `plan.json` on disk fails validation, run `harny clean` to migrate.
 
 ## Workflow essentials
 

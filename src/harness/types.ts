@@ -86,7 +86,6 @@ export type PlanRunStatus =
   | "exhausted";
 
 export type Plan = {
-  schema_version: 1;
   task_slug: string;
   user_prompt: string;
   branch: string;
