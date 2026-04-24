@@ -80,6 +80,16 @@ const noopPersist = fromPromise<void, { primaryCwd: string; taskSlug: string; pl
   async () => {},
 );
 
+function spyPersist() {
+  const calls: { primaryCwd: string; taskSlug: string; plan: Plan }[] = [];
+  const actor = fromPromise<void, { primaryCwd: string; taskSlug: string; plan: Plan }>(
+    async ({ input }) => {
+      calls.push(input);
+    },
+  );
+  return { actor, calls };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("feature-dev commit-gate: validator pass", () => {
@@ -225,6 +235,100 @@ describe("feature-dev commit-gate: commitActor failure", () => {
         ]),
         commitActor: failingCommit(new Error("git write locked")),
         persistPlanActor: noopPersist,
+      },
+    );
+
+    expect(snapshot.value).toBe("failed");
+  });
+});
+
+describe("feature-dev persistPlan: once per run, never on retry or task advance", () => {
+  test("single task, happy path → persistPlan called exactly once", async () => {
+    const persist = spyPersist();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "feat: t1" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "pass", session_id: "val-1", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: persist.actor,
+      },
+    );
+
+    expect(snapshot.value).toBe("done");
+    expect(persist.calls).toHaveLength(1);
+    expect(persist.calls[0]!.taskSlug).toBe("t");
+  });
+
+  test("multi-task happy path → persistPlan still called exactly once (not per task)", async () => {
+    const persist = spyPersist();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1"), task("t2")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "feat: t1" },
+          { session_id: "dev-2", status: "done", commit_message: "feat: t2" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "pass", session_id: "val-1", reasons: ["ok"] },
+          { verdict: "pass", session_id: "val-2", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: persist.actor,
+      },
+    );
+
+    expect(snapshot.value).toBe("done");
+    expect(persist.calls).toHaveLength(1);
+  });
+
+  test("retry path → persistPlan still called exactly once (not per retry)", async () => {
+    const persist = spyPersist();
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 2 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "m1" },
+          { session_id: "dev-1", status: "done", commit_message: "m2" },
+        ]),
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "val-1", reasons: ["r1"] },
+          { verdict: "pass", session_id: "val-1", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: persist.actor,
+      },
+    );
+
+    expect(snapshot.value).toBe("done");
+    expect(persist.calls).toHaveLength(1);
+  });
+
+  test("persistPlan error → machine failed (planner output not allowed to proceed unpersisted)", async () => {
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([]),
+        validatorActor: scripted([]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: fromPromise<
+          void,
+          { primaryCwd: string; taskSlug: string; plan: Plan }
+        >(async () => {
+          throw new Error("disk full");
+        }),
       },
     );
 
