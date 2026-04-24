@@ -25,6 +25,18 @@ function defaultTaskSlug(): string {
   return `run-${iso}`;
 }
 
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ESRCH") return false;
+    if (code === "EPERM") return true;
+    return true;
+  }
+}
+
 export async function runHarness(args: {
   cwd: string;
   userPrompt: string;
@@ -67,9 +79,15 @@ export async function runHarness(args: {
       return { status: existing.lifecycle.status, planPath: planFilePath(primaryCwd, taskSlug), branch: existing.environment.branch };
     }
     if (existing.lifecycle.status === "running") {
-      throw new Error(
-        `Run ${taskSlug} appears to still be running (pid=${existing.lifecycle.pid}). If it's actually dead, \`harny clean ${taskSlug}\` and retry.`,
-      );
+      if (isPidAlive(existing.lifecycle.pid)) {
+        throw new Error(
+          `Run ${taskSlug} appears to still be running (pid=${existing.lifecycle.pid}). If it's actually dead, \`harny clean ${taskSlug}\` and retry.`,
+        );
+      } else {
+        throw new Error(
+          `Run ${taskSlug} crashed mid-execution (pid=${existing.lifecycle.pid} no longer exists). Run \`harny clean ${taskSlug}\` to discard state and retry.`,
+        );
+      }
     }
     if (existing.lifecycle.status === "waiting_human") {
       throw new Error(
