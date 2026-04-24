@@ -166,8 +166,14 @@ export function buildFeatureDevActors(deps: BuildFeatureDevActorsDeps) {
   });
 
   const gitCommitFn = deps.gitCommit ?? defaultGitCommit;
-  const commitActor = fromPromise<{ sha: string | null }, { cwd: string; message: string }>(
-    ({ input, signal }) => gitCommitFn({ cwd: input.cwd, message: input.message }, signal),
+  const commitActor = fromPromise<{ sha: string | null }, { cwd: string; message: string; validatorAttempt: number }>(
+    async ({ input, signal }) => {
+      const result = await gitCommitFn({ cwd: input.cwd, message: input.message }, signal);
+      if (result.sha === null) {
+        await deps.store?.updatePhase('validator', input.validatorAttempt, { no_op: true });
+      }
+      return result;
+    },
   );
 
   // Persists the planner's output to .harny/<slug>/plan.json. Called once,

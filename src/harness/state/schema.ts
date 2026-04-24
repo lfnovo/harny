@@ -13,6 +13,7 @@ export const PhaseEntrySchema = z.object({
   status: z.enum(["running", "completed", "failed", "parked"]),
   verdict: z.string().nullable(),
   session_id: z.string().nullable(),
+  no_op: z.boolean().optional(),
 });
 
 export const HumanReviewHistoryEntrySchema = z.object({
