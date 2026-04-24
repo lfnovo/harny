@@ -154,15 +154,30 @@ async function phoenixProjectMap(baseUrl: string): Promise<Record<string, string
   if (phoenixProjectsCache && now - phoenixProjectsCache.at < PHOENIX_CACHE_TTL_MS) {
     return phoenixProjectsCache.map;
   }
+  const url = `${baseUrl.replace(/\/+$/, "")}/v1/projects`;
   try {
-    const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/v1/projects`);
-    if (!res.ok) return phoenixProjectsCache?.map ?? {};
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn("[harny viewer] phoenix projects fetch failed:", res.status, url);
+      if (phoenixProjectsCache) {
+        console.warn(`[harny viewer] serving stale phoenix project map (age=${now - phoenixProjectsCache.at}ms)`);
+      } else {
+        console.warn("[harny viewer] check HARNY_PHOENIX_URL and phoenix container");
+      }
+      return phoenixProjectsCache?.map ?? {};
+    }
     const json = (await res.json()) as { data?: Array<{ id: string; name: string }> };
     const map: Record<string, string> = {};
     for (const p of json.data ?? []) map[p.name] = p.id;
     phoenixProjectsCache = { at: now, map };
     return map;
-  } catch {
+  } catch (err) {
+    console.warn("[harny viewer] phoenix projects fetch error", err);
+    if (phoenixProjectsCache) {
+      console.warn(`[harny viewer] serving stale phoenix project map (age=${now - phoenixProjectsCache.at}ms)`);
+    } else {
+      console.warn("[harny viewer] check HARNY_PHOENIX_URL and phoenix container");
+    }
     return phoenixProjectsCache?.map ?? {};
   }
 }
