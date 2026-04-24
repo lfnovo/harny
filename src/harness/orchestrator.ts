@@ -2,16 +2,7 @@ import { randomUUID } from "node:crypto";
 import { hostname, userInfo } from "node:os";
 import { coldInstallWorktree } from "./coldInstall.js";
 import { planFilePath, worktreePathFor } from "./state/plan.js";
-import {
-  addWorktree,
-  assertBranchAbsent,
-  assertCleanTree,
-  assertHasInitialCommit,
-  assertIsGitRepo,
-  assertWorktreePathAbsent,
-  createBranch,
-  removeWorktree,
-} from "./git.js";
+import { realGitOps, type GitOps } from "./gitOps.js";
 import { FilesystemStateStore } from "./state/filesystem.js";
 import type { State } from "./state/schema.js";
 import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
@@ -46,8 +37,10 @@ export async function runHarness(args: {
   isolation?: IsolationMode;
   mode?: RunMode;
   logMode?: LogMode;
+  gitOps?: GitOps;
 }): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human"; planPath: string; branch: string }> {
   const primaryCwd = args.cwd;
+  const git = args.gitOps ?? realGitOps;
   const taskSlug = args.taskSlug?.trim() || defaultTaskSlug();
   const logMode = args.logMode ?? "compact";
   const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
@@ -64,8 +57,8 @@ export async function runHarness(args: {
   log(args.userPrompt);
   log(`[harny] user prompt <<<`);
 
-  await assertIsGitRepo(primaryCwd);
-  await assertHasInitialCommit(primaryCwd);
+  await git.assertIsGitRepo(primaryCwd);
+  await git.assertHasInitialCommit(primaryCwd);
 
   // Idempotent rerun guard: if state.json already exists at this slug, refuse
   // gracefully so we don't clobber an in-progress or completed run.
@@ -101,21 +94,21 @@ export async function runHarness(args: {
   const branch = workflow.needsBranch ? `harny/${taskSlug}` : "";
 
   if (workflow.needsBranch) {
-    await assertBranchAbsent(primaryCwd, branch);
+    await git.assertBranchAbsent(primaryCwd, branch);
     if (workflow.needsWorktree && isolation !== "inline") {
       worktreePath = worktreePathFor(primaryCwd, taskSlug);
-      await assertWorktreePathAbsent(worktreePath);
-      await addWorktree(primaryCwd, worktreePath, branch);
+      await git.assertWorktreePathAbsent(worktreePath);
+      await git.addWorktree(primaryCwd, worktreePath, branch);
       phaseCwd = worktreePath;
       log(`[harny] worktree=${worktreePath}`);
       await coldInstallWorktree({ worktreePath, primaryCwd });
     } else {
-      await assertCleanTree(primaryCwd);
-      await createBranch(primaryCwd, branch);
+      await git.assertCleanTree(primaryCwd);
+      await git.createBranch(primaryCwd, branch);
       phaseCwd = primaryCwd;
     }
   } else if (!workflow.needsWorktree && isolation === "inline") {
-    await assertCleanTree(primaryCwd);
+    await git.assertCleanTree(primaryCwd);
   }
 
   const planPath = planFilePath(primaryCwd, taskSlug);
@@ -165,7 +158,7 @@ export async function runHarness(args: {
     if (!worktreePath) return;
     if (outcome === "done") {
       try {
-        await removeWorktree(primaryCwd, worktreePath, { force: true });
+        await git.removeWorktree(primaryCwd, worktreePath, { force: true });
         log(`[harny] worktree removed: ${worktreePath}`);
       } catch (err) {
         warn(`[harny] worktree cleanup failed: ${(err as Error).message}`);
