@@ -90,6 +90,23 @@ function spyPersist() {
   return { actor, calls };
 }
 
+// Captures each input on calls[] then pops the queued output. Throws on
+// exhaustion. Used for retry/session-propagation assertions where we need to
+// observe what the machine passed in, not just check state after the fact.
+function capturingScripted<TOut>(outputs: TOut[]) {
+  const queue = [...outputs];
+  const calls: any[] = [];
+  const actor = fromPromise<TOut, any>(async ({ input }) => {
+    calls.push({ ...input });
+    const next = queue.shift();
+    if (next === undefined) {
+      throw new Error("capturingScripted: script exhausted");
+    }
+    return next;
+  });
+  return { actor, calls };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("feature-dev commit-gate: validator pass", () => {
@@ -239,6 +256,208 @@ describe("feature-dev commit-gate: commitActor failure", () => {
     );
 
     expect(snapshot.value).toBe("failed");
+  });
+});
+
+describe("feature-dev retry: session propagation within a task", () => {
+  test("retry: developer re-invoked with resumeSessionId = prior devSession", async () => {
+    const dev = capturingScripted([
+      { session_id: "dev-sess-1", status: "done", commit_message: "m1" },
+      { session_id: "dev-sess-2", status: "done", commit_message: "m2" },
+    ]);
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 2 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: dev.actor,
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "val-1", reasons: ["r"] },
+          { verdict: "pass", session_id: "val-1", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    expect(snapshot.value).toBe("done");
+    expect(dev.calls).toHaveLength(2);
+    expect(dev.calls[0]!.resumeSessionId).toBeUndefined();
+    expect(dev.calls[1]!.resumeSessionId).toBe("dev-sess-1");
+  });
+
+  test("retry: validator re-invoked with resumeSessionId = prior validatorSession", async () => {
+    const val = capturingScripted([
+      { verdict: "fail", session_id: "val-sess-1", reasons: ["r"] },
+      { verdict: "pass", session_id: "val-sess-2", reasons: ["ok"] },
+    ]);
+    const snapshot = await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 2 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: scripted([
+          { session_id: "dev-1", status: "done", commit_message: "m1" },
+          { session_id: "dev-1", status: "done", commit_message: "m2" },
+        ]),
+        validatorActor: val.actor,
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    expect(snapshot.value).toBe("done");
+    expect(val.calls).toHaveLength(2);
+    expect(val.calls[0]!.resumeSessionId).toBeUndefined();
+    expect(val.calls[1]!.resumeSessionId).toBe("val-sess-1");
+  });
+
+  test("bumpAttempts: developer's attempt param increments on each retry", async () => {
+    const dev = capturingScripted([
+      { session_id: "d", status: "done", commit_message: "m" },
+      { session_id: "d", status: "done", commit_message: "m" },
+      { session_id: "d", status: "done", commit_message: "m" },
+    ]);
+    await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 3 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: dev.actor,
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "v", reasons: ["r"] },
+          { verdict: "fail", session_id: "v", reasons: ["r"] },
+          { verdict: "pass", session_id: "v", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    expect(dev.calls.map((c) => c.attempt)).toEqual([1, 2, 3]);
+  });
+
+  test("advanceTask: attempts counter resets to 1 on first invocation of the next task", async () => {
+    const dev = capturingScripted([
+      { session_id: "d1a", status: "done", commit_message: "m" },
+      { session_id: "d1b", status: "done", commit_message: "m" },
+      { session_id: "d2", status: "done", commit_message: "m" },
+    ]);
+    await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 2 },
+      {
+        plannerActor: scripted([plan([task("t1"), task("t2")])]),
+        developerActor: dev.actor,
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "v", reasons: ["r"] },
+          { verdict: "pass", session_id: "v", reasons: ["ok"] },
+          { verdict: "pass", session_id: "v", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    // task1 attempts: 1, 2; task2 attempts: 1 (reset).
+    expect(dev.calls.map((c) => c.attempt)).toEqual([1, 2, 1]);
+  });
+});
+
+describe("feature-dev retry: cross-task session isolation (bug lockdown, see #65)", () => {
+  // These two tests capture the expected-correct contract: advanceTask
+  // should zero devSession/validatorSession before the next task's first
+  // invocation. Current machine leaks both — tracked in issue #65.
+  // Unskip after the fix lands via harny.
+  test.skip("devSession is reset on advanceTask (not leaked into next task's first dev invoke)", async () => {
+    const dev = capturingScripted([
+      { session_id: "dev-task1", status: "done", commit_message: "m1" },
+      { session_id: "dev-task2", status: "done", commit_message: "m2" },
+    ]);
+    await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1"), task("t2")])]),
+        developerActor: dev.actor,
+        validatorActor: scripted([
+          { verdict: "pass", session_id: "v1", reasons: ["ok"] },
+          { verdict: "pass", session_id: "v2", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    expect(dev.calls[0]!.resumeSessionId).toBeUndefined();
+    // Expected (post-fix): task2's first dev invoke has NO resumeSessionId.
+    expect(dev.calls[1]!.resumeSessionId).toBeUndefined();
+  });
+
+  test.skip("validatorSession is reset on advanceTask (not leaked into next task's first validator invoke)", async () => {
+    const val = capturingScripted([
+      { verdict: "pass", session_id: "val-task1", reasons: ["ok"] },
+      { verdict: "pass", session_id: "val-task2", reasons: ["ok"] },
+    ]);
+    await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t" },
+      {
+        plannerActor: scripted([plan([task("t1"), task("t2")])]),
+        developerActor: scripted([
+          { session_id: "d1", status: "done", commit_message: "m1" },
+          { session_id: "d2", status: "done", commit_message: "m2" },
+        ]),
+        validatorActor: val.actor,
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    expect(val.calls[0]!.resumeSessionId).toBeUndefined();
+    // Expected (post-fix): task2's first validator invoke has NO resumeSessionId.
+    expect(val.calls[1]!.resumeSessionId).toBeUndefined();
+  });
+});
+
+describe("feature-dev retry: validator feedback does NOT enter developer input", () => {
+  // Locks the current contract: on retry, developer input is the same
+  // shape as the first invocation plus resumeSessionId + incremented
+  // attempt. Validator reasons are NOT injected. Feedback to the dev
+  // flows only via SDK session resume (prior dev session replayed), not
+  // via explicit prompt injection.
+  //
+  // If a future change starts threading validatorReasons into the dev
+  // input, this test breaks and the contract change becomes a visible
+  // decision rather than a silent drift.
+  test("retry: developer input on attempt 2 has no validator-reasons field", async () => {
+    const dev = capturingScripted([
+      { session_id: "d1", status: "done", commit_message: "m1" },
+      { session_id: "d2", status: "done", commit_message: "m2" },
+    ]);
+    await runEngineWorkflowDry(
+      featureDevWorkflow,
+      { cwd: "/tmp", userPrompt: "p", taskSlug: "t", maxRetries: 2 },
+      {
+        plannerActor: scripted([plan([task("t1")])]),
+        developerActor: dev.actor,
+        validatorActor: scripted([
+          { verdict: "fail", session_id: "v1", reasons: ["missing X", "bad Y"] },
+          { verdict: "pass", session_id: "v2", reasons: ["ok"] },
+        ]),
+        commitActor: spyCommit().actor,
+        persistPlanActor: noopPersist,
+      },
+    );
+    expect(dev.calls).toHaveLength(2);
+    const retryInput = dev.calls[1]!;
+    // Locked shape: exactly these 4 keys, nothing else.
+    expect(Object.keys(retryInput).sort()).toEqual([
+      "attempt",
+      "cwd",
+      "resumeSessionId",
+      "task",
+    ]);
+    // task is the same object shape as attempt 1 — no feedback baked in.
+    expect(retryInput.task).toEqual(dev.calls[0]!.task);
+    // And no stringified validator reasons leak anywhere in the input.
+    const asJson = JSON.stringify(retryInput);
+    expect(asJson).not.toContain("missing X");
+    expect(asJson).not.toContain("bad Y");
   });
 });
 
