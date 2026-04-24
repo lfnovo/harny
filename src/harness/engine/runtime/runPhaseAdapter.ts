@@ -111,15 +111,19 @@ export function adaptRunPhase(
 
       return { output: result.structuredOutput, session_id: result.sessionId };
     } finally {
-      if (deps.store) {
-        const endedAt = new Date().toISOString();
-        await deps.store.updatePhase(engineArgs.phaseName, attempt, {
-          ended_at: endedAt,
-          status: phaseStatus,
-          session_id: phaseSessionId,
-          verdict: phaseVerdict,
-        });
-        await deps.store.appendHistory({ at: endedAt, phase: engineArgs.phaseName, event: 'phase_end' });
+      try {
+        if (deps.store) {
+          const endedAt = new Date().toISOString();
+          await deps.store.updatePhase(engineArgs.phaseName, attempt, {
+            ended_at: endedAt,
+            status: phaseStatus,
+            session_id: phaseSessionId,
+            verdict: phaseVerdict,
+          });
+          await deps.store.appendHistory({ at: endedAt, phase: engineArgs.phaseName, event: 'phase_end' });
+        }
+      } catch (err) {
+        console.warn('[harny adapter] store write failed in finally', err);
       }
     }
   };

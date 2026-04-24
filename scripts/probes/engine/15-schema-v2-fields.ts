@@ -142,7 +142,7 @@ try {
       const name = 'scenario-C-v1-rejected';
       const now = new Date().toISOString();
       let threw = false;
-      let errorMessage = '';
+      let caughtError: any = null;
       try {
         StateSchema.parse({
           schema_version: 1,
@@ -178,12 +178,12 @@ try {
         });
       } catch (e: any) {
         threw = true;
-        errorMessage = e.message;
+        caughtError = e;
       }
       if (!threw) throw new Error('expected StateSchema.parse to throw for schema_version: 1');
-      if (!errorMessage.includes('schema_version')) {
+      if (caughtError?.issues?.[0]?.path?.[0] !== 'schema_version') {
         throw new Error(
-          `expected error message to contain 'schema_version', got: ${errorMessage.slice(0, 300)}`,
+          `expected error.issues[0].path[0] === schema_version, got: ` + String(caughtError?.issues?.[0]?.path?.[0]),
         );
       }
       console.log(`PASS ${name}`);

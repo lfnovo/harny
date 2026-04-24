@@ -95,6 +95,12 @@ try {
         if (capturedHistory.length !== 2) {
           throw new Error(`expected history.length === 2, got ${capturedHistory.length}`);
         }
+        if (capturedHistory[0]?.event !== 'phase_start') {
+          throw new Error(`expected capturedHistory[0].event === phase_start`);
+        }
+        if (capturedHistory[1]?.event !== 'phase_end') {
+          throw new Error(`expected capturedHistory[1].event === phase_end`);
+        }
 
         console.log(`PASS ${name}`);
       } finally {
@@ -192,6 +198,18 @@ try {
         }
         if (capturedHistory.length !== 4) {
           throw new Error(`expected history.length === 4, got ${capturedHistory.length}`);
+        }
+        if (capturedHistory[0]?.event !== 'phase_start') {
+          throw new Error(`expected capturedHistory[0].event === phase_start`);
+        }
+        if (capturedHistory[1]?.event !== 'phase_end') {
+          throw new Error(`expected capturedHistory[1].event === phase_end`);
+        }
+        if (capturedHistory[2]?.event !== 'phase_start') {
+          throw new Error(`expected capturedHistory[2].event === phase_start`);
+        }
+        if (capturedHistory[3]?.event !== 'phase_end') {
+          throw new Error(`expected capturedHistory[3].event === phase_end`);
         }
 
         console.log(`PASS ${name}`);
