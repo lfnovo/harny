@@ -149,4 +149,139 @@ try {
   failures++;
 }
 
+// Scenario (d): 2-space indented bullet → counts as 1
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'indented-bullet';
+      const userPrompt = '  - [ ] indented task';
+
+      const captured = await runPlannerAndCapturePrompt(userPrompt);
+
+      if (!captured) {
+        throw new Error('no prompt captured');
+      }
+      if (!captured.includes('1 checklist item')) {
+        throw new Error(
+          `expected '1 checklist item' in prompt, got: ${captured.slice(0, 200)}`,
+        );
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL indented-bullet: ${e.message}`);
+  failures++;
+}
+
+// Scenario (e): capital-X marker → counts as 1
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'capital-X';
+      const userPrompt = '- [X] Done';
+
+      const captured = await runPlannerAndCapturePrompt(userPrompt);
+
+      if (!captured) {
+        throw new Error('no prompt captured');
+      }
+      if (!captured.includes('1 checklist item')) {
+        throw new Error(
+          `expected '1 checklist item' in prompt, got: ${captured.slice(0, 200)}`,
+        );
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL capital-X: ${e.message}`);
+  failures++;
+}
+
+// Scenario (f): asterisk bullet marker → counts as 1
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'asterisk-marker';
+      const userPrompt = '* [ ] Star task';
+
+      const captured = await runPlannerAndCapturePrompt(userPrompt);
+
+      if (!captured) {
+        throw new Error('no prompt captured');
+      }
+      if (!captured.includes('1 checklist item')) {
+        throw new Error(
+          `expected '1 checklist item' in prompt, got: ${captured.slice(0, 200)}`,
+        );
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL asterisk-marker: ${e.message}`);
+  failures++;
+}
+
+// Scenario (g): plus bullet marker → counts as 1
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'plus-marker';
+      const userPrompt = '+ [ ] Plus task';
+
+      const captured = await runPlannerAndCapturePrompt(userPrompt);
+
+      if (!captured) {
+        throw new Error('no prompt captured');
+      }
+      if (!captured.includes('1 checklist item')) {
+        throw new Error(
+          `expected '1 checklist item' in prompt, got: ${captured.slice(0, 200)}`,
+        );
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL plus-marker: ${e.message}`);
+  failures++;
+}
+
+// Scenario (h): checklist inside fenced code block is ignored; only the real item outside is counted
+try {
+  await Promise.race([
+    (async () => {
+      const name = 'fenced-code-block-ignored';
+      const userPrompt = [
+        '- [ ] real task',
+        '```',
+        '- [ ] inside fence',
+        '```',
+      ].join('\n');
+
+      const captured = await runPlannerAndCapturePrompt(userPrompt);
+
+      if (!captured) {
+        throw new Error('no prompt captured');
+      }
+      if (!captured.includes('1 checklist item')) {
+        throw new Error(
+          `expected '1 checklist item' in prompt (fence should not be counted), got: ${captured.slice(0, 200)}`,
+        );
+      }
+      console.log(`PASS ${name}`);
+    })(),
+    hardDeadline(),
+  ]);
+} catch (e: any) {
+  console.log(`FAIL fenced-code-block-ignored: ${e.message}`);
+  failures++;
+}
+
 process.exit(failures > 0 ? 1 : 0);
