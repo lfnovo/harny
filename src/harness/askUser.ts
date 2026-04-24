@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline";
+import { z } from "zod";
 
 export type ResolvedAnswer =
   | { ok: true; value: string }
@@ -19,6 +20,22 @@ export type AskUserQuestionItem = {
 export type AskUserQuestionInput = {
   questions: AskUserQuestionItem[];
 };
+
+export const AskUserQuestionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string().optional(),
+});
+
+export const AskUserQuestionItemSchema = z.object({
+  question: z.string(),
+  header: z.string().optional(),
+  options: z.array(AskUserQuestionOptionSchema),
+  multiSelect: z.boolean().optional(),
+});
+
+export const AskUserQuestionInputSchema = z.object({
+  questions: z.array(AskUserQuestionItemSchema),
+});
 
 export type AskUserQuestionResult =
   | {
