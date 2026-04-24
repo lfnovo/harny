@@ -1,3 +1,37 @@
+/**
+ * Security model for this module
+ * ================================
+ * The FORBIDDEN_GIT_COMMAND regex (see below) is best-effort defense-in-depth,
+ * NOT a security boundary. Do not rely on it to prevent a determined or
+ * adversarial actor from landing unauthorized commits.
+ *
+ * Known bypass shapes the regex does NOT catch:
+ *   1. git;commit               — no-whitespace form; semicolon is not \s
+ *   2. cd /good && cd /tmp && git commit
+ *                               — operatesOutsidePrimary only inspects the
+ *                                 leading `cd` segment, not subsequent ones
+ *   3. GIT_DIR=/tmp/foo git commit
+ *                               — env-var prefix form; `git` still matches a
+ *                                 word boundary but the dir target is ignored
+ *   4. $(echo git) commit / "git" commit
+ *                               — shell substitution or quoting breaks \bgit\b
+ *   5. git -c user.name=x commit
+ *                               — handled by the non-greedy repetition in the
+ *                                 regex today, but the pattern is fragile
+ *
+ * Real enforcement of the "only validated commits land on the harny branch"
+ * invariant lives in the orchestrator's reset-before-return logic: on any
+ * terminal state (pass, fail, blocked) the orchestrator resets the working
+ * tree to the last known-good commit before handing control back. This hook
+ * is supplementary, not primary.
+ *
+ * Threat model: accidental misuse by the developer agent (e.g., the agent
+ * misreads its instructions and runs `git commit` directly). Adversarial
+ * scenarios — where a malicious payload in a tool result deliberately
+ * constructs bypass shapes to slip a commit through — are out of scope for
+ * this regex. Handling those would require Option C: regex + real parser +
+ * sandbox. Re-open as a separate RFC when that threat model becomes relevant.
+ */
 import { resolve } from "node:path";
 import type {
   HookCallback,
