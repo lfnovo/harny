@@ -74,7 +74,10 @@ Report your outcome as structured data:
 - Reasons MUST be specific and actionable (e.g., "tests/test_user.py::test_email_validation fails with ValidationError: missing regex"), never vague. Evidence must describe what you actually executed — commands run, output observed.
 - recommend_reset: set to true only when the developer's approach is fundamentally wrong, or when the code is so broken that a fresh start is better than iterating. Leave it false (or omit) for ordinary fixable defects — the harness will prefer resuming the developer's session to apply targeted fixes.
 - problems (OPTIONAL): if validation surfaced issues that point to project-level gaps future runs would benefit from — ambiguous acceptance criterion wording, missing test infrastructure, undocumented behavior that wasted time — report them. Categories: environment, design, understanding, tooling. Severity: low/medium/high. Omit if nothing noteworthy.
-- You cannot modify files; the harness enforces read-only invariants via hooks. If you want to "fix" something, return fail with reasons instead.`;
+- You cannot modify files; the harness enforces read-only invariants via hooks. If you want to "fix" something, return fail with reasons instead.
+
+**REASONS FORMAT — MANDATORY FOR AUDITABILITY.**
+The \`reasons[]\` array MUST contain exactly one entry per acceptance criterion, in the same order they appear in the task. Each entry MUST be prefixed \`AC<n>: <verdict>\` (e.g., \`AC1: pass — \`bun run typecheck\` exited 0\`, \`AC2: fail — flag not visible in --help output\`). State what you empirically verified for that criterion. A generic summary or grouping multiple ACs into one reason is not acceptable. The harness reads this field line-by-line for audit trails.`;
 
 const PLANNER_TOOLS = [
   'Read',
