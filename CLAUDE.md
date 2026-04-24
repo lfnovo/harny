@@ -31,16 +31,16 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 ## Key paths
 
 - `bin/harny.ts` — published bin entrypoint.
-- `src/runner.ts` — CLI entry. Flags: `--assistant`, `--task`, `--workflow <id>[:<variant>]`, `--input`, `--isolation <worktree|inline>`, `--mode <interactive|silent|async>`, `-v`, `--quiet`. Subcommands: `clean`, `ls`, `show`, `answer`, `ui`.
-- `src/harness/orchestrator.ts` — run lifecycle. Resolves workflow, sets up git/branch/worktree, dispatches to `runEngineWorkflow`, wraps in `withRunSpan`. Catches `PausedForUserInputError` and exits `waiting_human`. Idempotent rerun guard refuses to clobber an existing `state.json`.
-- `src/harness/sessionRecorder.ts` — `runPhase<T>()`: one SDK `query()` per phase, validated `structured_output`. Strips `$schema` from Zod schemas before passing to the SDK (the bundled `claude-code` binary silently ignores schemas with a top-level `$schema` key). Retries 3× on transient API errors. `canUseTool` is mode-aware.
-- `src/harness/state/` — `state.json` (single source of truth per run, `schema_version: 2`, v1 rejected) and `plan.json` (feature-dev only). I/O via `FilesystemStateStore`. Cross-run helpers: `listRunsInCwd`, `listAllRuns`, `findRun`.
+- `src/runner.ts` — CLI entry, arg parsing, subcommands (`clean|ls|show|answer|ui`).
+- `src/harness/orchestrator.ts` — run lifecycle, git/worktree setup, dispatches to engine.
+- `src/harness/sessionRecorder.ts` — `runPhase<T>()`, SDK seam.
+- `src/harness/state/` — `state.json` (v2) + `plan.json` I/O, cross-run helpers.
 - `src/harness/engine/` — XState workflows. See subtree CLAUDE.md.
 - `src/harness/observability/` — Phoenix instrumentation. See subtree CLAUDE.md.
-- `src/viewer/` — read-only HTTP + SPA for browsing runs. Booted via `harny ui`.
-- `src/harness/workflows/composeCommit.ts` — shared commit-message composer (strips pre-existing `task=<id>` trailers before appending one).
-- `src/harness/guardHooks.ts` — `PhaseGuards` (`readOnly`, `noPlanWrites`, `noGitHistory`). Active: `DEFAULT_DEVELOPER` sets `{noPlanWrites, noGitHistory}`, `DEFAULT_VALIDATOR` sets `{readOnly}`. `readOnly` covers `Write|Edit|MultiEdit|NotebookEdit` only; Bash mutations not blocked (validator needs Bash).
-- `src/harness/coldInstall.ts` — auto-`bun install` on cold worktrees (toggle: `harny.json:coldWorktreeInstall`).
+- `src/viewer/` — read-only HTTP + SPA, booted via `harny ui`.
+- `src/harness/workflows/composeCommit.ts` — commit-message composer.
+- `src/harness/guardHooks.ts` — `PhaseGuards` (`readOnly` blocks `Write|Edit|MultiEdit|NotebookEdit`; Bash not blocked — validator needs it).
+- `src/harness/coldInstall.ts` — cold-worktree `bun install` (toggle: `harny.json:coldWorktreeInstall`).
 
 ## Config
 
