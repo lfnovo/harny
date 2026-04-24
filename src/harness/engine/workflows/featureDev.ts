@@ -67,6 +67,11 @@ const machine = setup({
       currentTaskIdx: context.currentTaskIdx + 1,
       attempts: 0,
       iterationsThisTask: 0,
+      // Clear per-task session handles so the next task's first invocation
+      // starts fresh instead of resuming the prior task's SDK session.
+      // See #65.
+      devSession: undefined,
+      validatorSession: undefined,
     })),
     bumpAttempts: assign(({ context }) => ({
       attempts: context.attempts + 1,

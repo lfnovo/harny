@@ -333,12 +333,8 @@ describe("feature-dev retry: session propagation within a task", () => {
   });
 });
 
-describe("feature-dev retry: cross-task session isolation (bug lockdown, see #65)", () => {
-  // These two tests capture the expected-correct contract: advanceTask
-  // should zero devSession/validatorSession before the next task's first
-  // invocation. Current machine leaks both — tracked in issue #65.
-  // Unskip after the fix lands via harny.
-  test.skip("devSession is reset on advanceTask (not leaked into next task's first dev invoke)", async () => {
+describe("feature-dev retry: cross-task session isolation (fixed in #65)", () => {
+  test("devSession is reset on advanceTask (not leaked into next task's first dev invoke)", async () => {
     const dev = capturingScripted([
       { session_id: "dev-task1", status: "done", commit_message: "m1" },
       { session_id: "dev-task2", status: "done", commit_message: "m2" },
@@ -362,7 +358,7 @@ describe("feature-dev retry: cross-task session isolation (bug lockdown, see #65
     expect(dev.calls[1]!.resumeSessionId).toBeUndefined();
   });
 
-  test.skip("validatorSession is reset on advanceTask (not leaked into next task's first validator invoke)", async () => {
+  test("validatorSession is reset on advanceTask (not leaked into next task's first validator invoke)", async () => {
     const val = capturingScripted([
       { verdict: "pass", session_id: "val-task1", reasons: ["ok"] },
       { verdict: "pass", session_id: "val-task2", reasons: ["ok"] },
