@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-01
+
+**CLI flag rename: `--task` → `--name`.** The flag that names a run was colliding with the planner's domain vocabulary — a run's plan contains many `tasks`, so calling the *run name* `--task` was ambiguous. `--name` is what users intuit and removes the overlap. No deprecation alias; the previous flag is gone.
+
+### Changed (breaking)
+- **CLI flag `--task <slug>` renamed to `--name <slug>`** (#72). Names the run (becomes `.harny/<slug>/` and the `harny/<slug>` branch). Internal field `ParsedArgs.task` and `RunArgs.task` also renamed to `name`. Any script invoking `harny --task ...` must update to `harny --name ...`. Affected files: `src/runner.ts`, `src/runner/run.ts`, `src/runner.test.ts`, `src/harness/git.ts`, `src/harness/observability/phoenix.ts`, plus README, observability CLAUDE.md, and `harny-release` skill.
+
 ## [0.2.1] — 2026-05-01
 
 **Hotfix: published package missing runtime dependency `xstate`.** The 0.2.0 engine rewrite imports `xstate` from `src/harness/engine/`, but the dependency was declared in `devDependencies` only. Globally-installed users hit `Cannot find package 'xstate'` on first invocation. Moving the entry to `dependencies` fixes the published install with no behavior change.
