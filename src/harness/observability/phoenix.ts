@@ -148,7 +148,7 @@ export function setupPhoenix(args: {
  * this scope inherit our trace_id, so a single harness run = one trace in
  * Phoenix.
  *
- * Span name is the task slug (the "feature name" from --task), so traces
+ * Span name is the run slug (the "feature name" from --name), so traces
  * appear as e.g. "calc-module" in Phoenix's trace list. Tagged with
  * openinference.span.kind=AGENT.
  *

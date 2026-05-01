@@ -104,11 +104,11 @@ describe("parseArgs: global flags", () => {
   test("--assistant= form", () => {
     expect(parseArgs(["--assistant=myproject"]).assistant).toBe("myproject");
   });
-  test("--task space form", () => {
-    expect(parseArgs(["--task", "issue-42"]).task).toBe("issue-42");
+  test("--name space form", () => {
+    expect(parseArgs(["--name", "issue-42"]).name).toBe("issue-42");
   });
-  test("--task= form", () => {
-    expect(parseArgs(["--task=issue-42"]).task).toBe("issue-42");
+  test("--name= form", () => {
+    expect(parseArgs(["--name=issue-42"]).name).toBe("issue-42");
   });
   test("--isolation space form", () => {
     expect(parseArgs(["--isolation", "worktree"]).isolation).toBe("worktree");

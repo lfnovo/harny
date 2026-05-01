@@ -23,7 +23,7 @@ const FLAGS: Record<string, FlagSpec> = {
   "--quiet":    { kind: "bool",  target: "quiet" },
   "--workflow": { kind: "value", target: "workflow" },
   "--assistant":{ kind: "value", target: "assistant" },
-  "--task":     { kind: "value", target: "task" },
+  "--name":     { kind: "value", target: "name" },
   "--isolation":{ kind: "value", target: "isolation" },
   "--mode":     { kind: "value", target: "mode" },
 };
@@ -51,7 +51,7 @@ export type ParsedArgs = {
   assistant: string | null;
   workflow: string | null;
   registryCmd: RegistryCmd | null;
-  task: string | null;
+  name: string | null;
   isolation: IsolationMode | null;
   mode: RunMode | null;
   prompt: string;
@@ -117,7 +117,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     logMode: fv["quiet"] ? "quiet" : fv["verbose"] ? "verbose" : "compact",
     assistant: (fv["assistant"] as string) ?? null,
     workflow: (fv["workflow"] as string) ?? null,
-    registryCmd, task: (fv["task"] as string) ?? null, isolation, mode,
+    registryCmd, name: (fv["name"] as string) ?? null, isolation, mode,
     prompt: rest.join(" ").trim(),
   };
 }
@@ -128,7 +128,7 @@ export async function main() {
   if (!registryCmd && !parsed.prompt) {
     console.log(
       [
-        "Usage: harny [--workflow <id>] [--task <slug>] [--assistant <name>] \"<prompt>\"",
+        "Usage: harny [--workflow <id>] [--name <slug>] [--assistant <name>] \"<prompt>\"",
         "       harny ls | show <runId> | clean <slug> | ui",
         "",
         "Default workflow: feature-dev. cwd defaults to process.cwd() when --assistant is omitted.",

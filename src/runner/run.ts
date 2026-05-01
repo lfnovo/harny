@@ -6,7 +6,7 @@ import type { IsolationMode, RunMode } from "../harness/types.js";
 
 type RunArgs = {
   workflow: string | null;
-  task: string | null;
+  name: string | null;
   isolation: IsolationMode | null;
   mode: RunMode | null;
   prompt: string;
@@ -26,7 +26,7 @@ export async function handleRun(parsed: RunArgs, ctx: RunnerContext): Promise<vo
   const result = await runHarness({
     cwd: assistant.cwd,
     userPrompt: parsed.prompt,
-    taskSlug: parsed.task ?? undefined,
+    taskSlug: parsed.name ?? undefined,
     workflowId,
     variant,
     isolation: parsed.isolation ?? undefined,

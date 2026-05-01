@@ -65,7 +65,7 @@ export async function assertBranchAbsent(
   ]);
   if (code === 0) {
     throw new Error(
-      `Branch "${branch}" already exists in ${cwd}. Pick a different --task slug or delete the branch.`,
+      `Branch "${branch}" already exists in ${cwd}. Pick a different --name slug or delete the branch.`,
     );
   }
 }

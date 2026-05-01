@@ -86,7 +86,7 @@ If a rule isn't serving you, change it — but change it explicitly, not silentl
 ## Per-run loop
 
 1. **Align prompt with architect** — product-vision shape (see "Prompt writing" below). Discuss until you both agree what success looks like.
-2. **Dispatch** — `harny --task <slug> "..."` in background. Parallel where safe (see "Parallelism" below).
+2. **Dispatch** — `harny --name <slug> "..."` in background. Parallel where safe (see "Parallelism" below).
 3. **Monitor** — `ScheduleWakeup` for long runs OR await background notification. Don't poll.
 4. **Code-review (Rule 5)** — `git show <commit>` + re-run new probes + scan for dead code, missing error handlers, observability gaps, scope drift.
 5. **Merge (Rule 4)** — `git checkout main && git merge --no-ff harny/<slug>` before next run.
