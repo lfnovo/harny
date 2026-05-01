@@ -112,7 +112,7 @@ flowchart TB
 ## CLI
 
 ```
-harny [--workflow <id>] [--task <slug>] [--assistant <name>]
+harny [--workflow <id>] [--name <slug>] [--assistant <name>]
       [--isolation worktree|inline] [--mode interactive|silent|async]
       [--input <path>] [-v|--verbose|--quiet]
       "<prompt>"
@@ -126,7 +126,7 @@ harny ui [--port=N] [--no-open]
 
 - `--workflow` defaults to `feature-dev`.
 - `--assistant` is optional; without it the run targets the current working directory.
-- `--task <slug>` controls the branch name (`harny/<slug>`) and the per-run state directory. When omitted, a timestamped slug is generated.
+- `--name <slug>` controls the branch name (`harny/<slug>`) and the per-run state directory. When omitted, a timestamped slug is generated.
 - `--mode silent` is auto-selected when stdin is not a TTY (CI, background runs).
 - `harny show <id> --tail` streams the active phase's tool activity in real time. `--since=30s|5m|1h` backfills the recent past before subscribing to new events.
 

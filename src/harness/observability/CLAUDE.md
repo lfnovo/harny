@@ -4,7 +4,7 @@ Opt-in observability via Arize OpenInference. `setupPhoenix({ workflowId, runId,
 
 ## Per-run shape
 
-- One Phoenix trace per harness run, named after the `--task` slug.
+- One Phoenix trace per harness run, named after the `--name` slug.
 - Root span kind = `AGENT`.
 - Phase children are renamed from the SDK's `ClaudeAgent.query` to `harny.<phase>` by the `RenameClaudeAgentSpanProcessor`.
 - Project = `basename(cwd)`.
