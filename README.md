@@ -208,11 +208,12 @@ See [`src/harness/engine/workflows/echoCommit.ts`](./src/harness/engine/workflow
 The `plugin/` directory ships `harny-plugin` — a Claude Code plugin with skills and an orchestrator agent that make it natural to use harny from a Claude Code conversation. Versioned independently of the CLI.
 
 ```bash
-# Install locally for testing
-claude plugin install ./plugin
+# Permanent install via marketplace
+claude plugin marketplace add /path/to/harny    # or: lfnovo/harny once published
+claude plugin install harny-plugin
 
-# Once published / in its own repo:
-# claude plugin install lfnovo/harny-plugin
+# Session-only (no global install, no marketplace)
+claude --plugin-dir /path/to/harny/plugin
 ```
 
 Once installed, you get:

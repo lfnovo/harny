@@ -8,15 +8,31 @@ Ships skills, an orchestrator agent, and onboarding so you can use harny from a 
 
 ## Install
 
-```bash
-# Local (development / testing)
-claude plugin install ./plugin
+The plugin is distributed via a marketplace manifest at the root of the harny repo. Two ways to load it:
 
-# From GitHub (once the plugin lives in its own repo)
-claude plugin install lfnovo/harny-plugin
+### Permanent install (via marketplace)
+
+```bash
+# Add the harny marketplace (local path or GitHub)
+claude plugin marketplace add /path/to/harny
+# or once published:
+# claude plugin marketplace add lfnovo/harny
+
+# Install harny-plugin from it
+claude plugin install harny-plugin
 ```
 
-You also need the harny CLI itself:
+### Session-only (no install, no marketplace)
+
+```bash
+claude --plugin-dir /path/to/harny/plugin
+```
+
+Useful for testing without modifying global config.
+
+### CLI dependency
+
+The plugin orchestrates the harny CLI; install it separately:
 
 ```bash
 bun install -g @lfnovo/harny
