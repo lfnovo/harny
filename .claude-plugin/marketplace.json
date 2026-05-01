@@ -9,7 +9,7 @@
   },
   "plugins": [
     {
-      "name": "harny-plugin",
+      "name": "harny",
       "source": "./plugin",
       "description": "Claude Code skills and orchestrator agent for using harny in any repository — capture learnings, run post-mortems, evaluate repo readiness, and orchestrate harness runs from natural language.",
       "version": "0.1.0",

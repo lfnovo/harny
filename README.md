@@ -205,12 +205,12 @@ See [`src/harness/engine/workflows/echoCommit.ts`](./src/harness/engine/workflow
 
 ## Plugin (Claude Code)
 
-The `plugin/` directory ships `harny-plugin` — a Claude Code plugin with skills and an orchestrator agent that make it natural to use harny from a Claude Code conversation. Versioned independently of the CLI.
+The `plugin/` directory ships `harny` plugin — a Claude Code plugin with skills and an orchestrator agent that make it natural to use harny from a Claude Code conversation. Versioned independently of the CLI.
 
 ```bash
 # Permanent install via marketplace
 claude plugin marketplace add /path/to/harny    # or: lfnovo/harny once published
-claude plugin install harny-plugin
+claude plugin install harny
 
 # Session-only (no global install, no marketplace)
 claude --plugin-dir /path/to/harny/plugin
@@ -218,13 +218,13 @@ claude --plugin-dir /path/to/harny/plugin
 
 Once installed, you get:
 
-- `/harny-plugin:harny` — onboarding + router; start here if new to harny.
-- `/harny-plugin:check-repo` — pre-flight readiness assessment.
-- `/harny-plugin:learn` — fast capture of a learning into the local inbox.
-- `/harny-plugin:drain` — analytical triage of accumulated learnings.
-- `/harny-plugin:review` — per-run post-mortem with leaves-to-trunk analysis.
-- `/harny-plugin:release` — operate as release manager across multiple runs.
-- `harny-orchestrator` agent — dispatches and monitors harny runs from natural-language intent.
+- `/harny:harny` — onboarding + router; start here if new to harny.
+- `/harny:check-repo` — pre-flight readiness assessment.
+- `/harny:learn` — fast capture of a learning into the local inbox.
+- `/harny:drain` — analytical triage of accumulated learnings.
+- `/harny:review` — per-run post-mortem with leaves-to-trunk analysis.
+- `/harny:release` — operate as release manager across multiple runs.
+- `orchestrator` agent — dispatches and monitors harny runs from natural-language intent.
 
 See [`plugin/README.md`](plugin/README.md) for the full surface.
 

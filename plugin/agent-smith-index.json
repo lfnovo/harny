@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "mode": "plugin",
-  "lastUpdated": "2026-05-01T19:39:43Z",
+  "lastUpdated": "2026-05-01T21:36:40Z",
   "components": {
     "skills": [
       {
@@ -77,8 +77,8 @@
     ],
     "agents": [
       {
-        "name": "harny-orchestrator",
-        "path": "agents/harny-orchestrator.md",
+        "name": "orchestrator",
+        "path": "agents/orchestrator.md",
         "description": "Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target CLAUDE.md, dispatches + monitors. Use to delegate harny invocation."
       }
     ],

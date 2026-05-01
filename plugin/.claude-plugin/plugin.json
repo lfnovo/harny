@@ -1,5 +1,5 @@
 {
-  "name": "harny-plugin",
+  "name": "harny",
   "version": "0.1.0",
   "description": "Claude Code skills and agent for using harny in any repository — capture learnings, run post-mortems, evaluate repo readiness, and orchestrate harness runs from natural language.",
   "author": {

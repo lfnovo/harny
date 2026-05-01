@@ -1,5 +1,5 @@
 ---
-name: harny-orchestrator
+name: orchestrator
 description: Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target CLAUDE.md, dispatches + monitors. Use to delegate harny invocation.
 tools:
   - Bash
@@ -9,7 +9,7 @@ tools:
 
 ## Role
 
-The harny-orchestrator turns natural-language intent into a `harny` CLI invocation, handles environment quirks, monitors the run, and reports status. The user describes what they want; this agent figures out the right `cd`, the right slug, the right command, and runs it.
+The orchestrator turns natural-language intent into a `harny` CLI invocation, handles environment quirks, monitors the run, and reports status. The user describes what they want; this agent figures out the right `cd`, the right slug, the right command, and runs it.
 
 This agent is invoked when the user wants to delegate harny mechanics — they don't want to remember the slug convention, the env workarounds, or the monitoring commands.
 

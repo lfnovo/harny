@@ -85,7 +85,7 @@ Guidance about how the architect should write prompts, with no natural existing 
 
 **Examples.** L10 → Issue #25. L11 → Issue #26.
 
-**Action:** OPEN ISSUE targeting the future skill that would absorb it (e.g., `harny-release` or `harny-orchestrator`). The Issue travels until that skill incorporates it.
+**Action:** OPEN ISSUE targeting the future skill that would absorb it (e.g., `release` or `orchestrator`). The Issue travels until that skill incorporates it.
 
 ---
 

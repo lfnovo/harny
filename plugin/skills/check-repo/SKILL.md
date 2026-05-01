@@ -104,7 +104,7 @@ Brief offer of follow-ups, only if relevant:
 
 - If `ready with prep`: list the top 1-3 prep items the user could fix now.
 - If `not yet`: explain the single biggest blocker.
-- If `ready`: suggest a first task and which skill helps next (e.g., `/harny-plugin:harny` for orchestration model).
+- If `ready`: suggest a first task and which skill helps next (e.g., `/harny:harny` for orchestration model).
 
 Do not auto-invoke other skills.
 
@@ -115,7 +115,7 @@ Do not auto-invoke other skills.
 - Does not write or modify any file in the user's repo.
 - Does not commit, branch, or push anything.
 - Does not invoke harny — that is the orchestrator agent's job.
-- Does not auto-fix the items it flags. It produces a checklist; the user (or `/harny-plugin:harny`) drives action.
+- Does not auto-fix the items it flags. It produces a checklist; the user (or `/harny:harny`) drives action.
 
 ---
 

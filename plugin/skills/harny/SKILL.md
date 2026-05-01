@@ -74,9 +74,9 @@ The architect does **not**:
 | Triage accumulated learnings into Issues / CLAUDE.md edits / discards | `/drain` |
 | Post-mortem a single harny run that surprised you | `/review <slug>` |
 | Operate as release manager across multiple harny runs | `/release` |
-| Have an agent dispatch + monitor a harny run for you in natural language | `Task(subagent_type: "harny-orchestrator", ...)` |
+| Have an agent dispatch + monitor a harny run for you in natural language | `Task(subagent_type: "orchestrator", ...)` |
 
-Prefix all skills with `/harny-plugin:` if your Claude Code resolves them by full namespace (e.g., `/harny-plugin:check-repo`).
+Prefix all skills with `/harny:` if your Claude Code resolves them by full namespace (e.g., `/harny:check-repo`).
 
 ---
 
@@ -131,7 +131,7 @@ harny --name <some-slug> "<outcome statement + AC + constraints>"
 Or have the orchestrator agent do it:
 
 ```
-@harny-orchestrator <natural-language intent>
+@orchestrator <natural-language intent>
 ```
 
 ### 6. Review the result
@@ -159,7 +159,7 @@ Skipping this between runs causes the [sibling-branch silent-regress gotcha](htt
 
 ## What this skill does NOT do
 
-- Does not dispatch harny on your behalf — that's the `harny-orchestrator` agent.
+- Does not dispatch harny on your behalf — that's the `orchestrator` agent.
 - Does not run the readiness checklist itself — that's `/check-repo`.
 - Does not capture learnings — that's `/learn`.
 
