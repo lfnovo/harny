@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-01
+
+**Hotfix: published package missing runtime dependency `xstate`.** The 0.2.0 engine rewrite imports `xstate` from `src/harness/engine/`, but the dependency was declared in `devDependencies` only. Globally-installed users hit `Cannot find package 'xstate'` on first invocation. Moving the entry to `dependencies` fixes the published install with no behavior change.
+
+### Fixed
+- `xstate` moved from `devDependencies` to `dependencies` in `package.json`. The package now installs its runtime dependencies correctly via `npm install -g @lfnovo/harny`, `bun install -g @lfnovo/harny`, or `bunx @lfnovo/harny`.
+
 ## [0.2.0] — 2026-04-24
 
 **Engine rewrite on XState v5.** The entire orchestration layer was rebuilt from a hand-rolled TypeScript loop into a declarative XState v5 machine with typed actors for each phase. The engine path is now canonical — the legacy TS loop is gone. Along the way the config surface was simplified (no more `harny.json`), the on-disk state schema was bumped, and the committing step was promoted to a first-class PhaseEntry. Testing infrastructure migrated from ad-hoc probes to `bun:test` with a documented testing constitution (`src/harness/testing/CLAUDE.md`).
