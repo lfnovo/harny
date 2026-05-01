@@ -24,7 +24,7 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 
 - **Runtime: Bun ≥ 1.3.** TypeScript runs natively — no `tsx`, no build step.
 - **`bun run typecheck` after every change.**
-- **No human-written TS.** Production code under `src/**/*.ts` and `bin/**/*.ts` lands through harness runs only; see `harny-release` skill Rule 1. Markdown, JSON config, and probes under `scripts/probes/*` may be hand-edited.
+- **No human-written TS.** Production code under `src/**/*.ts` and `bin/**/*.ts` lands through harness runs only; see `/harny-plugin:release` Rule 1. Markdown, JSON config, and probes under `scripts/probes/*` may be hand-edited.
 - **Local dev:** `bun run harny -- "<prompt>"` or `bun bin/harny.ts "<prompt>"`. E2E smoke: `/tmp/harny-e2e-*` dir + `git init` + `bun /path/to/harny/bin/harny.ts "<prompt>"`.
 - **State inspection:** `harny ls [--status X]`, `harny show <runId> [--tail]`, `harny answer <runId>`, `harny ui`.
 - **Conventional commits.** Never mention Claude Code in commit messages or PR descriptions. No emojis in code, output, or docs. Never implement what wasn't requested — ask before adding improvements.
@@ -75,10 +75,23 @@ No per-project config file — `harny.json` was removed end-to-end (commit `8c33
 - **Structured outputs missing?** Check the Zod schema for a top-level `$schema` key; `sessionRecorder.ts` strips it before passing to the SDK because the bundled `claude-code` binary silently ignores schemas with it.
 - **`.harny/<slug>/` survives `git clean -fd`** (gitignored, untracked protection doesn't apply to gitignored paths).
 
-## Skills
+## Plugin (Claude Code skills + agent)
 
-- **`harny-release`** — release cycle orchestration (generic, for adopters): dispatch, code-review merges, triage findings, cheap validator patterns, re-orient on fresh context.
-- **`harny-review`** — per-run post-mortem: leaves-to-trunk analysis with counterfactual test + triage tags.
-- **`harny-learnings`** — capture (`/harny-learnings <text>`) and drain (`/harny-learnings drain`) the local inbox into Issues / CLAUDE.md edits / discards.
+The `plugin/` directory ships `harny-plugin` — a Claude Code plugin with skills and an orchestrator agent for using harny in any repository. Versioned independently of the CLI.
+
+Skills (invoke as `/harny-plugin:<name>`):
+- **`harny`** — onboarding + router; start here if new to harny.
+- **`check-repo`** — pre-flight readiness assessment for adopting harny in a repo.
+- **`learn`** — fast, non-analytical capture of a learning into the local inbox.
+- **`drain`** — analytical triage of accumulated learnings into Issues / CLAUDE.md edits / discards.
+- **`review`** — post-mortem of a single harny run with leaves-to-trunk analysis and triage tags.
+- **`release`** — operate as release manager across multiple harny runs (dispatch → review → triage → loop).
+
+Agent:
+- **`harny-orchestrator`** — dispatch and manage harny CLI runs from natural language. Does not auto-invoke `/review` or `/learn`; only suggests.
+
+See `plugin/README.md` for install + structure. The plugin uses `agent-smith` conventions — `plugin/agent-smith-index.json` is the component map.
+
+Note: Rule 1 in `/release` ("no human-written TS, production code lands through harness runs") replaces the older `harny-release skill Rule 1` reference at line 27.
 
 Full documentation strategy: `specs/documentation.md` (gitignored working memory).

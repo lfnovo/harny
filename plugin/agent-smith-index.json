@@ -1,0 +1,130 @@
+{
+  "version": "1.0",
+  "mode": "plugin",
+  "lastUpdated": "2026-05-01T19:39:43Z",
+  "components": {
+    "skills": [
+      {
+        "name": "check-repo",
+        "path": "skills/check-repo/SKILL.md",
+        "description": "Walk a repo through the harny readiness checklist. Score 10 dimensions Red/Yellow/Green, surface anti-signals, output a scorecard + prep checklist. Use when adopting harny in a new repo, or troubleshooting why it struggles in a familiar one.",
+        "supportingFiles": [
+          "skills/check-repo/dimensions.md",
+          "skills/check-repo/scorecard-template.md"
+        ],
+        "allowedTools": [
+          "Bash",
+          "Read"
+        ]
+      },
+      {
+        "name": "drain",
+        "path": "skills/drain/SKILL.md",
+        "description": "Triage accumulated learnings from the local harny inbox into GitHub Issues, CLAUDE.md edits, or discards. Walks one entry at a time, verifies claims against current code, opens issues with provenance. Sister of /learn.",
+        "supportingFiles": [
+          "skills/drain/patterns.md"
+        ],
+        "allowedTools": [
+          "Bash",
+          "Read",
+          "Edit",
+          "Write"
+        ]
+      },
+      {
+        "name": "harny",
+        "path": "skills/harny/SKILL.md",
+        "description": "Onboarding and router for the harny plugin. Teaches the harny mental model (run anatomy, .harny/ state, architect role) and routes to focused skills. Use when adopting harny or unsure where to start.",
+        "allowedTools": [
+          "Bash",
+          "Read"
+        ]
+      },
+      {
+        "name": "learn",
+        "path": "skills/learn/SKILL.md",
+        "description": "Append a one-line learning to the local harny inbox. Fast, non-analytical capture \u2014 copies text verbatim, no analysis, no follow-ups. Use when the user wants to note something about harny adoption mid-conversation without breaking flow.",
+        "allowedTools": [
+          "Bash",
+          "Read",
+          "Write",
+          "Edit"
+        ]
+      },
+      {
+        "name": "release",
+        "path": "skills/release/SKILL.md",
+        "description": "Orchestrate a release cycle across multiple harny runs. Dispatch with product-vision prompts, parallelize when safe, code-review every merge, triage findings into NOW-blocks/NOW-quick/BACKLOG. Use as release manager across N runs.",
+        "allowedTools": [
+          "Bash",
+          "Read",
+          "Write",
+          "Edit",
+          "Agent"
+        ]
+      },
+      {
+        "name": "review",
+        "path": "skills/review/SKILL.md",
+        "description": "Post-mortem of a single harny run. Reads state.json + plan.json + per-phase transcripts. Emits a leaves-to-trunk review with evidence-backed proposals (triaged NOW-blocks/NOW-quick/BACKLOG). Use after failed, retried, slow, or novel runs.",
+        "allowedTools": [
+          "Bash",
+          "Read",
+          "Write",
+          "Agent"
+        ]
+      }
+    ],
+    "agents": [
+      {
+        "name": "harny-orchestrator",
+        "path": "agents/harny-orchestrator.md",
+        "description": "Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target CLAUDE.md, dispatches + monitors. Use to delegate harny invocation."
+      }
+    ],
+    "hooks": [],
+    "scripts": []
+  },
+  "relationships": [
+    {
+      "from": "skills/harny",
+      "to": "skills/check-repo",
+      "type": "references"
+    },
+    {
+      "from": "skills/harny",
+      "to": "skills/learn",
+      "type": "references"
+    },
+    {
+      "from": "skills/harny",
+      "to": "skills/drain",
+      "type": "references"
+    },
+    {
+      "from": "skills/harny",
+      "to": "skills/review",
+      "type": "references"
+    },
+    {
+      "from": "skills/harny",
+      "to": "skills/release",
+      "type": "references"
+    },
+    {
+      "from": "skills/check-repo",
+      "to": "skills/check-repo/dimensions.md",
+      "type": "references"
+    },
+    {
+      "from": "skills/check-repo",
+      "to": "skills/check-repo/scorecard-template.md",
+      "type": "references"
+    },
+    {
+      "from": "skills/drain",
+      "to": "skills/drain/patterns.md",
+      "type": "references"
+    }
+  ]
+}

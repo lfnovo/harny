@@ -1,0 +1,18 @@
+{
+  "name": "harny-plugin",
+  "version": "0.1.0",
+  "description": "Claude Code skills and agent for using harny in any repository — capture learnings, run post-mortems, evaluate repo readiness, and orchestrate harness runs from natural language.",
+  "author": {
+    "name": "Luis Novo"
+  },
+  "homepage": "https://github.com/lfnovo/harny",
+  "repository": "https://github.com/lfnovo/harny",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "harny",
+    "harness",
+    "agent",
+    "ai"
+  ]
+}

@@ -1,11 +1,14 @@
 ---
-name: harny-release
-description: Orchestrate a release cycle driven by harny — dispatch harness runs with product-vision prompts, parallelize when safe, code-review every merge, triage findings into now/quick/backlog, and surface gaps through smoke tests. Architect-side skill that runs in the outer Claude conversation, not inside a harness run. Sister of harny-review (per-run post-mortem) and harny-learnings (inbox capture + drain).
+name: release
+description: Orchestrate a release cycle across multiple harny runs. Dispatch with product-vision prompts, parallelize when safe, code-review every merge, triage findings into NOW-blocks/NOW-quick/BACKLOG. Use as release manager across N runs.
+allowed-tools: Bash, Read, Write, Edit, Agent
 ---
 
-# harny-release
+# release — operate as release manager across multiple harny runs
 
-Architect-side skill. Operate as release manager across multiple harness runs within a release cycle.
+Operate the release-manager role: dispatch, monitor, code-review, merge, triage findings. Iterate. Sister of `/review` (per-run post-mortem) and `/learn` + `/drain` (learnings inbox).
+
+---
 
 ## Two roles
 
@@ -14,7 +17,9 @@ Architect-side skill. Operate as release manager across multiple harness runs wi
 | **Architect** | User + Claude | Discuss design, agree on outcomes, decide what's next, analyze run outputs, refine approach. **Make decisions.** |
 | **Release manager** | Same humans, different hat | Operate harness invocations: dispatch, monitor, code-review, merge, triage findings. **Execute.** This skill guides the release-manager role. |
 
-Same humans wear both hats; over time the release-manager role increasingly delegates to AI-orchestrated runs while the architect remains human-in-the-loop.
+Same humans wear both hats; over time the release-manager role increasingly delegates to AI-orchestrated runs while the architect stays human-in-the-loop.
+
+---
 
 ## Role boundary — the most important rule
 
@@ -34,16 +39,18 @@ The detailed plan (file paths, function signatures, code shape) is the **planner
 
 **Litmus test before dispatching:** if your prompt contains file paths, function signatures, or code blocks → STOP, you're doing the planner's job. Rewrite as outcome + AC.
 
+---
+
 ## Rules of engagement
 
 These rules are policy, not contract. If a rule isn't serving after 5+ runs, change it explicitly.
 
 ### Rule 1 — No code by hand
 
-No human writes production code by hand. Every change to production code goes through a harness run.
+No human writes production code by hand. Every change goes through a harness run.
 
 - Markdown (prompts, docs, CHANGELOG), JSON config, and test probes may be hand-edited.
-- Production code lands through harness runs. If the architect feels they "need to just edit this real quick", pause and improve the setup — don't break the rule.
+- Production code lands through harness runs. If you feel you "need to just edit this real quick", pause and improve the setup — don't break the rule.
 
 ### Rule 2 — Preserve all runs
 
@@ -83,6 +90,8 @@ Issues found → triage per "Per-run loop" step 6.
 
 If a rule isn't serving you, change it — but change it explicitly, not silently.
 
+---
+
 ## Per-run loop
 
 1. **Align prompt with architect** — product-vision shape (see "Prompt writing" below). Discuss until you both agree what success looks like.
@@ -94,10 +103,12 @@ If a rule isn't serving you, change it — but change it explicitly, not silentl
    - **Prejudices this release → fix NOW** (don't backlog).
    - **Quick fixer that rounds out the system without blocking → fix NOW** (small infra wins compound).
    - **Doesn't prejudice the release → open GitHub Issue** for later.
-7. **Optional: `/harny-review <slug>`** for non-trivial runs (failed, retried, novel architectural surface). Route its findings through the same triage in step 6.
+7. **Optional: `/review <slug>`** for non-trivial runs (failed, retried, novel architectural surface). Route its findings through the same triage in step 6.
 8. **Loop or pause** — next run aligned with architect, OR pause for user direction.
 
 **Emergent planning principle:** plan the immediate next move with full attention. Plan the run after that with what we learn from the immediate run. **No batch planning.**
+
+---
 
 ## Prompt writing
 
@@ -107,7 +118,7 @@ If a rule isn't serving you, change it — but change it explicitly, not silentl
 - **AC as observable behaviors.** "Running the CLI against a tmp git repo produces a real commit on the run branch."
 - **Constraints (must / must-not).** "Do not modify legacy module X. Do not invoke real LLM APIs in probes."
 - **Test plan reference.** "Probe should be self-bounding (hard deadlines, no open-ended waits)."
-- **Separate validator-exercise vs read-only verification** when the environment limits exercise (e.g., no API key in the validator's subprocess). Be explicit: "Validator MUST exercise X. Validator MUST verify Y by reading code only."
+- **Separate validator-exercise vs read-only verification** when the environment limits exercise. Be explicit: "Validator MUST exercise X. Validator MUST verify Y by reading code only."
 
 ### DON'T
 
@@ -121,18 +132,22 @@ If a rule isn't serving you, change it — but change it explicitly, not silentl
 - *Is this a CONSTRAINT (must/must-not) or an IMPLEMENTATION SUGGESTION (planner choice)?* → keep constraints, drop suggestions.
 - *Is this AC (observable) or DESIGN (how the code should look)?* → keep AC, drop design.
 
+---
+
 ## Parallelism heuristic
 
-Multiple runs can dispatch concurrently if they touch **disjoint file sets**. Before dispatching, build a touch matrix for your codebase:
+Multiple runs can dispatch concurrently if they touch **disjoint file sets**. Before dispatching, build a touch matrix:
 
 | Run | Files touched | Conflicts with |
 |---|---|---|
-| (fill with the files each pending run will modify) | | |
+| (one row per pending run) | | |
 
 Rule of thumb:
 - Two runs touching the same file → sequential.
 - One run depending on another's output → sequential.
 - Otherwise → parallel is safe.
+
+---
 
 ## Anti-patterns
 
@@ -144,6 +159,8 @@ Rule of thumb:
 | Merging without diff review | Observability gaps + resource leaks slip past AC-scope checks | Rule 5: `git show <commit>` + re-run probe before every merge |
 | Branching successive runs from stale main | Sibling-branch divergence | Rule 4: merge to main between runs |
 | Stuck processes accumulate | CPU/token burn | Kill on first sign of hang; ask architect for auth |
+
+---
 
 ## Cheap validator principles
 
@@ -158,7 +175,7 @@ The validator is a phase of your harness run. It is expensive when it does expen
 - **Prefer fixture-based tests over live LLM calls** in validator phases. Stub the phase-runner seam and inject canned outputs.
 - **Prefer probes with exit codes** over probes that "check by reading text." A probe that exits 0/1 is a cheap, deterministic signal the validator can consume.
 - **Keep probe wall-clock budgeted.** Hard deadlines in each scenario; total probe time bounded.
-- **Only escalate to real-API verification when the change genuinely crosses an LLM-SDK boundary.** Even then, prefer an **architect-run post-merge smoke** over a nested invocation inside the validator.
+- **Only escalate to real-API verification when the change genuinely crosses an LLM-SDK boundary.** Even then, prefer an architect-run post-merge smoke over a nested invocation inside the validator.
 
 ### AC framing, before/after
 
@@ -178,6 +195,8 @@ end-to-end in-process, and asserts the final state structurally.
 ```
 Deterministic, fast, same correctness signal.
 
+---
+
 ## How to re-orient on a fresh context
 
 If returning to this work after a context compaction:
@@ -185,11 +204,15 @@ If returning to this work after a context compaction:
 1. Read your project's `CLAUDE.md` — invariants, gotchas, key paths.
 2. Re-read this skill — policy + operational HOW.
 3. Check `git log --oneline -20` — what was last committed.
-4. Check `.harny/` for the most recent run; read its `state.json` + `review.md` (if `/harny-review` was invoked).
+4. Check `.harny/` for the most recent run; read its `state.json` + `review.md` (if `/review` was invoked).
 5. Scan open GitHub Issues + Discussions for pending architectural decisions.
 6. Ask the user: "what's the next decision we're making?" Don't assume.
 
+---
+
 ## Companion skills
 
-- **`/harny-review <slug>`** — post-mortem of one finished run; emits findings pre-triaged (prejudices-release / quick-fix / backlog) so this skill can route them without re-classifying.
-- **`/harny-learnings`** — capture (`/harny-learnings <text>`) + drain the inbox into Issues / CLAUDE.md edits / discards.
+- **`/review <slug>`** — post-mortem of one finished run; emits findings pre-triaged (NOW-blocks / NOW-quick / BACKLOG) so this skill can route them without re-classifying.
+- **`/learn` + `/drain`** — capture (`/learn <text>`) + drain the inbox into Issues / CLAUDE.md edits / discards.
+- **`/check-repo`** — pre-flight readiness assessment, run before adopting harny in a fresh repo.
+- **`/harny`** — onboarding + router if you've never used harny before.

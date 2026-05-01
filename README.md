@@ -203,6 +203,30 @@ See [`src/harness/engine/workflows/echoCommit.ts`](./src/harness/engine/workflow
 - **Cross-project view** — one `harny ui` shows runs across all your registered projects.
 - **Phoenix integration** — opt-in OpenInference traces, one per run.
 
+## Plugin (Claude Code)
+
+The `plugin/` directory ships `harny-plugin` — a Claude Code plugin with skills and an orchestrator agent that make it natural to use harny from a Claude Code conversation. Versioned independently of the CLI.
+
+```bash
+# Install locally for testing
+claude plugin install ./plugin
+
+# Once published / in its own repo:
+# claude plugin install lfnovo/harny-plugin
+```
+
+Once installed, you get:
+
+- `/harny-plugin:harny` — onboarding + router; start here if new to harny.
+- `/harny-plugin:check-repo` — pre-flight readiness assessment.
+- `/harny-plugin:learn` — fast capture of a learning into the local inbox.
+- `/harny-plugin:drain` — analytical triage of accumulated learnings.
+- `/harny-plugin:review` — per-run post-mortem with leaves-to-trunk analysis.
+- `/harny-plugin:release` — operate as release manager across multiple runs.
+- `harny-orchestrator` agent — dispatches and monitors harny runs from natural-language intent.
+
+See [`plugin/README.md`](plugin/README.md) for the full surface.
+
 ## Development
 
 This repo is the source of `harny` itself. To work on it:
