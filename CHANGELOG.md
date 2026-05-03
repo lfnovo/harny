@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+### Added
+- **`--version`/`-V` flag**: prints `harny <version>` (e.g. `harny 0.3.0`) and exits with code 0. Short-circuits before any dispatch or subcommand handling.
+- **`--help`/`-h` flag**: prints the full usage block (synopsis, global flags table with `--verbose`, `--quiet`, `--workflow`, `--assistant`, `--name`, `--isolation`, `--mode`, and subcommand list `ls show answer ui clean`) and exits with code 0. Short-circuits before any dispatch.
+- Both flags are detected in a pre-pass before the `FLAGS` lookup map is built; first sighting sets the flag and breaks. Unknown flags continue to fall through to the prompt as before.
+
 ## [0.3.0] — 2026-05-01
 
 **CLI flag rename: `--task` → `--name`.** The flag that names a run was colliding with the planner's domain vocabulary — a run's plan contains many `tasks`, so calling the *run name* `--task` was ambiguous. `--name` is what users intuit and removes the overlap. No deprecation alias; the previous flag is gone.
