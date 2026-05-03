@@ -1,6 +1,6 @@
 {
   "name": "@lfnovo/harny",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "TypeScript task launcher built on the Claude Agent SDK. Implements the harness-engineering pattern: planner -> developer -> validator loop orchestrated externally with file-based handoff through plan.json.",
   "license": "MIT",
   "author": "Luis Novo <lfnovo@gmail.com>",

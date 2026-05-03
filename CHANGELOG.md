@@ -4,8 +4,12 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-03
+
+**Fix: `harny --version` and `harny --help` no longer dispatch a run.** Before this release, any unrecognized argument fell through to the prompt — so `harny --version` would launch a full planner→developer cycle (creating a stray worktree and branch) instead of printing version info. Both flags now short-circuit before dispatch.
+
 ### Added
-- **`--version`/`-V` flag**: prints `harny <version>` (e.g. `harny 0.3.0`) and exits with code 0. Short-circuits before any dispatch or subcommand handling.
+- **`--version`/`-V` flag**: prints `harny <version>` (e.g. `harny 0.3.1`) and exits with code 0. Short-circuits before any dispatch or subcommand handling.
 - **`--help`/`-h` flag**: prints the full usage block (synopsis, global flags table with `--verbose`, `--quiet`, `--workflow`, `--assistant`, `--name`, `--isolation`, `--mode`, and subcommand list `ls show answer ui clean`) and exits with code 0. Short-circuits before any dispatch.
 - Both flags are detected in a pre-pass before the `FLAGS` lookup map is built; first sighting sets the flag and breaks. Unknown flags continue to fall through to the prompt as before.
 
