@@ -148,12 +148,63 @@ Skipping this between runs causes the [sibling-branch silent-regress gotcha](htt
 
 ---
 
+## Customizing prompts
+
+Each phase (planner, developer, validator) is driven by a markdown prompt that ships bundled with the CLI. You can override any subset per-repo by dropping files into `.harny/prompts/<workflow>/<variant>/<actor>.md`.
+
+Resolution order (first match wins):
+
+1. `<cwd>/.harny/prompts/feature-dev/<variant>/<actor>.md`
+2. `<cwd>/.harny/prompts/feature-dev/default/<actor>.md`
+3. bundled `<variant>` then `default`
+
+Where `<actor>` is `planner`, `developer`, or `validator`. Override only the actors you want — the rest fall through to bundled defaults.
+
+Two common shapes:
+
+- **Stricter validator for one repo.** Drop `.harny/prompts/feature-dev/default/validator.md` with extra acceptance rules (e.g., "every new function must have a test"). Planner and developer keep the bundled defaults.
+- **Variants for experimentation.** Keep your house-style prompt at `default/` and stash an experimental version at `<variant>/`, then dispatch with `harny --variant <name> ...`.
+
+`.harny/` is gitignored as a whole — to version overrides, add an exception in `.harny/.gitignore` for the `prompts/` subtree.
+
+---
+
+## Cleaning up runs
+
+`harny clean <slug>` deletes a single run's state — the `.harny/<slug>/` directory, the `harny/<slug>` git worktree, and the local `harny/<slug>` branch. It's per-slug only (no batch, no `--all`, no status filter).
+
+### How to run
+
+```bash
+harny clean <slug>                 # safe path: refuses if the run is active
+harny clean <slug> --force         # SIGTERM the running process group, then clean
+harny clean <slug> --force --kill  # SIGTERM, then SIGKILL after 5s, then clean
+```
+
+With no flags, `clean` refuses if `state.json` shows `status=running` with a live PID. Stale PIDs (process already gone) are detected and cleanup proceeds with a warning. `--force` terminates the process group; add `--kill` only if the process ignores SIGTERM.
+
+### When to run
+
+- **Schema migration.** A stale `plan.json` or `state.json` from an older harny version may fail validation on a fresh dispatch. Cleaning the offending slug is the official migration path.
+- **Slug reuse.** You want to re-dispatch with the same `--name <slug>` and the previous run left a worktree/branch behind.
+- **Aborted run with no recoverable signal.** A failed run whose transcripts and verdicts you've already triaged (or that has no insight worth keeping).
+- **Throwaway experimentation.** Sandbox repo where run history has no value.
+
+### When NOT to run
+
+- **During active development you might `/review` or `/drain` later.** The on-disk state is the only record of what planner/developer/validator actually did — transcripts alone don't reconstruct verdicts and history.
+- **Merged runs with insights you might revisit.** Cheap to keep; expensive to recreate.
+- **Inside the orchestrator agent flow.** The orchestrator is a dispatcher, not a janitor — cleanup is an architect decision.
+
+Default is preserve. `harny ls`, `harny show`, and `harny ui` all rely on the on-disk state, so a wiped slug disappears from those views too.
+
+---
+
 ## Common gotchas
 
 - **`ANTHROPIC_API_KEY` in target repo's `.env`.** Bun auto-loads `.env` from cwd. If the target has the API key set, the SDK uses pay-per-use API billing instead of your Claude Code (Max/Pro) subscription. Workaround: prefix invocation with `ANTHROPIC_API_KEY= harny ...` (empty string overrides).
 - **Pre-existing lint/type debt** as validator gate → harny tries to fix all of it. Either fix the debt, configure a baseline, or drop the tool from the validator.
 - **Multiple long-lived branches** with stale work touching the same paths as your harny task → silent regression on later merge. Inventory before dispatching.
-- **`harny clean`** during active development → loses run history that's useful for `/review` and `/drain`. Default is preserve.
 
 ---
 
