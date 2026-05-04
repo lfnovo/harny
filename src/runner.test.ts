@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { parseArgs } from "./runner.js";
+import { describe, test, expect, spyOn } from "bun:test";
+import { parseArgs, printVersion, printHelp } from "./runner.js";
 
 describe("parseArgs: subcommand ls", () => {
   test("no flags", () => {
@@ -143,5 +143,53 @@ describe("parseArgs: no subcommand preserves prompt", () => {
     const r = parseArgs([]);
     expect(r.registryCmd).toBeNull();
     expect(r.prompt).toBe("");
+  });
+});
+
+describe("parseArgs: version and help flags", () => {
+  test("--version sets versionFlag", () => {
+    expect(parseArgs(["--version"]).versionFlag).toBe(true);
+  });
+  test("-V sets versionFlag", () => {
+    expect(parseArgs(["-V"]).versionFlag).toBe(true);
+  });
+  test("--help sets helpFlag", () => {
+    expect(parseArgs(["--help"]).helpFlag).toBe(true);
+  });
+  test("-h sets helpFlag", () => {
+    expect(parseArgs(["-h"]).helpFlag).toBe(true);
+  });
+  test("--version among other args sets versionFlag (first-sighting wins)", () => {
+    expect(parseArgs(["--verbose", "--version"]).versionFlag).toBe(true);
+  });
+  test("--help among other args sets helpFlag", () => {
+    expect(parseArgs(["--verbose", "--help"]).helpFlag).toBe(true);
+  });
+  test("regression: unknown flag does not set versionFlag or helpFlag", () => {
+    const r = parseArgs(["--bogus", "some", "prompt"]);
+    expect(r.versionFlag).toBe(false);
+    expect(r.helpFlag).toBe(false);
+    expect(r.prompt).toBe("--bogus some prompt");
+  });
+  test("no flags → versionFlag and helpFlag both false", () => {
+    const r = parseArgs(["implement", "feature", "X"]);
+    expect(r.versionFlag).toBe(false);
+    expect(r.helpFlag).toBe(false);
+  });
+  test("printVersion returns undefined without throwing", () => {
+    const spy = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      expect(printVersion()).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  test("printHelp returns undefined without throwing", () => {
+    const spy = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      expect(printHelp()).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

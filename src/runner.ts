@@ -7,6 +7,41 @@ import { handleAnswer } from "./runner/answer.js";
 import { handleUi } from "./runner/ui.js";
 import { handleClean } from "./runner/clean.js";
 import { handleRun } from "./runner/run.js";
+import pkg from "../package.json" with { type: "json" };
+
+export function printVersion(): void {
+  console.log(`harny ${pkg.version}`);
+}
+
+export function printHelp(): void {
+  console.log(
+    [
+      "Usage: harny [flags] \"<prompt>\"",
+      "       harny <subcommand> [subcommand-flags]",
+      "",
+      "Global flags:",
+      "  --verbose, -v        Verbose log output",
+      "  --quiet              Suppress all non-error output",
+      "  --workflow <id>      Workflow to run (default: feature-dev)",
+      "  --assistant <name>   Named assistant from ~/.harny/assistants.json",
+      "  --name <slug>        Name for this run (becomes .harny/<slug>/ and harny/<slug> branch)",
+      "  --isolation <mode>   worktree (default) or inline",
+      "  --mode <mode>        interactive, silent, or async",
+      "  --version, -V        Print version and exit",
+      "  --help, -h           Print this help and exit",
+      "",
+      "Subcommands:",
+      "  ls [--status <s>] [--cwd <path>] [--workflow <id>]   List runs",
+      "  show <runId> [--tail] [--since <duration>]            Show run detail",
+      "  answer <runId>                                        Answer a parked question",
+      "  ui [--port <n>] [--no-open]                          Launch the viewer UI",
+      "  clean <slug> [--force] [--kill]                      Clean up a run",
+      "",
+      "When no subcommand is given, the prompt is dispatched as a new harny run.",
+      "Default workflow: feature-dev. cwd defaults to process.cwd() when --assistant is omitted.",
+    ].join("\n"),
+  );
+}
 
 type FlagSpec = { kind: "value" | "bool"; target: string; short?: string };
 type SubcommandSpec = { positional?: string[]; flags: string[] };
@@ -55,9 +90,17 @@ export type ParsedArgs = {
   isolation: IsolationMode | null;
   mode: RunMode | null;
   prompt: string;
+  versionFlag: boolean;
+  helpFlag: boolean;
 };
 
 export function parseArgs(argv: string[]): ParsedArgs {
+  let versionFlag = false;
+  let helpFlag = false;
+  for (const a of argv) {
+    if (a === "--version" || a === "-V") { versionFlag = true; break; }
+    if (a === "--help" || a === "-h") { helpFlag = true; break; }
+  }
   const lookup = new Map<string, FlagSpec>();
   for (const [flag, spec] of Object.entries(FLAGS)) {
     lookup.set(flag, spec);
@@ -119,12 +162,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
     workflow: (fv["workflow"] as string) ?? null,
     registryCmd, name: (fv["name"] as string) ?? null, isolation, mode,
     prompt: rest.join(" ").trim(),
+    versionFlag, helpFlag,
   };
 }
 
 export async function main() {
   const parsed = parseArgs(process.argv.slice(2));
   const { logMode, registryCmd } = parsed;
+  if (parsed.versionFlag) { printVersion(); process.exit(0); }
+  if (parsed.helpFlag) { printHelp(); process.exit(0); }
   if (!registryCmd && !parsed.prompt) {
     console.log(
       [
