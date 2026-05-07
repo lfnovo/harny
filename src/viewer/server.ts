@@ -205,6 +205,8 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
   const port = opts.port ?? (Number(process.env.HARNY_UI_PORT) || 4123);
   const host = opts.host ?? "127.0.0.1";
   const html = await loadHtml();
+  const pkgPath = new URL("../../package.json", import.meta.url);
+  const version = JSON.parse(await readFile(pkgPath, "utf8")).version as string;
 
   const server = Bun.serve({
     port,
@@ -217,6 +219,10 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
+      }
+
+      if (path === "/api/meta") {
+        return jsonRes({ version });
       }
 
       if (path === "/api/assistants") {
