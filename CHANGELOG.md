@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+### Added
+- **Credential isolation from project `.env`** (#85). When a project's `.env` (or `.env.local` / `.env.development` / `.env.production`) defines `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or `ANTHROPIC_MODEL`, harny now scrubs those values from `process.env` at boot so the project app's credentials don't silently drive the harness. Harny then overlays its own `~/.harny/.env` (user-global) and `./harny.env` (per-project, project takes precedence). Set `HARNY_INHERIT_ENV=1` to restore the legacy pass-through behavior. See README "Credentials" section.
+
 ## [0.3.1] — 2026-05-03
 
 **Fix: `harny --version` and `harny --help` no longer dispatch a run.** Before this release, any unrecognized argument fell through to the prompt — so `harny --version` would launch a full planner→developer cycle (creating a stray worktree and branch) instead of printing version info. Both flags now short-circuit before dispatch.

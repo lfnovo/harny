@@ -130,6 +130,23 @@ harny ui [--port=N] [--no-open]
 - `--mode silent` is auto-selected when stdin is not a TTY (CI, background runs).
 - `harny show <id> --tail` streams the active phase's tool activity in real time. `--since=30s|5m|1h` backfills the recent past before subscribing to new events.
 
+## Credentials
+
+By default, harny isolates its Anthropic credentials from the project's `.env`. When a project `.env` (or `.env.local` / `.env.development` / `.env.production`) defines `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or `ANTHROPIC_MODEL`, those values are **scrubbed from `process.env` at boot** so the project's app credentials don't silently drive the harness. Harny then overlays its own files:
+
+- `~/.harny/.env` — user-global defaults
+- `./harny.env` — per-project override (gitignore it)
+
+Precedence: existing shell env (when not scrubbed) > `./harny.env` > `~/.harny/.env`.
+
+```sh
+# ~/.harny/.env
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+```
+
+To restore the legacy pass-through behavior (no scrubbing, no overlay), set `HARNY_INHERIT_ENV=1`.
+
 ## Observability (opt-in)
 
 Set `HARNY_PHOENIX_URL` to mirror SDK transcripts and tool calls into a local [Phoenix](https://github.com/Arize-ai/phoenix) instance via Arize OpenInference. Each harny run becomes one Phoenix trace named after the task slug, with phase-named child spans and tool sub-spans.

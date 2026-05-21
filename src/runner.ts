@@ -1,6 +1,7 @@
 import type { IsolationMode, LogMode, RunMode } from "./harness/types.js";
 import { loadSearchCwds } from "./runner/context.js";
 import type { RunnerContext } from "./runner/context.js";
+import { configureEnv } from "./runner/env.js";
 import { handleLs } from "./runner/ls.js";
 import { handleShow } from "./runner/show.js";
 import { handleAnswer } from "./runner/answer.js";
@@ -167,6 +168,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
 }
 
 export async function main() {
+  // Scrub credentials Bun's autoloaded project .env may have leaked into
+  // process.env, then overlay harny's own ~/.harny/.env and ./harny.env.
+  // HARNY_INHERIT_ENV=1 opts out.
+  configureEnv();
   const parsed = parseArgs(process.argv.slice(2));
   const { logMode, registryCmd } = parsed;
   if (parsed.versionFlag) { printVersion(); process.exit(0); }
