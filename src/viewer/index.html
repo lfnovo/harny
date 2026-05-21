@@ -4,13 +4,33 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>harny viewer</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@14.1.3/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .task-md { font-size: 0.75rem; line-height: 1.5; color: rgb(71 85 105); }
+    .task-md p { margin: 0.5em 0; }
+    .task-md p:first-child { margin-top: 0; }
+    .task-md p:last-child { margin-bottom: 0; }
+    .task-md code { background: rgb(241 245 249); padding: 0 0.25em; border-radius: 3px; font-size: 0.95em; }
+    .task-md pre { background: rgb(241 245 249); padding: 0.5em 0.75em; border-radius: 4px; overflow-x: auto; margin: 0.5em 0; }
+    .task-md pre code { background: transparent; padding: 0; }
+    .task-md ul, .task-md ol { margin: 0.5em 0; padding-left: 1.25em; }
+    .task-md li { margin: 0.15em 0; }
+    .task-md strong { color: rgb(30 41 59); font-weight: 600; }
+    .task-md a { color: rgb(79 70 229); text-decoration: underline; }
+    .task-md h1, .task-md h2, .task-md h3, .task-md h4 { font-weight: 600; color: rgb(30 41 59); margin: 0.75em 0 0.25em; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
+  <header class="border-b border-slate-200 bg-white">
+    <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+      <a href="#/" class="text-sm font-semibold text-slate-700 hover:text-slate-900">harny</a>
+      <span id="version" class="text-xs text-slate-500 font-mono"></span>
+    </div>
+  </header>
   <div id="app" class="max-w-6xl mx-auto p-6">
     <p class="text-slate-500">loading…</p>
   </div>
@@ -45,7 +65,13 @@
       return badge(status, STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800 ring-slate-200');
     }
     function phaseBadge(status) {
-      return badge(status, PHASE_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800');
+      const cls = PHASE_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800';
+      const dotColor = status === 'running' ? 'bg-blue-500 animate-pulse'
+        : status === 'completed' ? 'bg-emerald-500'
+        : status === 'failed' ? 'bg-rose-500'
+        : status === 'parked' ? 'bg-amber-500'
+        : 'bg-slate-400';
+      return `<span class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${cls}"><span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span>${status}</span>`;
     }
     function taskBadge(status) {
       return badge(status, TASK_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-700');
@@ -56,6 +82,19 @@
       const date = d.toISOString().split('T')[0];
       const time = d.toTimeString().slice(0, 8);
       return `${date} ${time}`;
+    }
+    function fmtRelative(iso) {
+      if (!iso) return '—';
+      const diff = Date.now() - new Date(iso).getTime();
+      if (diff < 0) return 'just now';
+      const s = Math.floor(diff / 1000);
+      if (s < 60) return `${s}s ago`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `${m}m ago`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h ago`;
+      const d = Math.floor(h / 24);
+      return `${d}d ago`;
     }
     function durationMs(a, b) {
       if (!a || !b) return null;
@@ -73,38 +112,56 @@
       })[c]);
     }
 
+    // Task descriptions come from an LLM — sanitize to block rogue HTML.
+    marked.setOptions({ breaks: true, gfm: true });
+    function renderMarkdown(s) {
+      if (!s) return '';
+      return DOMPurify.sanitize(marked.parse(String(s)));
+    }
+
+    function truncate(s, n) {
+      const str = String(s ?? '');
+      return str.length > n ? str.slice(0, n) + '…' : str;
+    }
+
     function eventSubstance(e, state, plan) {
-      if (e.event !== 'phase_end') return e.event;
+      if (e.event !== 'phase_end') return { text: e.event, kind: 'info' };
       const phase = e.phase ?? '';
       if (phase === 'planner') {
-        if (plan && Array.isArray(plan.tasks)) return plan.tasks.length + ' tasks planned';
-        return 'planner done';
+        const text = (plan && Array.isArray(plan.tasks))
+          ? plan.tasks.length + ' tasks planned'
+          : 'planner done';
+        return { text, kind: 'info' };
       }
+      // Multiple phases share a name (one per task); match by ended_at.
+      const findEntry = () => (state.phases ?? [])
+        .find(p => p.name === phase && p.ended_at === e.at);
       if (phase.startsWith('developer')) {
-        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && (e.attempt == null || p.attempt === e.attempt));
+        const entry = findEntry();
         if (entry && entry.verdict) {
           try {
             const v = JSON.parse(entry.verdict);
-            const s = 'task ' + (v.task_id ?? '?') + ': ' + (v.status ?? '?');
-            return s.length > 80 ? s.slice(0, 80) + '...' : s;
+            return { text: truncate('task ' + (v.task_id ?? '?') + ': ' + (v.status ?? '?'), 80), kind: 'info' };
           } catch {}
         }
-        return 'developer done';
+        return { text: 'developer done', kind: 'info' };
       }
       if (phase.startsWith('validator')) {
-        const entry = (state.phases ?? []).slice().reverse().find(p => p.name === phase && (e.attempt == null || p.attempt === e.attempt));
+        const entry = findEntry();
         if (entry && entry.verdict) {
           try {
             const v = JSON.parse(entry.verdict);
-            const label = v.status === 'pass' ? 'PASS' : 'FAIL';
-            const evText = (v.evidence ?? '');
-            const truncated = evText.length > 80;
-            return label + ': ' + evText.slice(0, 80) + (truncated ? '...' : '');
+            const pass = v.verdict === 'pass';
+            const reason = Array.isArray(v.reasons) ? v.reasons[0] : '';
+            return {
+              text: (pass ? 'PASS' : 'FAIL') + (reason ? ': ' + truncate(reason, 80) : ''),
+              kind: pass ? 'pass' : 'fail',
+            };
           } catch {}
         }
-        return 'validator done';
+        return { text: 'validator done', kind: 'info' };
       }
-      return e.event;
+      return { text: e.event, kind: 'info' };
     }
 
     async function fetchJSON(path) {
@@ -120,34 +177,49 @@
       if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
     }
 
+    // Polling redraws full innerHTML — remember <details> open state across draws.
+    const openDetails = new Set();
+    function bindDetailsTracking(root) {
+      root.querySelectorAll('details[data-detail-id]').forEach((el) => {
+        const id = el.getAttribute('data-detail-id');
+        if (openDetails.has(id)) el.open = true;
+        el.addEventListener('toggle', () => {
+          if (el.open) openDetails.add(id);
+          else openDetails.delete(id);
+        });
+      });
+    }
+
     async function renderRunList() {
       stopPoll();
       const draw = async () => {
         try {
           const { runs } = await fetchJSON('/api/runs');
           if (runs.length === 0) {
-            app.innerHTML = '<h1 class="text-2xl font-semibold mb-2">harny runs</h1><p class="text-slate-500">No runs yet. Start one with <code class="bg-slate-200 px-1 rounded">bunx @lfnovo/harny "&lt;prompt&gt;"</code></p>';
+            app.innerHTML = '<h1 class="text-2xl font-semibold mb-2">Runs</h1><p class="text-slate-500">No runs yet. Start one with <code class="bg-slate-200 px-1 rounded">bunx @lfnovo/harny "&lt;prompt&gt;"</code></p>';
             return;
           }
           const rows = runs.map(r => {
             const dur = fmtDuration(durationMs(r.started_at, r.ended_at ?? new Date().toISOString()));
             const retryCls = r.retries === 0 ? 'text-emerald-700' : r.retries <= 2 ? 'text-amber-700' : 'text-rose-700';
+            const cwdParts = r.cwd.split('/').filter(Boolean);
+            const cwdShort = cwdParts.length > 2 ? '…/' + cwdParts.slice(-2).join('/') : r.cwd;
             return `
               <tr class="hover:bg-slate-100 cursor-pointer" onclick="location.hash='#/runs/${r.cwd_hash}/${encodeURIComponent(r.task_slug)}'">
                 <td class="px-3 py-2 text-xs text-slate-500">${escapeHtml(r.short_id)}</td>
-                <td class="px-3 py-2 text-xs">${escapeHtml(fmtTime(r.started_at))}</td>
+                <td class="px-3 py-2 text-xs whitespace-nowrap" title="${escapeHtml(fmtTime(r.started_at))}">${escapeHtml(fmtRelative(r.started_at))}</td>
                 <td class="px-3 py-2 text-xs">${escapeHtml(r.workflow)}</td>
-                <td class="px-3 py-2 text-sm font-medium">${escapeHtml(r.task_slug)}</td>
+                <td class="px-3 py-2 text-sm font-medium whitespace-nowrap">${escapeHtml(r.task_slug)}</td>
                 <td class="px-3 py-2">${statusBadge(r.status)}</td>
                 <td class="px-3 py-2 text-xs text-slate-600">${escapeHtml(r.current_phase ?? '—')}</td>
-                <td class="px-3 py-2 text-xs ${retryCls}">${r.retries}</td>
-                <td class="px-3 py-2 text-xs text-slate-500">${dur}</td>
-                <td class="px-3 py-2 text-xs text-slate-400 truncate max-w-xs" title="${escapeHtml(r.cwd)}">${escapeHtml(r.cwd)}</td>
+                <td class="px-3 py-2 text-xs ${retryCls}" title="${r.retries} phase retr${r.retries === 1 ? 'y' : 'ies'}">${r.retries}</td>
+                <td class="px-3 py-2 text-xs text-slate-500 text-right tabular-nums">${dur}</td>
+                <td class="px-3 py-2 text-xs text-slate-400 font-mono whitespace-nowrap" title="${escapeHtml(r.cwd)}">${escapeHtml(cwdShort)}</td>
               </tr>
             `;
           }).join('');
           app.innerHTML = `
-            <h1 class="text-2xl font-semibold mb-1">harny runs</h1>
+            <h1 class="text-2xl font-semibold mb-1">Runs</h1>
             <p class="text-sm text-slate-500 mb-4">${runs.length} run${runs.length === 1 ? '' : 's'} across all assistants. Auto-refreshes every 3s.</p>
             <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
               <table class="min-w-full divide-y divide-slate-200">
@@ -160,7 +232,7 @@
                     <th class="px-3 py-2">Status</th>
                     <th class="px-3 py-2">Phase</th>
                     <th class="px-3 py-2">Retries</th>
-                    <th class="px-3 py-2">Duration</th>
+                    <th class="px-3 py-2 text-right">Duration</th>
                     <th class="px-3 py-2">CWD</th>
                   </tr>
                 </thead>
@@ -189,15 +261,35 @@
           // The detail API pre-bakes phoenix.url server-side (Phoenix has no
           // CORS so the browser can't resolve project name → GraphQL id).
           // ONE trace per run — link goes in the header.
-          const phasesRows = state.phases.map(p => {
+          // Hide `committing` phases — sub-second and the SHA is in plan tasks.
+          // Insert an "Iteration N" header row before each developer to group
+          // visually, with the task title when resolvable from the verdict.
+          const visiblePhases = state.phases.filter(p => p.name !== 'committing');
+          let iter = 0;
+          const phasesRows = visiblePhases.map(p => {
             const dur = fmtDuration(durationMs(p.started_at, p.ended_at));
-            return `
-              <tr>
-                <td class="px-3 py-2 text-sm font-medium">${escapeHtml(p.name)}</td>
-                <td class="px-3 py-2 text-xs text-slate-500">#${p.attempt}</td>
+            const name = p.attempt > 1 ? `${p.name} #${p.attempt}` : p.name;
+            let header = '';
+            if (p.name === 'developer') {
+              iter += 1;
+              let taskTitle = '';
+              if (p.verdict) {
+                try {
+                  const v = JSON.parse(p.verdict);
+                  const subject = (v.commit_message ?? '').split('\n')[0].trim();
+                  if (subject) taskTitle = ` — ${truncate(subject, 80)}`;
+                } catch {}
+              }
+              header = `<tr class="bg-slate-50"><td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Iteration ${iter}${escapeHtml(taskTitle)}</td></tr>`;
+            }
+            const fullId = p.session_id ?? '';
+            const shortId = fullId ? fullId.slice(0, 8) : '—';
+            return header + `
+              <tr class="hover:bg-slate-50">
+                <td class="px-3 py-2 text-sm font-medium">${escapeHtml(name)}</td>
                 <td class="px-3 py-2">${phaseBadge(p.status)}</td>
-                <td class="px-3 py-2 text-xs">${dur}</td>
-                <td class="px-3 py-2 text-xs text-slate-500 font-mono">${escapeHtml(p.session_id?.slice(0, 8) ?? '—')}</td>
+                <td class="px-3 py-2 text-xs text-right tabular-nums">${dur}</td>
+                <td class="px-3 py-2 text-xs text-slate-400 font-mono" title="${escapeHtml(fullId)}">${escapeHtml(shortId)}</td>
               </tr>
             `;
           }).join('');
@@ -211,10 +303,10 @@
             const planSummary = plan.summary ? `<p class="text-xs text-slate-600 mb-3">${escapeHtml(plan.summary)}</p>` : '';
             const taskRows = plan.tasks.map(t => {
               const desc = t.description && t.description !== t.title
-                ? `<div class="text-xs text-slate-500 mt-0.5">${escapeHtml(t.description)}</div>`
+                ? `<details class="mt-1 group" data-detail-id="task-${escapeHtml(t.id)}-desc"><summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-700 select-none list-none flex items-center gap-1"><span class="inline-block transition-transform group-open:rotate-90">▸</span> Details</summary><div class="task-md mt-2 ml-4 max-w-prose">${renderMarkdown(t.description)}</div></details>`
                 : '';
               const acceptance = (t.acceptance ?? []).length
-                ? `<details class="mt-1"><summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-700">${t.acceptance.length} acceptance criteria</summary><ul class="mt-1 ml-4 list-disc text-xs text-slate-500 space-y-0.5">${t.acceptance.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></details>`
+                ? `<details class="mt-1 group" data-detail-id="task-${escapeHtml(t.id)}-acceptance"><summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-700 select-none list-none flex items-center gap-1"><span class="inline-block transition-transform group-open:rotate-90">▸</span> ${t.acceptance.length} acceptance criteria</summary><ul class="mt-1 ml-4 list-disc text-xs text-slate-500 space-y-0.5">${t.acceptance.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></details>`
                 : '';
               const sha = t.commit_sha ? `<span class="font-mono text-xs text-slate-500" title="${escapeHtml(t.commit_sha)}">${escapeHtml(t.commit_sha.slice(0,8))}</span>` : '<span class="text-xs text-slate-400">—</span>';
               const attemptsCls = t.attempts <= 1 ? 'text-emerald-700' : t.attempts <= 2 ? 'text-amber-700' : 'text-rose-700';
@@ -263,7 +355,7 @@
             : `<ul class="space-y-1">${commits.map(c => `
                 <li class="text-sm">
                   <span class="font-mono text-xs text-slate-500">${escapeHtml(c.sha)}</span>
-                  <span class="text-xs text-slate-400 ml-2">${escapeHtml(fmtTime(c.date))}</span>
+                  <span class="text-xs text-slate-400 ml-2" title="${escapeHtml(fmtTime(c.date))}">${escapeHtml(fmtRelative(c.date))}</span>
                   <div class="text-sm">${escapeHtml(c.subject)}</div>
                 </li>
               `).join('')}</ul>`;
@@ -338,9 +430,9 @@
             <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
               <table class="min-w-full divide-y divide-slate-200">
                 <thead class="bg-slate-50 text-left text-xs uppercase text-slate-700">
-                  <tr><th class="px-3 py-2">Name</th><th class="px-3 py-2">Attempt</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Duration</th><th class="px-3 py-2">Session</th></tr>
+                  <tr><th class="px-3 py-2">Name</th><th class="px-3 py-2">Status</th><th class="px-3 py-2 text-right">Duration</th><th class="px-3 py-2">Session</th></tr>
                 </thead>
-                <tbody class="divide-y divide-slate-200">${phasesRows || '<tr><td colspan="5" class="px-3 py-2 text-xs text-slate-400">No phases yet.</td></tr>'}</tbody>
+                <tbody class="divide-y divide-slate-200">${phasesRows || '<tr><td colspan="4" class="px-3 py-2 text-xs text-slate-400">No phases yet.</td></tr>'}</tbody>
               </table>
             </div>
 
@@ -354,11 +446,16 @@
               <div class="bg-white border border-slate-200 rounded-lg p-4">
                 <h2 class="text-sm font-semibold mb-3 text-slate-700">Recent events</h2>
                 <ul class="space-y-1">
-                  ${recentHistory.map(e => `<li class="text-xs"><span class="text-slate-400">${escapeHtml(fmtTime(e.at))}</span> · <span class="text-slate-600">${escapeHtml(e.phase)}</span> · <span class="font-medium">${escapeHtml(eventSubstance(e, state, plan))}</span></li>`).join('')}
+                  ${recentHistory.map(e => {
+                    const sub = eventSubstance(e, state, plan);
+                    const cls = sub.kind === 'pass' ? 'text-emerald-700' : sub.kind === 'fail' ? 'text-rose-700' : '';
+                    return `<li class="text-xs"><span class="text-slate-400" title="${escapeHtml(fmtTime(e.at))}">${escapeHtml(fmtRelative(e.at))}</span> · <span class="text-slate-600">${escapeHtml(e.phase)}</span> · <span class="font-medium ${cls}">${escapeHtml(sub.text)}</span></li>`;
+                  }).join('')}
                 </ul>
               </div>
             </div>
           `;
+          bindDetailsTracking(app);
         } catch (e) {
           app.innerHTML = `<a href="#/" class="text-sm text-indigo-600 hover:underline">← all runs</a><p class="mt-4 text-rose-700">Error: ${escapeHtml(e.message)}</p>`;
         }
@@ -368,6 +465,7 @@
     }
 
     function route() {
+      openDetails.clear();
       const hash = location.hash || '#/';
       const detailMatch = hash.match(/^#\/runs\/([^/]+)\/(.+)$/);
       if (detailMatch) {
@@ -379,6 +477,10 @@
 
     window.addEventListener('hashchange', route);
     route();
+
+    fetchJSON('/api/meta')
+      .then(({ version }) => { document.getElementById('version').textContent = `v${version}`; })
+      .catch(() => {});
   </script>
 </body>
 </html>
