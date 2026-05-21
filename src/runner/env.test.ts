@@ -70,6 +70,20 @@ describe("configureEnv", () => {
     expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
   });
 
+  test("scrub is narrowed to keys actually present in project .env", () => {
+    // Shell exports BASE_URL; project .env only leaks API_KEY. Only API_KEY
+    // should be scrubbed; BASE_URL (shell-set) must survive.
+    process.env.ANTHROPIC_API_KEY = "leaked";
+    process.env.ANTHROPIC_BASE_URL = "https://shell.example";
+    writeFileSync(join(tmpCwd, ".env"), "ANTHROPIC_API_KEY=leaked\n");
+
+    const result = configureEnv({ cwd: tmpCwd, home: tmpHome });
+
+    expect(result.scrubbed).toEqual(["ANTHROPIC_API_KEY"]);
+    expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(process.env.ANTHROPIC_BASE_URL).toBe("https://shell.example");
+  });
+
   test("no project .env mentions Anthropic keys → process.env untouched", () => {
     process.env.ANTHROPIC_API_KEY = "shell-only";
     writeFileSync(join(tmpCwd, ".env"), "UNRELATED_VAR=foo\n");

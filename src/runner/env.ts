@@ -56,14 +56,15 @@ function loadFile(path: string): Record<string, string> {
   }
 }
 
-function projectDotenvHasScrubbedKey(cwd: string): boolean {
+function projectDotenvScrubbedKeys(cwd: string): Set<string> {
+  const found = new Set<string>();
   for (const name of PROJECT_DOTENV_CANDIDATES) {
     const parsed = loadFile(join(cwd, name));
     for (const key of SCRUBBED_KEYS) {
-      if (parsed[key] !== undefined) return true;
+      if (parsed[key] !== undefined) found.add(key);
     }
   }
-  return false;
+  return found;
 }
 
 export type ConfigureEnvOptions = {
@@ -99,12 +100,11 @@ export function configureEnv(opts: ConfigureEnvOptions = {}): ConfigureEnvResult
   }
 
   const scrubbed: string[] = [];
-  if (projectDotenvHasScrubbedKey(cwd)) {
-    for (const key of SCRUBBED_KEYS) {
-      if (process.env[key] !== undefined) {
-        delete process.env[key];
-        scrubbed.push(key);
-      }
+  const leakedKeys = projectDotenvScrubbedKeys(cwd);
+  for (const key of leakedKeys) {
+    if (process.env[key] !== undefined) {
+      delete process.env[key];
+      scrubbed.push(key);
     }
   }
 
