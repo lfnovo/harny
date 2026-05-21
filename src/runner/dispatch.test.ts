@@ -1,17 +1,29 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { handleLs } from "./ls.js";
 import { handleShow } from "./show.js";
 import { handleAnswer } from "./answer.js";
 import { handleClean } from "./clean.js";
 import type { RunnerContext } from "./context.js";
+import { setRegistryDirForTesting } from "../harness/state/registry.js";
 
-// Fake context: searchCwds points to a nonexistent dir so cross-run discovery
-// returns [] / null without touching real harness state.
+// Empty pointer registry → discovery returns [] / null without touching real
+// harness state. Each test gets a fresh tmp dir.
 const ctx: RunnerContext = {
   logMode: "compact",
   assistantName: null,
-  searchCwds: [`/tmp/harny-probe-dispatch-${Date.now()}`],
 };
+let tmpRegistry: string;
+beforeEach(() => {
+  tmpRegistry = mkdtempSync(join(tmpdir(), "harny-probe-registry-"));
+  setRegistryDirForTesting(tmpRegistry);
+});
+afterEach(() => {
+  setRegistryDirForTesting(null);
+  rmSync(tmpRegistry, { recursive: true, force: true });
+});
 
 function captureConsole(): {
   restore: () => void;
@@ -55,7 +67,7 @@ describe("handleLs", () => {
   test("empty search dir → 'No runs found.'", async () => {
     const cap = captureConsole();
     try {
-      await handleLs({ kind: "ls" }, ctx);
+      await handleLs({ kind: "ls" });
     } finally {
       cap.restore();
     }
@@ -65,7 +77,7 @@ describe("handleLs", () => {
   test("status filter + empty dir → still 'No runs found.'", async () => {
     const cap = captureConsole();
     try {
-      await handleLs({ kind: "ls", status: "done" }, ctx);
+      await handleLs({ kind: "ls", status: "done" });
     } finally {
       cap.restore();
     }
@@ -79,7 +91,7 @@ describe("handleShow", () => {
     let code: number | undefined;
     try {
       code = await captureExit(() =>
-        handleShow({ kind: "show", runId: "nonexistent-probe-id" }, ctx),
+        handleShow({ kind: "show", runId: "nonexistent-probe-id" }),
       );
     } finally {
       cap.restore();
@@ -94,7 +106,7 @@ describe("handleAnswer", () => {
     let code: number | undefined;
     try {
       code = await captureExit(() =>
-        handleAnswer({ kind: "answer", runId: "nonexistent-probe-id" }, ctx),
+        handleAnswer({ kind: "answer", runId: "nonexistent-probe-id" }),
       );
     } finally {
       cap.restore();

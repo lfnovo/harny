@@ -1,7 +1,10 @@
 import { rm, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { removeWorktree } from "./git.js";
 import { worktreePathFor, planDir } from "./state/plan.js";
+import { deletePointer, listPointers, registryDir, type RunPointer } from "./state/registry.js";
+import { statePathFor } from "./state/filesystem.js";
 import { spawn } from "node:child_process";
 
 function runGit(
@@ -133,4 +136,39 @@ export async function cleanRun(
 
   if (verbose) console.log(`[clean] removing state dir: ${stateDir}`);
   await rm(stateDir, { recursive: true, force: true });
+
+  // Best-effort: drop the matching pointer from the cross-project registry.
+  // Multiple pointers may reference this slug if the same run was attempted
+  // in different cwds; only delete those pointing at this cwd.
+  try {
+    const pointers: RunPointer[] = await listPointers();
+    for (const p of pointers) {
+      if (p.cwd === primaryCwd && p.task_slug === slug) {
+        await deletePointer(p.run_id);
+        if (verbose) console.log(`[clean] removed pointer: ${p.run_id}`);
+      }
+    }
+  } catch {
+    // pointer registry is an index; failure to clean here is non-fatal
+  }
+}
+
+/**
+ * Prune pointers in `~/.harny/runs/` whose underlying state.json is
+ * unreachable (project deleted, run dir removed manually). Returns the count
+ * removed.
+ */
+export async function pruneRegistry(verbose: boolean): Promise<number> {
+  if (!existsSync(registryDir())) return 0;
+  const pointers = await listPointers();
+  let removed = 0;
+  for (const p of pointers) {
+    const statePath = statePathFor(p.cwd, p.task_slug);
+    if (!existsSync(statePath)) {
+      await deletePointer(p.run_id);
+      removed++;
+      if (verbose) console.log(`[clean] pruned unreachable pointer: ${p.run_id} (${p.cwd})`);
+    }
+  }
+  return removed;
 }

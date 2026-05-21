@@ -5,46 +5,12 @@
  * No writes, no auth, binds to 127.0.0.1 only.
  */
 
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { listAllRuns, listRunsInCwd, statePathFor } from "../harness/state/filesystem.js";
 import { planFilePath } from "../harness/state/plan.js";
 import type { State } from "../harness/state/schema.js";
-
-const ASSISTANTS_FILE = join(homedir(), ".harny", "assistants.json");
-
-type Assistant = {
-  name: string;
-  cwd: string;
-  additionalDirectories?: string[];
-};
-type AssistantsFile = { assistants: Assistant[] };
-
-async function loadAssistants(): Promise<Assistant[]> {
-  if (!existsSync(ASSISTANTS_FILE)) return [];
-  try {
-    const raw = await readFile(ASSISTANTS_FILE, "utf8");
-    const parsed = JSON.parse(raw) as AssistantsFile;
-    return parsed.assistants ?? [];
-  } catch {
-    return [];
-  }
-}
-
-async function loadAllCwds(): Promise<string[]> {
-  const set = new Set<string>();
-  for (const a of await loadAssistants()) {
-    if (a.cwd) set.add(a.cwd);
-    for (const d of a.additionalDirectories ?? []) set.add(d);
-  }
-  // Always include the dir the viewer was launched from so unregistered
-  // local runs are visible.
-  set.add(process.cwd());
-  return Array.from(set);
-}
 
 function cwdHashOf(cwd: string): string {
   return Buffer.from(cwd).toString("base64url");
@@ -225,13 +191,8 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         return jsonRes({ version });
       }
 
-      if (path === "/api/assistants") {
-        return jsonRes(await loadAssistants());
-      }
-
       if (path === "/api/runs") {
-        const cwds = await loadAllCwds();
-        const runs = await listAllRuns(cwds);
+        const runs = await listAllRuns();
         const summarized = runs.map((r) => ({
           run_id: r.run_id,
           short_id: r.run_id.slice(0, 8),

@@ -1,12 +1,10 @@
 import { findRun, statePathFor } from "../harness/state/filesystem.js";
 import type { AskUserQuestionItem } from "../harness/askUser.js";
-import type { RunnerContext } from "./context.js";
 
 export async function handleShow(
   cmd: { kind: "show"; runId: string; tail?: boolean; since?: string },
-  ctx: RunnerContext,
 ): Promise<void> {
-  const run = await findRun(ctx.searchCwds, cmd.runId);
+  const run = await findRun(cmd.runId);
   if (!run) { console.error(`Run not found: ${cmd.runId}`); process.exit(1); }
 
   if (cmd.tail) {

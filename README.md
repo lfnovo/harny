@@ -15,7 +15,7 @@ The mechanism: a planner → developer → validator discipline that catches bad
 # Run feature-dev workflow against the current directory.
 bunx @lfnovo/harny "build me a calculator CLI in calc.py"
 
-# All runs in this directory + any registered cross-project assistants.
+# All your runs across every project — pulled from ~/.harny/runs/ pointer registry.
 bunx @lfnovo/harny ls
 
 # Visual viewer with run timeline, plan, sibling-branch warnings, Phoenix deep-links.
@@ -159,23 +159,44 @@ bunx @lfnovo/harny "build me a calculator"
 
 The viewer surfaces a deep-link to the run's Phoenix trace when this is enabled.
 
-## Cross-project registry (optional)
+## Cross-project run registry
 
-`~/.harny/assistants.json` registers named working directories. With it, you can:
+Every run auto-registers itself in `~/.harny/runs/<run_id>.json` — a small pointer file containing the cwd, task slug, workflow, and lifecycle status. `harny ls`, `harny show`, `harny answer`, and `harny ui` all read from this registry, so they work from any directory regardless of where the run was launched.
 
-- Run `harny --assistant my-app "..."` from any directory and have it execute against the registered cwd.
-- See runs from all registered projects in `harny ls` and `harny ui`.
+No configuration required. The pointer is written on `createRun` and updated on lifecycle transitions; the full `state.json` continues to live at `<cwd>/.harny/<slug>/state.json` (the registry is an index, not a duplicate).
+
+```sh
+# From anywhere on the machine:
+harny ls
+harny show <runId>
+harny ui
+```
+
+### Maintenance
+
+```sh
+# Reindex runs from a project (e.g. after upgrading from a pre-registry version).
+harny scan [<cwd>]
+
+# Prune pointers whose underlying state.json is gone (deleted project, manual rm).
+harny clean --prune
+```
+
+On first invocation after upgrading from a pre-registry harny, the CLI auto-backfills pointers from the current cwd and any cwds listed in the legacy `~/.harny/assistants.json` — no manual `scan` needed in the common case.
+
+### Named-cwd shortcut (optional)
+
+`~/.harny/assistants.json` remains supported as a purely optional shortcut for `--assistant <name>`:
 
 ```jsonc
 {
   "assistants": [
-    { "name": "my-app", "cwd": "/Users/me/projects/my-app" },
-    { "name": "harny",  "cwd": "/Users/me/dev/harny" }
+    { "name": "my-app", "cwd": "/Users/me/projects/my-app" }
   ]
 }
 ```
 
-See `assistants.example.json`.
+`harny --assistant my-app "..."` then runs against `/Users/me/projects/my-app` regardless of `process.cwd()`. Cross-project visibility no longer depends on this file.
 
 ## Per-project config
 
