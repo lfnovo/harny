@@ -211,16 +211,19 @@ export async function listAllRuns(): Promise<State[]> {
 export async function findRun(runIdOrSlug: string): Promise<State | null> {
   const pointers = await listPointers();
   const isPrefix = runIdOrSlug.length >= 8 && runIdOrSlug.length < 36;
-  const byId = pointers.find((p) =>
-    isPrefix ? p.run_id.startsWith(runIdOrSlug) : p.run_id === runIdOrSlug,
-  );
-  if (byId) {
-    const s = await loadStateFromPointer(byId);
+  // Keep scanning if a matching pointer's state.json is unreachable — prefix
+  // collisions or stale pointers must not mask a still-valid match further on.
+  for (const p of pointers) {
+    const idMatch = isPrefix
+      ? p.run_id.startsWith(runIdOrSlug)
+      : p.run_id === runIdOrSlug;
+    if (!idMatch) continue;
+    const s = await loadStateFromPointer(p);
     if (s) return s;
   }
-  const bySlug = pointers.find((p) => p.task_slug === runIdOrSlug);
-  if (bySlug) {
-    const s = await loadStateFromPointer(bySlug);
+  for (const p of pointers) {
+    if (p.task_slug !== runIdOrSlug) continue;
+    const s = await loadStateFromPointer(p);
     if (s) return s;
   }
   return null;

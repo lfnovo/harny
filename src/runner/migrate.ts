@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { registryDir, listPointers } from "../harness/state/registry.js";
+import { mkdir } from "node:fs/promises";
+import { registryDir } from "../harness/state/registry.js";
 import { migrationCwds } from "./context.js";
 import { scanCwd } from "./scan.js";
 import type { LogMode } from "../harness/types.js";
@@ -7,30 +8,35 @@ import type { LogMode } from "../harness/types.js";
 /**
  * One-shot migration helper. The pointer registry was introduced after
  * `~/.harny/assistants.json` and per-cwd `.harny/<slug>/` directories
- * already existed. On first invocation post-upgrade we backfill pointers
- * so `ls`/`show`/`ui` are not suddenly empty.
+ * already existed. On the first invocation post-upgrade — detected by the
+ * absence of `~/.harny/runs/` — we scan the current cwd and any cwds in
+ * the legacy `assistants.json`, backfilling pointers.
  *
- * Trigger: registry dir does not exist OR is empty. We scan the current
- * cwd and any cwds registered in the legacy `assistants.json`. Subsequent
- * runs are no-ops because `createRun` writes pointers inline.
+ * The migration is genuinely one-shot: we `mkdir -p` the registry dir at
+ * the end even when zero pointers were written, so a user with no legacy
+ * runs doesn't trigger a re-scan on every subsequent invocation.
  */
 export async function maybeRunMigration(logMode: LogMode): Promise<void> {
   const dir = registryDir();
-  const registryAbsent = !existsSync(dir);
-  if (!registryAbsent) {
-    const pointers = await listPointers();
-    if (pointers.length > 0) return;
-  }
+  if (existsSync(dir)) return;
   const cwds = await migrationCwds();
-  let total = 0;
+  let added = 0;
+  let refreshed = 0;
   for (const cwd of cwds) {
     try {
-      total += await scanCwd(cwd);
+      const r = await scanCwd(cwd);
+      added += r.added;
+      refreshed += r.refreshed;
     } catch {
       // Best-effort: a broken cwd in legacy assistants.json must not abort.
     }
   }
-  if (total > 0 && logMode !== "quiet") {
-    console.log(`[harny] migrated ${total} legacy run${total === 1 ? "" : "s"} into ${dir}`);
+  // Ensure the dir exists so this migration is genuinely one-shot, even when
+  // no legacy runs were found.
+  await mkdir(dir, { recursive: true });
+  if (added + refreshed > 0 && logMode !== "quiet") {
+    console.log(
+      `[harny] migrated ${added + refreshed} legacy run${added + refreshed === 1 ? "" : "s"} into ${dir}`,
+    );
   }
 }

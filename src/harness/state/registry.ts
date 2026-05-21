@@ -49,7 +49,18 @@ export function registryDir(): string {
   return registryDirOverride ?? defaultRegistryDir();
 }
 
+const SAFE_RUN_ID = /^[A-Za-z0-9_-]+$/;
+
+function assertSafeRunId(runId: string): void {
+  if (!SAFE_RUN_ID.test(runId)) {
+    throw new Error(
+      `Invalid run_id ${JSON.stringify(runId)}: must match ${SAFE_RUN_ID}`,
+    );
+  }
+}
+
 export function pointerPath(runId: string): string {
+  assertSafeRunId(runId);
   return join(registryDir(), `${runId}.json`);
 }
 

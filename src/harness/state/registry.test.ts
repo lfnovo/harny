@@ -123,6 +123,14 @@ describe("registry: pointer I/O", () => {
   test("registryDir respects the override", () => {
     expect(registryDir()).toBe(dir);
   });
+
+  test("pointerPath rejects path-traversal in run_id", () => {
+    expect(() => pointerPath("../escape")).toThrow();
+    expect(() => pointerPath("foo/bar")).toThrow();
+    expect(() => pointerPath("with space")).toThrow();
+    // UUID-style is accepted
+    expect(() => pointerPath("550e8400-e29b-41d4-a716-446655440000")).not.toThrow();
+  });
 });
 
 describe("FilesystemStateStore: pointer integration", () => {
@@ -211,6 +219,23 @@ describe("discovery via registry", () => {
     await writePointer(minimalState("ghost", "run-ghost", "/nonexistent/cwd-ghost", "2026-01-01T00:00:00.000Z"));
     const found = await findRun("run-ghost");
     expect(found).toBeNull();
+  });
+
+  test("findRun keeps scanning when a matching pointer is stale", async () => {
+    // Write a pointer that points at a missing state.json, then a second one
+    // for the same id-prefix that is reachable. findRun must skip the stale
+    // entry and return the reachable one.
+    await writePointer(
+      minimalState("ghost", "abcd1234aa", "/nonexistent/ghost", "2026-01-01T00:00:00.000Z"),
+    );
+    const reachable = new FilesystemStateStore(cwdA, "real");
+    await reachable.createRun(
+      minimalState("real", "abcd1234bb", cwdA, "2026-01-01T00:00:00.000Z"),
+    );
+
+    const found = await findRun("abcd1234");
+
+    expect(found?.run_id).toBe("abcd1234bb");
   });
 
   test("pruneRegistry removes pointers whose state.json is unreachable", async () => {
