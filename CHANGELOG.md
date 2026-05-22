@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format loosely foll
 
 ### Added
 - **Credential isolation from project `.env`** (#85). When a project's `.env` (or `.env.local` / `.env.development` / `.env.production`) defines `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or `ANTHROPIC_MODEL`, harny now scrubs those values from `process.env` at boot so the project app's credentials don't silently drive the harness. Harny then overlays its own `~/.harny/.env` (user-global) and `./harny.env` (per-project, project takes precedence). Set `HARNY_INHERIT_ENV=1` to restore the legacy pass-through behavior. See README "Credentials" section.
+- **Cross-project run pointer registry at `~/.harny/runs/`** (#86). Every run now auto-registers a tiny pointer file (run_id, cwd, slug, workflow, status, timestamps) at start, and updates the pointer status on lifecycle transitions. `harny ls`, `harny show`, `harny answer`, and `harny ui` discover runs across projects via this registry — no user-maintained `assistants.json` needed. Full `state.json` continues to live at `<cwd>/.harny/<slug>/state.json`; the registry is an index, not a duplicate.
+- **`harny scan [<cwd>]`** reindexes runs from a project into the pointer registry. Auto-invoked once on first post-upgrade invocation against `process.cwd()` plus any cwds in the legacy `assistants.json`.
+- **`harny clean --prune`** removes pointers whose underlying `state.json` is unreachable.
+
+### Changed
+- **`assistants.json` is no longer required.** It remains an optional shortcut for the `--assistant <name>` named-cwd flag; cross-project visibility no longer depends on it. The `/api/assistants` endpoint in the viewer (which the SPA never consumed) was removed.
+- **CLI handler signatures**: `handleLs`/`handleShow`/`handleAnswer` no longer receive `RunnerContext` (discovery goes through the registry directly). `RunnerContext.searchCwds` was removed; `loadSearchCwds()` deleted from `src/runner/context.ts`.
 
 ## [0.3.1] — 2026-05-03
 

@@ -1,7 +1,8 @@
 import type { IsolationMode, LogMode, RunMode } from "./harness/types.js";
-import { loadSearchCwds } from "./runner/context.js";
 import type { RunnerContext } from "./runner/context.js";
 import { configureEnv } from "./runner/env.js";
+import { maybeRunMigration } from "./runner/migrate.js";
+import { handleScan } from "./runner/scan.js";
 import { handleLs } from "./runner/ls.js";
 import { handleShow } from "./runner/show.js";
 import { handleAnswer } from "./runner/answer.js";
@@ -24,7 +25,7 @@ export function printHelp(): void {
       "  --verbose, -v        Verbose log output",
       "  --quiet              Suppress all non-error output",
       "  --workflow <id>      Workflow to run (default: feature-dev)",
-      "  --assistant <name>   Named assistant from ~/.harny/assistants.json",
+      "  --assistant <name>   Named-cwd shortcut from ~/.harny/assistants.json (optional)",
       "  --name <slug>        Name for this run (becomes .harny/<slug>/ and harny/<slug> branch)",
       "  --isolation <mode>   worktree (default) or inline",
       "  --mode <mode>        interactive, silent, or async",
@@ -37,6 +38,8 @@ export function printHelp(): void {
       "  answer <runId>                                        Answer a parked question",
       "  ui [--port <n>] [--no-open]                          Launch the viewer UI",
       "  clean <slug> [--force] [--kill]                      Clean up a run",
+      "  clean --prune                                         Prune unreachable pointers from ~/.harny/runs/",
+      "  scan [<cwd>]                                          Reindex ~/.harny/runs/ from a project's .harny/<slug>/",
       "",
       "When no subcommand is given, the prompt is dispatched as a new harny run.",
       "Default workflow: feature-dev. cwd defaults to process.cwd() when --assistant is omitted.",
@@ -52,7 +55,8 @@ export type RegistryCmd =
   | { kind: "show"; runId: string; tail?: boolean; since?: string }
   | { kind: "answer"; runId: string }
   | { kind: "ui"; port?: number; noOpen?: boolean }
-  | { kind: "clean"; slug: string; force?: boolean; kill?: boolean };
+  | { kind: "clean"; slug: string | null; force?: boolean; kill?: boolean; prune?: boolean }
+  | { kind: "scan"; cwd?: string };
 
 const FLAGS: Record<string, FlagSpec> = {
   "--verbose":  { kind: "bool",  target: "verbose", short: "-v" },
@@ -69,7 +73,8 @@ const SUBCOMMANDS: Record<string, SubcommandSpec> = {
   show:   { positional: ["runId"], flags: ["--tail", "--since"] },
   answer: { positional: ["runId"], flags: ["--json"] },
   ui:     { flags: ["--no-open", "--port"] },
-  clean:  { positional: ["slug"], flags: ["--force", "--kill"] },
+  clean:  { positional: ["slug"], flags: ["--force", "--kill", "--prune"] },
+  scan:   { positional: ["cwd"], flags: [] },
 };
 
 function parseIsolation(v: string): IsolationMode {
@@ -153,7 +158,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
         registryCmd = { kind: "ui", ...(sf["--port"] ? { port: Number(sf["--port"]) } : {}), ...(sf["--no-open"] ? { noOpen: true } : {}) };
         break;
       case "clean":
-        if (pos[0]) registryCmd = { kind: "clean", slug: pos[0], ...(sf["--force"] ? { force: true } : {}), ...(sf["--kill"] ? { kill: true } : {}) };
+        if (sf["--prune"]) {
+          registryCmd = { kind: "clean", slug: null, prune: true };
+        } else if (pos[0]) {
+          registryCmd = { kind: "clean", slug: pos[0], ...(sf["--force"] ? { force: true } : {}), ...(sf["--kill"] ? { kill: true } : {}) };
+        }
+        break;
+      case "scan":
+        registryCmd = { kind: "scan", ...(pos[0] ? { cwd: pos[0] } : {}) };
         break;
     }
   }
@@ -187,10 +199,13 @@ export async function main() {
     );
     return;
   }
-  const searchCwds = await loadSearchCwds();
-  const ctx: RunnerContext = { logMode, assistantName: parsed.assistant, searchCwds };
+  const ctx: RunnerContext = { logMode, assistantName: parsed.assistant };
+  // One-shot migration: if the pointer registry is empty but legacy runs
+  // exist in known cwds, backfill so `ls`/`show`/`ui` aren't suddenly empty
+  // for upgraded users.
+  await maybeRunMigration(logMode);
   if (registryCmd) {
-    const handlers = { ls: handleLs, show: handleShow, answer: handleAnswer, ui: handleUi, clean: handleClean };
+    const handlers = { ls: handleLs, show: handleShow, answer: handleAnswer, ui: handleUi, clean: handleClean, scan: handleScan };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (handlers[registryCmd.kind] as any)(registryCmd as any, ctx);
     return;

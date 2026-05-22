@@ -1,11 +1,9 @@
 import { listAllRuns } from "../harness/state/filesystem.js";
-import type { RunnerContext } from "./context.js";
 
 export async function handleLs(
   cmd: { kind: "ls"; status?: string; cwd?: string; workflow?: string },
-  ctx: RunnerContext,
 ): Promise<void> {
-  let runs = await listAllRuns(ctx.searchCwds);
+  let runs = await listAllRuns();
   if (cmd.status) runs = runs.filter((r) => r.lifecycle.status === cmd.status);
   if (cmd.cwd) runs = runs.filter((r) => r.environment.cwd === cmd.cwd);
   if (cmd.workflow) runs = runs.filter((r) => r.origin.workflow === cmd.workflow);

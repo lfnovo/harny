@@ -24,7 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Probe lives at scripts/probes/, repo root is two up.
 const ROOT_DIR = join(__dirname, "..", "..");
 const SESSIONS_DIR = join(ROOT_DIR, "sessions");
-const ASSISTANTS_FILE = join(homedir(), ".harness", "assistants.json");
+const ASSISTANTS_FILE = join(homedir(), ".harny", "assistants.json");
 
 type Assistant = {
   name: string;

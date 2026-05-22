@@ -1,4 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, isAbsolute, basename } from "node:path";
 import type { LogMode } from "../harness/types.js";
@@ -6,7 +7,6 @@ import type { LogMode } from "../harness/types.js";
 export type RunnerContext = {
   logMode: LogMode;
   assistantName: string | null;
-  searchCwds: string[];
 };
 
 export type Assistant = {
@@ -19,6 +19,12 @@ type AssistantsFile = { assistants: Assistant[] };
 
 const ASSISTANTS_FILE = join(homedir(), ".harny", "assistants.json");
 
+/**
+ * `--assistant <name>` is now an optional named-cwd shortcut. Cross-project
+ * run discovery moved to the pointer registry (`~/.harny/runs/`), so this
+ * file is no longer required infrastructure — only consulted when the user
+ * passes `--assistant`.
+ */
 async function loadAssistant(name: string): Promise<Assistant> {
   let parsed: AssistantsFile;
   try {
@@ -53,29 +59,24 @@ export async function resolveAssistant(name: string | null): Promise<Assistant> 
   return { name: basename(cwd) || "harny", cwd, additionalDirectories: [] };
 }
 
-export async function loadSearchCwds(): Promise<string[]> {
-  let raw: string;
-  try {
-    raw = await readFile(ASSISTANTS_FILE, "utf8");
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`[harny] could not read ${ASSISTANTS_FILE}: ${(err as Error).message} — falling back to process.cwd() only`);
-    }
-    return [process.cwd()];
-  }
-  let parsed: AssistantsFile;
-  try {
-    parsed = JSON.parse(raw) as AssistantsFile;
-  } catch (err) {
-    console.warn(`[harny] invalid JSON in ${ASSISTANTS_FILE}: ${(err as Error).message} — falling back to process.cwd() only`);
-    return [process.cwd()];
-  }
+/**
+ * Return registered assistant cwds plus the current process cwd. Used by the
+ * one-shot migration on first run after upgrade — not for discovery anymore.
+ */
+export async function migrationCwds(): Promise<string[]> {
   const out = new Set<string>([process.cwd()]);
-  for (const a of parsed.assistants ?? []) {
-    if (a.cwd && isAbsolute(a.cwd)) out.add(a.cwd);
-    for (const d of a.additionalDirectories ?? []) {
-      if (isAbsolute(d)) out.add(d);
+  if (!existsSync(ASSISTANTS_FILE)) return Array.from(out);
+  try {
+    const raw = await readFile(ASSISTANTS_FILE, "utf8");
+    const parsed = JSON.parse(raw) as AssistantsFile;
+    for (const a of parsed.assistants ?? []) {
+      if (a.cwd && isAbsolute(a.cwd)) out.add(a.cwd);
+      for (const d of a.additionalDirectories ?? []) {
+        if (isAbsolute(d)) out.add(d);
+      }
     }
+  } catch {
+    // ignore malformed legacy file
   }
   return Array.from(out);
 }

@@ -10,6 +10,12 @@ import {
 } from "./schema.js";
 import type { StateStore } from "./store.js";
 import { writeJsonAtomic } from "./atomic.js";
+import {
+  listPointers,
+  patchPointer,
+  writePointer,
+  type RunPointer,
+} from "./registry.js";
 
 export function statePathFor(cwd: string, taskSlug: string): string {
   return join(cwd, ".harny", taskSlug, "state.json");
@@ -44,6 +50,13 @@ export class FilesystemStateStore implements StateStore {
     }
     StateSchema.parse(initial);
     await writeJsonAtomic(this.statePath, initial);
+    // Best-effort: register in the cross-project pointer index. Failures here
+    // must never abort a run — the state.json on disk is the source of truth.
+    try {
+      await writePointer(initial);
+    } catch (err) {
+      console.warn(`[harny] could not write run pointer: ${(err as Error).message}`);
+    }
   }
 
   private async mutate(mutator: (s: State) => void): Promise<void> {
@@ -58,9 +71,21 @@ export class FilesystemStateStore implements StateStore {
   }
 
   async updateLifecycle(patch: Partial<State["lifecycle"]>): Promise<void> {
+    let runId: string | null = null;
+    let nextStatus: State["lifecycle"]["status"] | undefined;
+    let nextEndedAt: string | null | undefined;
     await this.mutate((s) => {
       Object.assign(s.lifecycle, patch);
+      runId = s.run_id;
+      nextStatus = s.lifecycle.status;
+      nextEndedAt = s.lifecycle.ended_at;
     });
+    if (runId && (patch.status !== undefined || patch.ended_at !== undefined)) {
+      await patchPointer(runId, {
+        ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+        ...(nextEndedAt !== undefined ? { ended_at: nextEndedAt } : {}),
+      });
+    }
   }
 
   async appendPhase(phase: PhaseEntry): Promise<void> {
@@ -118,6 +143,10 @@ export class FilesystemStateStore implements StateStore {
 /**
  * Scan a single cwd for all run state.json files. Skips reserved subdirs
  * (`.harny/worktrees/`, dotfiles) and any malformed state.json.
+ *
+ * Used during migration (`harny scan`) and as the fallback when the pointer
+ * registry is empty. Once a run is registered, discovery routes via the
+ * registry without scanning the cwd.
  */
 export async function listRunsInCwd(cwd: string): Promise<State[]> {
   const harnyDir = join(cwd, ".harny");
@@ -144,40 +173,58 @@ export async function listRunsInCwd(cwd: string): Promise<State[]> {
   return states;
 }
 
-/**
- * Aggregate runs across many cwds, sorted by started_at descending.
- */
-export async function listAllRuns(cwds: string[]): Promise<State[]> {
-  const all: State[] = [];
-  for (const cwd of cwds) {
-    all.push(...(await listRunsInCwd(cwd)));
+async function loadStateFromPointer(p: RunPointer): Promise<State | null> {
+  const statePath = statePathFor(p.cwd, p.task_slug);
+  if (!existsSync(statePath)) return null;
+  try {
+    const raw = await readFile(statePath, "utf8");
+    const parsed = StateSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
   }
-  all.sort((a, b) => b.origin.started_at.localeCompare(a.origin.started_at));
-  return all;
 }
 
 /**
- * Find a single run by run_id (full or prefix ≥8 chars) across many cwds.
- * First match wins; on ambiguous prefix, returns the first match (acceptable
- * for v1 — collisions in the first 8 hex chars of UUIDv4 are vanishingly rare).
- * If `runIdOrSlug` matches no run_id, falls back to matching task_slug.
+ * List all known runs via the cross-project pointer registry, sorted by
+ * `started_at` descending. Pointers whose state.json is unreachable (project
+ * deleted, manually removed) are silently skipped — run `harny clean` or
+ * `harny scan` to prune them.
  */
-export async function findRun(
-  cwds: string[],
-  runIdOrSlug: string,
-): Promise<State | null> {
-  const isPrefix = runIdOrSlug.length >= 8 && runIdOrSlug.length < 36;
-  for (const cwd of cwds) {
-    const states = await listRunsInCwd(cwd);
-    const byId = states.find((s) =>
-      isPrefix ? s.run_id.startsWith(runIdOrSlug) : s.run_id === runIdOrSlug,
-    );
-    if (byId) return byId;
+export async function listAllRuns(): Promise<State[]> {
+  const pointers = await listPointers();
+  const states: State[] = [];
+  for (const p of pointers) {
+    const s = await loadStateFromPointer(p);
+    if (s) states.push(s);
   }
-  for (const cwd of cwds) {
-    const states = await listRunsInCwd(cwd);
-    const bySlug = states.find((s) => s.origin.task_slug === runIdOrSlug);
-    if (bySlug) return bySlug;
+  states.sort((a, b) => b.origin.started_at.localeCompare(a.origin.started_at));
+  return states;
+}
+
+/**
+ * Find a single run by run_id (full or ≥8-char prefix) or by task_slug. Reads
+ * the pointer registry; first matching pointer wins and its state.json is
+ * loaded. On ambiguous prefix collisions (vanishingly rare for UUIDv4), the
+ * first match wins.
+ */
+export async function findRun(runIdOrSlug: string): Promise<State | null> {
+  const pointers = await listPointers();
+  const isPrefix = runIdOrSlug.length >= 8 && runIdOrSlug.length < 36;
+  // Keep scanning if a matching pointer's state.json is unreachable — prefix
+  // collisions or stale pointers must not mask a still-valid match further on.
+  for (const p of pointers) {
+    const idMatch = isPrefix
+      ? p.run_id.startsWith(runIdOrSlug)
+      : p.run_id === runIdOrSlug;
+    if (!idMatch) continue;
+    const s = await loadStateFromPointer(p);
+    if (s) return s;
+  }
+  for (const p of pointers) {
+    if (p.task_slug !== runIdOrSlug) continue;
+    const s = await loadStateFromPointer(p);
+    if (s) return s;
   }
   return null;
 }
