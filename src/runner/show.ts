@@ -1,5 +1,6 @@
 import { findRun, statePathFor } from "../harness/state/filesystem.js";
 import type { AskUserQuestionItem } from "../harness/askUser.js";
+import { isPidAlive } from "../harness/pid.js";
 
 export async function handleShow(
   cmd: { kind: "show"; runId: string; tail?: boolean; since?: string },
@@ -15,9 +16,13 @@ export async function handleShow(
     return;
   }
 
+  const status =
+    run.lifecycle.status === "running" && !isPidAlive(run.lifecycle.pid)
+      ? "running (stale)"
+      : run.lifecycle.status;
   console.log(`Run:       ${run.run_id}`);
   console.log(`Workflow:  ${run.origin.workflow}`);
-  console.log(`Status:    ${run.lifecycle.status}`);
+  console.log(`Status:    ${status}`);
   console.log(`CWD:       ${run.environment.cwd}`);
   console.log(`Branch:    ${run.environment.branch}`);
   console.log(`TaskSlug:  ${run.origin.task_slug}`);

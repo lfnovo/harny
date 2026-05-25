@@ -6,6 +6,7 @@ import { worktreePathFor, planDir } from "./state/plan.js";
 import { deletePointer, listPointers, registryDir, type RunPointer } from "./state/registry.js";
 import { statePathFor } from "./state/filesystem.js";
 import { spawn } from "node:child_process";
+import { isPidAlive } from "./pid.js";
 
 function runGit(
   cwd: string,
@@ -28,19 +29,6 @@ async function deleteLocalBranch(cwd: string, branch: string): Promise<void> {
   const msg = stderr.trim();
   if (msg.includes("not found") || msg.includes("no branch named")) return;
   throw new Error(`git branch -D ${branch} failed (exit ${code}): ${msg}`);
-}
-
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ESRCH") return false;
-    // EPERM means the process exists but we can't signal it
-    if (code === "EPERM") return true;
-    return false;
-  }
 }
 
 async function sendSignalToGroup(pid: number, signal: NodeJS.Signals): Promise<void> {

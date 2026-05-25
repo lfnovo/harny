@@ -9,23 +9,12 @@ import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
 import { getWorkflow } from "./workflows/index.js";
 import { runEngineWorkflow } from "./engine/runtime/runEngineWorkflow.js";
 import type { IsolationMode, LogMode, RunMode } from "./types.js";
+import { isPidAlive } from "./pid.js";
 
 function defaultTaskSlug(): string {
   const now = new Date();
   const iso = now.toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
   return `run-${iso}`;
-}
-
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ESRCH") return false;
-    if (code === "EPERM") return true;
-    return true;
-  }
 }
 
 export async function runHarness(args: {
