@@ -5,11 +5,74 @@ import { planFilePath, worktreePathFor } from "./state/plan.js";
 import { realGitOps, type GitOps } from "./gitOps.js";
 import { FilesystemStateStore } from "./state/filesystem.js";
 import type { State } from "./state/schema.js";
+import type { StateStore } from "./state/store.js";
 import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
 import { getWorkflow } from "./workflows/index.js";
 import { runEngineWorkflow } from "./engine/runtime/runEngineWorkflow.js";
 import type { IsolationMode, LogMode, RunMode } from "./types.js";
 import { isPidAlive } from "./pid.js";
+
+/**
+ * Idempotently write terminal state. No-ops if lifecycle is already terminal.
+ * Exported for testing.
+ */
+export async function applyTerminalState(store: StateStore, reason: string): Promise<void> {
+  const current = await store.getState();
+  if (!current) return;
+  const { status } = current.lifecycle;
+  if (status === "done" || status === "failed" || status === "waiting_human") return;
+  await store.updateLifecycle({
+    status: "failed",
+    ended_at: new Date().toISOString(),
+    ended_reason: reason,
+    current_phase: null,
+  });
+}
+
+/**
+ * Install process-exit handlers that write terminal state on unexpected death.
+ * Returns a cleanup function; call it in a finally block to deregister.
+ * Exported for testing.
+ */
+export function installExitHandlers(store: StateStore): () => void {
+  // SIGKILL cannot be trapped — state.json will remain status=running in that case
+  let beforeExitCalled = false;
+
+  const sigintHandler = async () => {
+    process.off("SIGINT", sigintHandler);
+    await applyTerminalState(store, "SIGINT");
+    process.kill(process.pid, "SIGINT");
+  };
+
+  const sigtermHandler = async () => {
+    process.off("SIGTERM", sigtermHandler);
+    await applyTerminalState(store, "SIGTERM");
+    process.kill(process.pid, "SIGTERM");
+  };
+
+  const uncaughtExceptionHandler = async (err: Error) => {
+    await applyTerminalState(store, err.message || "uncaughtException");
+    process.exit(1);
+  };
+
+  const beforeExitHandler = async () => {
+    if (beforeExitCalled) return;
+    beforeExitCalled = true;
+    await applyTerminalState(store, "process_exit");
+  };
+
+  process.on("SIGINT", sigintHandler);
+  process.on("SIGTERM", sigtermHandler);
+  process.on("uncaughtException", uncaughtExceptionHandler);
+  process.on("beforeExit", beforeExitHandler);
+
+  return () => {
+    process.off("SIGINT", sigintHandler);
+    process.off("SIGTERM", sigtermHandler);
+    process.off("uncaughtException", uncaughtExceptionHandler);
+    process.off("beforeExit", beforeExitHandler);
+  };
+}
 
 function defaultTaskSlug(): string {
   const now = new Date();
@@ -27,6 +90,7 @@ export async function runHarness(args: {
   mode?: RunMode;
   logMode?: LogMode;
   gitOps?: GitOps;
+  _engineRunner?: typeof runEngineWorkflow;
 }): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human"; planPath: string; branch: string }> {
   const primaryCwd = args.cwd;
   const git = args.gitOps ?? realGitOps;
@@ -141,6 +205,8 @@ export async function runHarness(args: {
   };
   await store.createRun(initialState);
 
+  const removeExitHandlers = installExitHandlers(store);
+
   const handleCleanupWorktree = async (
     outcome: "done" | "failed" | "exhausted" | "waiting_human",
   ): Promise<void> => {
@@ -164,49 +230,54 @@ export async function runHarness(args: {
     cwd: primaryCwd,
   });
 
-  return await withRunSpan(
-    phoenix,
-    taskSlug,
-    {
-      "harny.workflow": workflow.id,
-      "harny.run_id": runId,
-      "harny.task_slug": taskSlug,
-      "harny.cwd": primaryCwd,
-    },
-    async (traceId) => {
-      if (traceId && phoenix.projectName) {
-        await store.setPhoenix({ project: phoenix.projectName, trace_id: traceId });
-      }
+  try {
+    return await withRunSpan(
+      phoenix,
+      taskSlug,
+      {
+        "harny.workflow": workflow.id,
+        "harny.run_id": runId,
+        "harny.task_slug": taskSlug,
+        "harny.cwd": primaryCwd,
+      },
+      async (traceId) => {
+        if (traceId && phoenix.projectName) {
+          await store.setPhoenix({ project: phoenix.projectName, trace_id: traceId });
+        }
 
-      const engineResult = await runEngineWorkflow(workflow, {
-        cwd: phaseCwd,
-        primaryCwd,
-        taskSlug,
-        runId,
-        userPrompt: args.userPrompt,
-        log,
-        mode,
-        logMode,
-        store,
-        variant,
-      });
+        const engineRunner = args._engineRunner ?? runEngineWorkflow;
+        const engineResult = await engineRunner(workflow, {
+          cwd: phaseCwd,
+          primaryCwd,
+          taskSlug,
+          runId,
+          userPrompt: args.userPrompt,
+          log,
+          mode,
+          logMode,
+          store,
+          variant,
+        });
 
-      await handleCleanupWorktree(engineResult.status);
+        await handleCleanupWorktree(engineResult.status);
 
-      await store.updateLifecycle({
-        status: engineResult.status === "done" ? "done" : "failed",
-        ended_at: new Date().toISOString(),
-        ended_reason: engineResult.status,
-        current_phase: null,
-      });
+        await store.updateLifecycle({
+          status: engineResult.status === "done" ? "done" : "failed",
+          ended_at: new Date().toISOString(),
+          ended_reason: engineResult.status,
+          current_phase: null,
+        });
 
-      if (engineResult.status === "failed") {
-        log(`[harny] engine workflow failed: ${engineResult.error ?? "(no error message)"}`);
-      } else {
-        log(`[harny] engine workflow done`);
-      }
+        if (engineResult.status === "failed") {
+          log(`[harny] engine workflow failed: ${engineResult.error ?? "(no error message)"}`);
+        } else {
+          log(`[harny] engine workflow done`);
+        }
 
-      return { status: engineResult.status, planPath, branch };
-    },
-  );
+        return { status: engineResult.status, planPath, branch };
+      },
+    );
+  } finally {
+    removeExitHandlers();
+  }
 }

@@ -1,8 +1,9 @@
 import { describe, test, expect, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, statSync } from "node:fs";
+import { mkdirSync, writeFileSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { runHarness } from "./orchestrator.js";
+import { runHarness, applyTerminalState, installExitHandlers } from "./orchestrator.js";
 import { tmpGitRepo } from "./testing/index.js";
+import { MockStateStore } from "./testing/mockStateStore.js";
 import type { State } from "./state/schema.js";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -208,4 +209,144 @@ describe("runHarness: existing-state guards", () => {
       }),
     ).rejects.toThrow(/don't yet support resume/);
   });
+});
+
+function minimalRunningState(): State {
+  return {
+    schema_version: 2,
+    run_id: "test-run-id",
+    origin: {
+      prompt: "p",
+      workflow: "feature-dev",
+      task_slug: "t",
+      started_at: "2026-01-01T00:00:00.000Z",
+      host: "h",
+      user: "u",
+      features: null,
+    },
+    environment: {
+      cwd: "/tmp",
+      branch: "main",
+      isolation: "inline",
+      worktree_path: null,
+      mode: "silent",
+    },
+    lifecycle: {
+      status: "running",
+      current_phase: null,
+      ended_at: null,
+      ended_reason: null,
+      pid: process.pid,
+    },
+    phases: [],
+    history: [],
+    pending_question: null,
+    workflow_state: {},
+    workflow_chosen: null,
+  };
+}
+
+// --- L2: applyTerminalState ---
+
+describe("applyTerminalState (L2)", () => {
+  test("status=running → store ends up status=failed with ended_reason set", async () => {
+    const store = new MockStateStore(minimalRunningState());
+    await applyTerminalState(store, "SIGTERM");
+    expect(store.state!.lifecycle.status).toBe("failed");
+    expect(store.state!.lifecycle.ended_reason).toBe("SIGTERM");
+    expect(store.state!.lifecycle.ended_at).not.toBeNull();
+  });
+
+  test("idempotent: second call after status=failed does not mutate store", async () => {
+    const store = new MockStateStore(minimalRunningState());
+    await applyTerminalState(store, "SIGTERM");
+    const callsBefore = store.calls.length;
+    await applyTerminalState(store, "SIGTERM");
+    // getState is called again but updateLifecycle should not be called again
+    const updateCalls = store.calls.filter((c) => c.op === "updateLifecycle");
+    expect(updateCalls).toHaveLength(1);
+    // total calls grew by exactly 1 (only getState, no updateLifecycle)
+    expect(store.calls.length).toBe(callsBefore + 1);
+  });
+
+  test("status=done → store is unchanged (no clobber)", async () => {
+    const store = new MockStateStore({
+      ...minimalRunningState(),
+      lifecycle: {
+        status: "done",
+        current_phase: null,
+        ended_at: "2026-01-01T00:01:00.000Z",
+        ended_reason: "done",
+        pid: process.pid,
+      },
+    });
+    const callsBefore = store.calls.length;
+    await applyTerminalState(store, "SIGTERM");
+    const updateCalls = store.calls.filter((c) => c.op === "updateLifecycle");
+    expect(updateCalls).toHaveLength(0);
+    // only getState was called
+    expect(store.calls.length).toBe(callsBefore + 1);
+    expect(store.state!.lifecycle.status).toBe("done");
+  });
+});
+
+// --- L2: installExitHandlers listener cleanup ---
+
+describe("installExitHandlers listener cleanup (L2)", () => {
+  test("removeHandlers() restores SIGINT and SIGTERM listener counts", () => {
+    const store = new MockStateStore(minimalRunningState());
+    const beforeSigint = process.listenerCount("SIGINT");
+    const beforeSigterm = process.listenerCount("SIGTERM");
+
+    const remove = installExitHandlers(store);
+    expect(process.listenerCount("SIGINT")).toBe(beforeSigint + 1);
+    expect(process.listenerCount("SIGTERM")).toBe(beforeSigterm + 1);
+
+    remove();
+    expect(process.listenerCount("SIGINT")).toBe(beforeSigint);
+    expect(process.listenerCount("SIGTERM")).toBe(beforeSigterm);
+  });
+});
+
+// --- L3: subprocess SIGTERM ---
+
+describe("exit handler: L3 subprocess SIGTERM", () => {
+  test("SIGTERM → state.json ends up status=failed, ended_reason=SIGTERM", async () => {
+    const repo = await prepRepo();
+    const taskSlug = `sigterm-test-${Date.now()}`;
+    const statePath = join(repo.path, ".harny", taskSlug, "state.json");
+    const fixtureScript = `${import.meta.dir}/testing/fixtures/sigterm-fixture.ts`;
+
+    const child = Bun.spawn(
+      ["bun", fixtureScript, repo.path, taskSlug],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+
+    // Poll until state.json appears with status=running
+    const deadline = Date.now() + 15_000;
+    let ready = false;
+    while (Date.now() < deadline) {
+      try {
+        const raw = readFileSync(statePath, "utf8");
+        const st = JSON.parse(raw) as { lifecycle: { status: string } };
+        if (st.lifecycle.status === "running") { ready = true; break; }
+      } catch { /* not yet */ }
+      await new Promise<void>((r) => setTimeout(r, 100));
+    }
+
+    if (!ready) {
+      child.kill();
+      await child.exited;
+      throw new Error("state.json did not reach status=running within 15s");
+    }
+
+    child.kill();
+    await child.exited;
+
+    const raw = readFileSync(statePath, "utf8");
+    const st = JSON.parse(raw) as State;
+    expect(st.lifecycle.status).toBe("failed");
+    expect(st.lifecycle.ended_reason).toBe("SIGTERM");
+    expect(st.lifecycle.ended_at).not.toBeNull();
+  }, 20_000);
 });
