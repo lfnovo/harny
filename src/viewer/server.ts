@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { listAllRuns, listRunsInCwd, statePathFor } from "../harness/state/filesystem.js";
+import { reconcileStaleRun } from "../harness/reconcile.js";
 import { planFilePath } from "../harness/state/plan.js";
 import type { State } from "../harness/state/schema.js";
 
@@ -192,7 +193,9 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       }
 
       if (path === "/api/runs") {
-        const runs = await listAllRuns();
+        // Reconcile before summarizing so a run whose process died untrapped
+        // (e.g. SIGKILL) is persisted+shown as failed, not stuck at running.
+        const runs = await Promise.all((await listAllRuns()).map(reconcileStaleRun));
         const summarized = runs.map((r) => ({
           run_id: r.run_id,
           short_id: r.run_id.slice(0, 8),
@@ -214,8 +217,9 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       if (detailMatch) {
         const cwd = cwdFromHash(detailMatch[1]!);
         const slug = detailMatch[2]!;
-        const run = await findOneRun(cwd, slug);
-        if (!run) return jsonRes({ error: "not found" }, 404);
+        const found = await findOneRun(cwd, slug);
+        if (!found) return jsonRes({ error: "not found" }, 404);
+        const run = await reconcileStaleRun(found);
         let plan: unknown = null;
         const planPath = planFilePath(cwd, slug);
         if (existsSync(planPath)) {
