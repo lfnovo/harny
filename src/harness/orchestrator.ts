@@ -38,21 +38,33 @@ export function installExitHandlers(store: StateStore): () => void {
   // SIGKILL cannot be trapped — state.json will remain status=running in that case
   let beforeExitCalled = false;
 
+  // Each handler re-raises/exits in a finally so a failed state write can
+  // never strand the process — termination must happen even if the disk
+  // write throws during shutdown.
   const sigintHandler = async () => {
     process.off("SIGINT", sigintHandler);
-    await applyTerminalState(store, "SIGINT");
-    process.kill(process.pid, "SIGINT");
+    try {
+      await applyTerminalState(store, "SIGINT");
+    } finally {
+      process.kill(process.pid, "SIGINT");
+    }
   };
 
   const sigtermHandler = async () => {
     process.off("SIGTERM", sigtermHandler);
-    await applyTerminalState(store, "SIGTERM");
-    process.kill(process.pid, "SIGTERM");
+    try {
+      await applyTerminalState(store, "SIGTERM");
+    } finally {
+      process.kill(process.pid, "SIGTERM");
+    }
   };
 
   const uncaughtExceptionHandler = async (err: Error) => {
-    await applyTerminalState(store, err.message || "uncaughtException");
-    process.exit(1);
+    try {
+      await applyTerminalState(store, err.message || "uncaughtException");
+    } finally {
+      process.exit(1);
+    }
   };
 
   const beforeExitHandler = async () => {
