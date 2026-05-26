@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -70,7 +70,7 @@ describe("stale running display", () => {
     rmSync(tmpRegistry, { recursive: true, force: true });
   });
 
-  function writeSyntheticState(deadPid: number): { runId: string } {
+  function writeSyntheticState(deadPid: number): { runId: string; statePath: string } {
     const runId = "aaaabbbb-cccc-dddd-1111-222233334444";
     const slug = "test-stale-run";
     const stateDir = join(tmpCwd, ".harny", slug);
@@ -124,12 +124,18 @@ describe("stale running display", () => {
 
     writeFileSync(join(tmpRegistry, `${runId}.json`), JSON.stringify(pointer));
 
-    return { runId };
+    return { runId, statePath: join(stateDir, "state.json") };
   }
 
-  test("handleLs shows 'running (stale)' for a run with a dead pid", async () => {
+  function readState(statePath: string): {
+    lifecycle: { status: string; ended_reason: string | null; ended_at: string | null };
+  } {
+    return JSON.parse(readFileSync(statePath, "utf8"));
+  }
+
+  test("handleLs reconciles a dead-pid run to failed and displays it as failed", async () => {
     const deadPid = await getDeadPid();
-    writeSyntheticState(deadPid);
+    const { statePath } = writeSyntheticState(deadPid);
 
     const cap = captureConsole();
     try {
@@ -138,10 +144,16 @@ describe("stale running display", () => {
       cap.restore();
     }
 
-    expect(cap.logs.join("\n")).toContain("running (stale)");
+    expect(cap.logs.join("\n")).toContain("failed");
+    expect(cap.logs.join("\n")).not.toContain("running (stale)");
+    // Persisted to disk, not just displayed.
+    const after = readState(statePath);
+    expect(after.lifecycle.status).toBe("failed");
+    expect(after.lifecycle.ended_reason).toBe("process_died_untrapped");
+    expect(after.lifecycle.ended_at).not.toBeNull();
   });
 
-  test("handleLs --status running still lists stale runs", async () => {
+  test("handleLs --status running no longer lists a dead-pid run (reconciled away)", async () => {
     const deadPid = await getDeadPid();
     writeSyntheticState(deadPid);
 
@@ -152,14 +164,28 @@ describe("stale running display", () => {
       cap.restore();
     }
 
-    const output = cap.logs.join("\n");
-    expect(output).not.toContain("No runs found");
-    expect(output).toContain("running (stale)");
+    expect(cap.logs.join("\n")).toContain("No runs found");
   });
 
-  test("handleShow shows 'Status:    running (stale)' for a run with a dead pid", async () => {
+  test("handleLs --status failed lists a reconciled dead-pid run", async () => {
     const deadPid = await getDeadPid();
-    const { runId } = writeSyntheticState(deadPid);
+    writeSyntheticState(deadPid);
+
+    const cap = captureConsole();
+    try {
+      await handleLs({ kind: "ls", status: "failed" });
+    } finally {
+      cap.restore();
+    }
+
+    const output = cap.logs.join("\n");
+    expect(output).not.toContain("No runs found");
+    expect(output).toContain("failed");
+  });
+
+  test("handleShow reconciles a dead-pid run to failed with process_died_untrapped reason", async () => {
+    const deadPid = await getDeadPid();
+    const { runId, statePath } = writeSyntheticState(deadPid);
 
     const cap = captureConsole();
     try {
@@ -168,6 +194,10 @@ describe("stale running display", () => {
       cap.restore();
     }
 
-    expect(cap.logs.join("\n")).toContain("Status:    running (stale)");
+    const output = cap.logs.join("\n");
+    expect(output).toContain("Status:    failed");
+    expect(output).toContain("process_died_untrapped");
+    expect(output).not.toContain("running (stale)");
+    expect(readState(statePath).lifecycle.status).toBe("failed");
   });
 });

@@ -1,5 +1,6 @@
 import { listAllRuns } from "../harness/state/filesystem.js";
 import { isPidAlive } from "../harness/pid.js";
+import { reconcileStaleRun } from "../harness/reconcile.js";
 
 function displayStatus(status: string, pid: number): string {
   if (status === "running" && !isPidAlive(pid)) return "running (stale)";
@@ -10,6 +11,10 @@ export async function handleLs(
   cmd: { kind: "ls"; status?: string; cwd?: string; workflow?: string },
 ): Promise<void> {
   let runs = await listAllRuns();
+  // Persist terminal state for runs whose process died untrapped, before
+  // filtering — so `--status running` no longer surfaces dead runs and
+  // `--status failed` correctly includes them.
+  runs = await Promise.all(runs.map(reconcileStaleRun));
   if (cmd.status) runs = runs.filter((r) => r.lifecycle.status === cmd.status);
   if (cmd.cwd) runs = runs.filter((r) => r.environment.cwd === cmd.cwd);
   if (cmd.workflow) runs = runs.filter((r) => r.origin.workflow === cmd.workflow);

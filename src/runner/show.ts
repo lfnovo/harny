@@ -1,20 +1,25 @@
 import { findRun, statePathFor } from "../harness/state/filesystem.js";
 import type { AskUserQuestionItem } from "../harness/askUser.js";
 import { isPidAlive } from "../harness/pid.js";
+import { reconcileStaleRun } from "../harness/reconcile.js";
 
 export async function handleShow(
   cmd: { kind: "show"; runId: string; tail?: boolean; since?: string },
 ): Promise<void> {
-  const run = await findRun(cmd.runId);
-  if (!run) { console.error(`Run not found: ${cmd.runId}`); process.exit(1); }
+  const found = await findRun(cmd.runId);
+  if (!found) { console.error(`Run not found: ${cmd.runId}`); process.exit(1); }
 
   if (cmd.tail) {
-    const sfp = statePathFor(run.environment.cwd, run.origin.task_slug);
+    const sfp = statePathFor(found.environment.cwd, found.origin.task_slug);
     const { tailRun, parseSinceArg } = await import("../harness/transcripts/tail.js");
     const sinceSeconds = cmd.since !== undefined ? parseSinceArg(cmd.since) : undefined;
     await tailRun(sfp, sinceSeconds);
     return;
   }
+
+  // Persist terminal state if the process died untrapped, then display the
+  // reconciled run (status=failed, ended_reason=process_died_untrapped).
+  const run = await reconcileStaleRun(found);
 
   const status =
     run.lifecycle.status === "running" && !isPidAlive(run.lifecycle.pid)

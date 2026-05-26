@@ -11,23 +11,10 @@ import { getWorkflow } from "./workflows/index.js";
 import { runEngineWorkflow } from "./engine/runtime/runEngineWorkflow.js";
 import type { IsolationMode, LogMode, RunMode } from "./types.js";
 import { isPidAlive } from "./pid.js";
+import { applyTerminalState } from "./reconcile.js";
 
-/**
- * Idempotently write terminal state. No-ops if lifecycle is already terminal.
- * Exported for testing.
- */
-export async function applyTerminalState(store: StateStore, reason: string): Promise<void> {
-  const current = await store.getState();
-  if (!current) return;
-  const { status } = current.lifecycle;
-  if (status === "done" || status === "failed" || status === "waiting_human") return;
-  await store.updateLifecycle({
-    status: "failed",
-    ended_at: new Date().toISOString(),
-    ended_reason: reason,
-    current_phase: null,
-  });
-}
+// Re-exported from ./reconcile.js so existing importers keep working.
+export { applyTerminalState };
 
 /**
  * Install process-exit handlers that write terminal state on unexpected death.
