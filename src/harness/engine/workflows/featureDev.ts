@@ -210,8 +210,10 @@ const machine = setup({
               message: composeCommitMessage({
                 devMessage: context.lastDevCommitMessage,
                 taskId: context.plan!.tasks[context.currentTaskIdx]!.id,
+                slug: context.taskSlug,
+                planTaskCount: context.plan!.tasks.length,
                 role: 'validator',
-                evidence: context.lastValidatorReasons.join('; '),
+                evidence: context.lastValidatorReasons,
               }),
               attempt: context.attempts + 1,
             }),
