@@ -1,0 +1,28 @@
+src/runner/summary.test.ts
+  s_464a6fd4517d65::t_f5246094b6dd11 1-143
+src/runner/summary.ts
+  s_464a6fd4517d65::t_ed79d23e9c7e36 1-105
+src/harness/orchestrator.ts
+  s_464a6fd4517d65::t_bfcfa49bbf92c9 41
+  s_464a6fd4517d65::t_73550a3dfeb189 72
+  s_464a6fd4517d65::t_79d9469a8762c2 220-221
+src/runner/run.ts
+  s_464a6fd4517d65::t_a5aa6dafbaebb5 6
+  s_464a6fd4517d65::t_dbc1db9e9f764f 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "6c96647147a10cefbe0d9808d0005879fc2d8787",
+  "prompts": {},
+  "sessions": {
+    "s_464a6fd4517d65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15e0037b-518d-49df-bede-9644295c590d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
