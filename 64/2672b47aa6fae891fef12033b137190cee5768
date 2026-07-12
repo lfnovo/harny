@@ -1,0 +1,21 @@
+src/runner/summary.ts
+  s_8c28bd8a8969fa::t_716217fafeaa2d 2,7,26-65,96,99,109-127,137-140,154-156
+src/runner/summary.test.ts
+  s_8c28bd8a8969fa::t_a6b9fc5225c850 2,5,71-97,103,105,112,114,121,127,130-138,183-261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "642672b47aa6fae891fef12033b137190cee5768",
+  "prompts": {},
+  "sessions": {
+    "s_8c28bd8a8969fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "038b3b4c-0700-41d6-a168-116f8438aa2a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
