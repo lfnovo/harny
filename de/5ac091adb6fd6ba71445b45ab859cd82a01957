@@ -1,0 +1,28 @@
+src/harness/workflows/composeCommit.test.ts
+  s_313064f7acd50f::t_76c8c3521976f2 15-16,21-22,26-27,34-35,39,46-47,51,54,58-59,63,71-72,76,80-191
+src/harness/workflows/composeCommit.ts
+  s_313064f7acd50f::t_4eff2d52dc475f 4-5,11-12,14,17-18,24-28
+src/harness/engine/workflows/featureDev.ts
+  s_313064f7acd50f::t_4c392b774a061c 213-214,216
+scripts/probes/workflows/01-compose-commit.ts
+  s_313064f7acd50f::t_ea39f988b6584b 216-218
+  s_313064f7acd50f::t_840ec8d9ad4620 213-215
+  s_313064f7acd50f::t_ede162534a4cc2 219-221
+  s_313064f7acd50f::t_177fd16ab75b38 1-212,222-239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "de5ac091adb6fd6ba71445b45ab859cd82a01957",
+  "prompts": {},
+  "sessions": {
+    "s_313064f7acd50f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a5a86e2e-95ad-43b8-b054-200776b0877d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
