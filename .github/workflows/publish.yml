@@ -66,28 +66,32 @@ jobs:
 
           echo "OK: $PKG_NAME@$PKG_VERSION is ready to publish"
 
+      # Inspect the real tarball via tar so the check does not depend on the
+      # shape of `npm pack --json`, which has changed across npm major versions.
       - name: Verify package contents
         run: |
           set -euo pipefail
-          npm pack --dry-run --json > pack.json
-          node -e '
-            const pkg = require("./pack.json")[0];
-            const files = pkg.files.map((f) => f.path);
-            const required = ["package.json", "bin/harny.ts", "README.md", "CHANGELOG.md"];
-            const missing = required.filter((r) => !files.includes(r));
-            if (missing.length) {
-              console.error("::error::missing from tarball: " + missing.join(", "));
-              process.exit(1);
-            }
-            const forbidden = files.filter((f) =>
-              /(^|\/)\.env|(^|\/)\.harny\/|(^|\/)\.git\/|(^|\/)assistants\.json$/.test(f)
-            );
-            if (forbidden.length) {
-              console.error("::error::unexpected sensitive files in tarball: " + forbidden.join(", "));
-              process.exit(1);
-            }
-            console.log(`Tarball OK: ${files.length} files, ${(pkg.size / 1024).toFixed(1)} KB`);
-          '
+          npm pack --silent >/dev/null
+          TARBALL=$(ls -t ./*.tgz | head -1)
+          FILES=$(tar -tzf "$TARBALL" | sed 's|^package/||' | grep -v '/$')
+
+          missing=""
+          for r in package.json bin/harny.ts README.md CHANGELOG.md; do
+            echo "$FILES" | grep -qx "$r" || missing="$missing $r"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::missing from tarball:$missing"
+            exit 1
+          fi
+
+          forbidden=$(echo "$FILES" | grep -E '(^|/)\.env|(^|/)\.harny/|(^|/)\.git/|(^|/)assistants\.json$' || true)
+          if [ -n "$forbidden" ]; then
+            echo "::error::unexpected sensitive files in tarball: $forbidden"
+            exit 1
+          fi
+
+          echo "Tarball OK: $(echo "$FILES" | wc -l | tr -d ' ') files"
+          rm -f "$TARBALL"
 
       # Authenticates via OIDC trusted publishing (no NPM_TOKEN). The package's
       # trusted publisher must be configured on npmjs.com to point at this repo
