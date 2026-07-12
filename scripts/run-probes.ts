@@ -13,14 +13,85 @@
 
 import { spawn } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { basename, join, relative, sep } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const PROBES_DIR = join(ROOT, 'scripts/probes');
 
 const PROBE_NAME = /^\d+[a-z]?-.+\.ts$/;
 const ENV_DEP_DIRS = new Set(['phoenix']);
-const includeEnvDeps = process.argv.includes('--env-deps');
+
+type CliOptions = {
+  includeEnvDeps: boolean;
+  listOnly: boolean;
+  subdirs: string[];
+  only: string[];
+};
+
+function printHelp(): void {
+  console.log(`Usage: bun scripts/run-probes.ts [options]
+
+Options:
+  --subdir <name>         Run probes in an exact subdirectory (repeatable)
+  --only <dir/index,...>  Run probes selected by subdirectory and numeric index
+  --list, --dry-run       Print the resolved probe list without executing it
+  --env-deps              Include probes that require external services
+  --help                  Show this help
+
+Examples:
+  bun scripts/run-probes.ts --subdir orchestrator
+  bun scripts/run-probes.ts --subdir orchestrator --subdir viewer
+  bun scripts/run-probes.ts --only orchestrator/03,viewer/01
+  bun scripts/run-probes.ts --subdir viewer --list`);
+}
+
+function parseArgs(argv: string[]): CliOptions {
+  const options: CliOptions = {
+    includeEnvDeps: false,
+    listOnly: false,
+    subdirs: [],
+    only: [],
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--help') {
+      printHelp();
+      process.exit(0);
+    }
+    if (arg === '--env-deps') {
+      options.includeEnvDeps = true;
+      continue;
+    }
+    if (arg === '--list' || arg === '--dry-run') {
+      options.listOnly = true;
+      continue;
+    }
+    if (arg === '--subdir' || arg === '--only') {
+      const value = argv[++i];
+      if (!value || value.startsWith('--')) {
+        throw new Error(`${arg} requires a value`);
+      }
+      if (arg === '--subdir') options.subdirs.push(value);
+      else options.only.push(...value.split(',').filter(Boolean));
+      continue;
+    }
+    throw new Error(`unknown option: ${arg} (see --help)`);
+  }
+
+  if (options.subdirs.length > 0 && options.only.length > 0) {
+    throw new Error('--subdir and --only cannot be combined');
+  }
+  return options;
+}
+
+let options: CliOptions;
+try {
+  options = parseArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(`error: ${(error as Error).message}`);
+  process.exit(2);
+}
 
 async function findProbes(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -29,7 +100,7 @@ async function findProbes(dir: string): Promise<string[]> {
     const st = await stat(full);
     if (st.isDirectory()) {
       if (entry === '_templates') continue;
-      if (ENV_DEP_DIRS.has(entry) && !includeEnvDeps) continue;
+      if (ENV_DEP_DIRS.has(entry) && !options.includeEnvDeps) continue;
       out.push(...(await findProbes(full)));
     } else if (PROBE_NAME.test(entry)) {
       out.push(full);
@@ -66,7 +137,72 @@ function runProbe(path: string): Promise<Result> {
   });
 }
 
-const probes = await findProbes(PROBES_DIR);
+function probeSubdir(path: string): string {
+  return relative(PROBES_DIR, path).split(sep)[0]!;
+}
+
+function availableSummary(probes: string[], subdir: string): string {
+  const indices = probes
+    .filter((probe) => probeSubdir(probe) === subdir)
+    .map((probe) => basename(probe).match(/^(\d+[a-z]?)-/)?.[1])
+    .filter((index): index is string => Boolean(index));
+  return indices.length > 0 ? indices.join(', ') : '(none)';
+}
+
+function filterProbes(allProbes: string[], cli: CliOptions): string[] {
+  const subdirs = [...new Set(allProbes.map(probeSubdir))].sort();
+  if (cli.subdirs.length > 0) {
+    for (const subdir of cli.subdirs) {
+      if (!subdirs.includes(subdir)) {
+        throw new Error(`unknown probe subdir "${subdir}"; available: ${subdirs.join(', ')}`);
+      }
+    }
+    const selected = new Set(cli.subdirs);
+    return allProbes.filter((probe) => selected.has(probeSubdir(probe)));
+  }
+
+  if (cli.only.length > 0) {
+    const selected = new Set<string>();
+    for (const selector of cli.only) {
+      const match = selector.match(/^([^/]+)\/(\d+[a-z]?)$/);
+      if (!match) {
+        throw new Error(`invalid --only selector "${selector}"; expected <subdir>/<index>`);
+      }
+      const [, subdir, index] = match;
+      if (!subdirs.includes(subdir!)) {
+        throw new Error(`unknown probe subdir "${subdir}"; available: ${subdirs.join(', ')}`);
+      }
+      const matches = allProbes.filter((probe) => {
+        if (probeSubdir(probe) !== subdir) return false;
+        const probeIndex = basename(probe).match(/^(\d+[a-z]?)-/)?.[1];
+        return probeIndex === index || probeIndex?.replace(/[a-z]$/, '') === index;
+      });
+      if (matches.length === 0) {
+        throw new Error(
+          `unknown probe index "${selector}"; available in ${subdir}: ${availableSummary(allProbes, subdir!)}`,
+        );
+      }
+      for (const probe of matches) selected.add(probe);
+    }
+    return allProbes.filter((probe) => selected.has(probe));
+  }
+
+  return allProbes;
+}
+
+let probes: string[];
+try {
+  probes = filterProbes(await findProbes(PROBES_DIR), options);
+} catch (error) {
+  console.error(`error: ${(error as Error).message}`);
+  process.exit(2);
+}
+
+if (options.listOnly) {
+  for (const probe of probes) console.log(relative(ROOT, probe));
+  process.exit(0);
+}
+
 console.log(`running ${probes.length} probes\n`);
 
 const results: Result[] = [];
