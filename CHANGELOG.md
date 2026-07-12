@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-12
+
 ### Added
 - **Credential isolation from project `.env`** (#85). When a project's `.env` (or `.env.local` / `.env.development` / `.env.production`) defines `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or `ANTHROPIC_MODEL`, harny now scrubs those values from `process.env` at boot so the project app's credentials don't silently drive the harness. Harny then overlays its own `~/.harny/.env` (user-global) and `./harny.env` (per-project, project takes precedence). Set `HARNY_INHERIT_ENV=1` to restore the legacy pass-through behavior. See README "Credentials" section.
 - **Cross-project run pointer registry at `~/.harny/runs/`** (#86). Every run now auto-registers a tiny pointer file (run_id, cwd, slug, workflow, status, timestamps) at start, and updates the pointer status on lifecycle transitions. `harny ls`, `harny show`, `harny answer`, and `harny ui` discover runs across projects via this registry — no user-maintained `assistants.json` needed. Full `state.json` continues to live at `<cwd>/.harny/<slug>/state.json`; the registry is an index, not a duplicate.
