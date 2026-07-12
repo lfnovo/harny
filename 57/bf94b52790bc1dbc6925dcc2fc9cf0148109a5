@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_0600305f14c417::t_316e5bdce2674d 7-8
+.github/workflows/publish.yml
+  s_0600305f14c417::t_94232d40118630 8-11,33-35,39,41-42,45,47-58,62-86,88,91-113
+package.json
+  s_0600305f14c417::t_8860fcd2e35ee2 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "57bf94b52790bc1dbc6925dcc2fc9cf0148109a5",
+  "prompts": {},
+  "sessions": {
+    "s_0600305f14c417": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a82cc5a9-45c0-4dd2-95fb-c949c138d958",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
