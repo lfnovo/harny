@@ -38,7 +38,7 @@ export async function runHarness(args: {
   mode?: RunMode;
   logMode?: LogMode;
   gitOps?: GitOps;
-}): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human"; planPath: string; branch: string }> {
+}): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human"; planPath: string; branch: string; state: State | null }> {
   const primaryCwd = args.cwd;
   const git = args.gitOps ?? realGitOps;
   const taskSlug = args.taskSlug?.trim() || defaultTaskSlug();
@@ -69,7 +69,7 @@ export async function runHarness(args: {
       log(
         `[harny] run already complete (status=${existing.lifecycle.status}, ended_at=${existing.lifecycle.ended_at ?? "?"}). Use \`harny clean ${taskSlug}\` then rerun.`,
       );
-      return { status: existing.lifecycle.status, planPath: planFilePath(primaryCwd, taskSlug), branch: existing.environment.branch };
+      return { status: existing.lifecycle.status, planPath: planFilePath(primaryCwd, taskSlug), branch: existing.environment.branch, state: existing };
     }
     if (existing.lifecycle.status === "running") {
       if (isPidAlive(existing.lifecycle.pid)) {
@@ -217,7 +217,8 @@ export async function runHarness(args: {
         log(`[harny] engine workflow done`);
       }
 
-      return { status: engineResult.status, planPath, branch };
+      const finalState = await store.getState();
+      return { status: engineResult.status, planPath, branch, state: finalState };
     },
   );
 }
