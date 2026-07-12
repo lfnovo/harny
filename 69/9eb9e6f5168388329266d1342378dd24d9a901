@@ -1,0 +1,19 @@
+.github/workflows/publish.yml
+  s_0600305f14c417::t_d8ef6668d2d468 69-70,74-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "699eb9e6f5168388329266d1342378dd24d9a901",
+  "prompts": {},
+  "sessions": {
+    "s_0600305f14c417": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a82cc5a9-45c0-4dd2-95fb-c949c138d958",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
