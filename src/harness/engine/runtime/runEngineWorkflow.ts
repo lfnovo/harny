@@ -1,5 +1,9 @@
 // runtime executor for WorkflowDefinition-shaped workflows
 
+export function renderSnapshotValue(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
 import { createActor } from 'xstate';
 import type { AnyStateMachine } from 'xstate';
 import type { LogMode, RunMode } from '../../types.js';
@@ -40,7 +44,7 @@ export async function runEngineWorkflow(
 
       actor.subscribe({
         next: (snapshot) => {
-          log(`[engine] workflow=${workflow.id} state=${String(snapshot.value)} status=${snapshot.status}`);
+          log(`[engine] workflow=${workflow.id} state=${renderSnapshotValue(snapshot.value)} status=${snapshot.status}`);
 
           if (snapshot.status === 'done') {
             if (snapshot.value === 'failed') {

@@ -3,6 +3,7 @@ import { getWorkflow } from "../harness/workflows/index.js";
 import { resolveAssistant } from "./context.js";
 import type { RunnerContext } from "./context.js";
 import type { IsolationMode, RunMode } from "../harness/types.js";
+import { printRunSummary } from "./summary.js";
 
 type RunArgs = {
   workflow: string | null;
@@ -36,6 +37,6 @@ export async function handleRun(parsed: RunArgs, ctx: RunnerContext): Promise<vo
   if (ctx.logMode === "quiet") {
     console.log(`[harny] status=${result.status} branch=${result.branch}`);
   } else {
-    console.log(`[harny] finished status=${result.status} branch=${result.branch}`);
+    await printRunSummary(result, assistant.cwd);
   }
 }

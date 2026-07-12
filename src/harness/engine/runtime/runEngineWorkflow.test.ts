@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { setup } from "xstate";
-import { runEngineWorkflow } from "./runEngineWorkflow.js";
+import { runEngineWorkflow, renderSnapshotValue } from "./runEngineWorkflow.js";
 import echoCommit from "../workflows/echoCommit.js";
 import { tmpGitRepo } from "../../testing/index.js";
 
@@ -57,6 +57,22 @@ describe("runEngineWorkflow: timeout cleanup", () => {
     const elapsed = Date.now() - start;
     expect(result.status).toBe("failed");
     expect(elapsed).toBeLessThan(1000);
+  });
+});
+
+describe("renderSnapshotValue", () => {
+  test("passes through a plain string unchanged", () => {
+    expect(renderSnapshotValue("idle")).toBe("idle");
+  });
+
+  test("serializes a shallow compound state to JSON", () => {
+    expect(renderSnapshotValue({ loop: "developer" })).toBe('{"loop":"developer"}');
+  });
+
+  test("serializes a deeply nested compound state to valid JSON (no [object Object])", () => {
+    const result = renderSnapshotValue({ loop: { validator: {} } });
+    expect(result).not.toContain("[object Object]");
+    expect(() => JSON.parse(result)).not.toThrow();
   });
 });
 
