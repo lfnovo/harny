@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format loosely foll
 ### Changed
 - **`assistants.json` is no longer required.** It remains an optional shortcut for the `--assistant <name>` named-cwd flag; cross-project visibility no longer depends on it. The `/api/assistants` endpoint in the viewer (which the SPA never consumed) was removed.
 - **CLI handler signatures**: `handleLs`/`handleShow`/`handleAnswer` no longer receive `RunnerContext` (discovery goes through the registry directly). `RunnerContext.searchCwds` was removed; `loadSearchCwds()` deleted from `src/runner/context.ts`.
+- **Viewer UI redesign** (#90). The read-only viewer (`src/viewer/index.html`) is now a token-based dark/light interface (dark by default, in-page toggle wins over OS), with a header mascot and dynamic version, an animated planner→developer→validator empty-state, a runs list with status summary and per-run pipeline pips, and a run detail view with a live pipeline ribbon, KPI tiles, an iteration timeline with illustrated agent scenes, git-graph commits, and event history. Polling now refreshes data only — unchanged payloads skip re-render and elapsed/relative times tick in place, so the DOM and animations stay stable. Drops the Tailwind CDN runtime, respects `prefers-reduced-motion`, and keeps the existing hash routing, 3s polling, and `/api` contract. No TypeScript or build-step changes.
 
 ## [0.3.1] — 2026-05-03
 
