@@ -9,6 +9,7 @@ import { handleAnswer } from "./runner/answer.js";
 import { handleUi } from "./runner/ui.js";
 import { handleClean } from "./runner/clean.js";
 import { handleRun } from "./runner/run.js";
+import { startUpdateCheck, printUpdateNotice } from "./runner/updateCheck.js";
 import pkg from "../package.json" with { type: "json" };
 
 export function printVersion(): void {
@@ -200,17 +201,24 @@ export async function main() {
     return;
   }
   const ctx: RunnerContext = { logMode, assistantName: parsed.assistant };
+  // Fire-and-forget the update check now so its network round-trip overlaps
+  // the actual work; the notice is printed once the command finishes.
+  const updateCheck = startUpdateCheck(pkg.version, logMode);
   // One-shot migration: if the pointer registry is empty but legacy runs
   // exist in known cwds, backfill so `ls`/`show`/`ui` aren't suddenly empty
   // for upgraded users.
   await maybeRunMigration(logMode);
-  if (registryCmd) {
-    const handlers = { ls: handleLs, show: handleShow, answer: handleAnswer, ui: handleUi, clean: handleClean, scan: handleScan };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (handlers[registryCmd.kind] as any)(registryCmd as any, ctx);
-    return;
+  try {
+    if (registryCmd) {
+      const handlers = { ls: handleLs, show: handleShow, answer: handleAnswer, ui: handleUi, clean: handleClean, scan: handleScan };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (handlers[registryCmd.kind] as any)(registryCmd as any, ctx);
+      return;
+    }
+    await handleRun(parsed, ctx);
+  } finally {
+    printUpdateNotice(await updateCheck);
   }
-  await handleRun(parsed, ctx);
 }
 
 if (import.meta.main) main();
