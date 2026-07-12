@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format loosely foll
 - **Cross-project run pointer registry at `~/.harny/runs/`** (#86). Every run now auto-registers a tiny pointer file (run_id, cwd, slug, workflow, status, timestamps) at start, and updates the pointer status on lifecycle transitions. `harny ls`, `harny show`, `harny answer`, and `harny ui` discover runs across projects via this registry — no user-maintained `assistants.json` needed. Full `state.json` continues to live at `<cwd>/.harny/<slug>/state.json`; the registry is an index, not a duplicate.
 - **`harny scan [<cwd>]`** reindexes runs from a project into the pointer registry. Auto-invoked once on first post-upgrade invocation against `process.cwd()` plus any cwds in the legacy `assistants.json`.
 - **`harny clean --prune`** removes pointers whose underlying `state.json` is unreachable.
+- **Update-available notice.** harny now checks npm at most once per 24h (result cached under `~/.harny/update-check.json`) and prints a discreet notice at the end of a command when a newer version is published. The check is non-blocking (2s timeout, silent on failure) and skipped in CI, non-TTY, `--quiet`, or when `HARNY_NO_UPDATE_CHECK` is set.
 
 ### Changed
 - **`assistants.json` is no longer required.** It remains an optional shortcut for the `--assistant <name>` named-cwd flag; cross-project visibility no longer depends on it. The `/api/assistants` endpoint in the viewer (which the SPA never consumed) was removed.

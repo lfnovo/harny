@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write # create the GitHub Release
-  id-token: write # npm provenance attestation
+  id-token: write # OIDC trusted publishing + provenance attestation
 
 jobs:
   publish:
@@ -21,8 +21,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 still ships
+      # npm 10.x, so upgrade the CLI before publishing.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -84,10 +89,11 @@ jobs:
             console.log(`Tarball OK: ${files.length} files, ${(pkg.size / 1024).toFixed(1)} KB`);
           '
 
+      # Authenticates via OIDC trusted publishing (no NPM_TOKEN). The package's
+      # trusted publisher must be configured on npmjs.com to point at this repo
+      # and workflow. Provenance is emitted automatically under trusted publishing.
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Extract release notes
         run: |
