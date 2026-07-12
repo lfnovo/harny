@@ -5,12 +5,13 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # npm provenance attestation
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -29,19 +30,84 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Tests
+        run: bun test
+
       - name: Probes
         run: bun run probes
 
-      - name: Verify package version matches tag
+      - name: Verify version, tag, and changelog
         run: |
+          set -euo pipefail
+          PKG_NAME=$(node -p "require('./package.json').name")
           PKG_VERSION=$(node -p "require('./package.json').version")
           TAG_VERSION="${GITHUB_REF_NAME#v}"
+
           if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "package.json version ($PKG_VERSION) does not match tag ($TAG_VERSION)" >&2
+            echo "::error::package.json version ($PKG_VERSION) does not match tag ($TAG_VERSION)"
             exit 1
           fi
 
+          if ! grep -qE "^## \[${PKG_VERSION//./\\.}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$PKG_VERSION]' section"
+            exit 1
+          fi
+
+          PUBLISHED=$(npm view "$PKG_NAME@$PKG_VERSION" version 2>/dev/null || true)
+          if [ -n "$PUBLISHED" ]; then
+            echo "::error::$PKG_NAME@$PKG_VERSION is already published to npm"
+            exit 1
+          fi
+
+          echo "OK: $PKG_NAME@$PKG_VERSION is ready to publish"
+
+      - name: Verify package contents
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > pack.json
+          node -e '
+            const pkg = require("./pack.json")[0];
+            const files = pkg.files.map((f) => f.path);
+            const required = ["package.json", "bin/harny.ts", "README.md", "CHANGELOG.md"];
+            const missing = required.filter((r) => !files.includes(r));
+            if (missing.length) {
+              console.error("::error::missing from tarball: " + missing.join(", "));
+              process.exit(1);
+            }
+            const forbidden = files.filter((f) =>
+              /(^|\/)\.env|(^|\/)\.harny\/|(^|\/)\.git\/|(^|\/)assistants\.json$/.test(f)
+            );
+            if (forbidden.length) {
+              console.error("::error::unexpected sensitive files in tarball: " + forbidden.join(", "));
+              process.exit(1);
+            }
+            console.log(`Tarball OK: ${files.length} files, ${(pkg.size / 1024).toFixed(1)} KB`);
+          '
+
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract release notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { grab = 1; next }
+            grab && /^## \[/ { exit }
+            grab { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No release notes for $VERSION" > release-notes.md
+          fi
+          echo "--- release notes ---"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md
