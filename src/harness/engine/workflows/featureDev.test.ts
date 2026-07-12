@@ -103,8 +103,8 @@ describe("feature-dev commit-gate: validator pass", () => {
 
     expect(snapshot.value).toBe("done");
     expect(spy.calls).toHaveLength(1);
-    expect(spy.calls[0]!.message).toContain("task=t1");
-    expect(spy.calls[0]!.message).toContain("validator: checklist ok");
+    expect(spy.calls[0]!.message).toContain("task=t");
+    expect(spy.calls[0]!.message).toContain("validator:\n  - checklist ok");
     expect(spy.calls[0]!.cwd).toBe("/tmp");
   });
 });
@@ -132,7 +132,7 @@ describe("feature-dev commit-gate: retry path does not commit", () => {
 
     expect(snapshot.value).toBe("done");
     expect(spy.calls).toHaveLength(1);
-    expect(spy.calls[0]!.message).toContain("validator: checklist ok");
+    expect(spy.calls[0]!.message).toContain("validator:\n  - checklist ok");
     expect(spy.calls[0]!.message).not.toContain("missing X");
   });
 });
@@ -547,11 +547,11 @@ describe("feature-dev commit-gate: per-task reasons are fresh, not stale", () =>
 
     expect(snapshot.value).toBe("done");
     expect(spy.calls).toHaveLength(2);
-    expect(spy.calls[0]!.message).toContain("task=t1");
-    expect(spy.calls[0]!.message).toContain("validator: reason-a");
+    expect(spy.calls[0]!.message).toContain("task=t/t1");
+    expect(spy.calls[0]!.message).toContain("validator:\n  - reason-a");
     expect(spy.calls[0]!.message).not.toContain("reason-b");
-    expect(spy.calls[1]!.message).toContain("task=t2");
-    expect(spy.calls[1]!.message).toContain("validator: reason-b");
+    expect(spy.calls[1]!.message).toContain("task=t/t2");
+    expect(spy.calls[1]!.message).toContain("validator:\n  - reason-b");
     expect(spy.calls[1]!.message).not.toContain("reason-a");
   });
 });
