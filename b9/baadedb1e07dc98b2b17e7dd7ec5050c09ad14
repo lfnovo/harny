@@ -1,0 +1,31 @@
+CHANGELOG.md
+  s_0600305f14c417::t_554af2a4935e32 14
+src/runner.ts
+  s_0600305f14c417::t_a2b63fd7c36bc8 12
+  s_0600305f14c417::t_9028bffd6588ea 204-206,211-220
+src/runner/updateCheck.ts
+  s_0600305f14c417::t_948cbb2c1b9ab5 1-108
+.github/workflows/publish.yml
+  s_0600305f14c417::t_7ace6c80c9aa88 24,27-30
+  s_0600305f14c417::t_40bc5caf430cc7 92-94
+  s_0600305f14c417::t_e3af5e7bb16d1e 10
+  s_0600305f14c417::t_0135d672f98a99 31
+src/runner/updateCheck.test.ts
+  s_0600305f14c417::t_8cadfd394d20d4 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "b9baadedb1e07dc98b2b17e7dd7ec5050c09ad14",
+  "prompts": {},
+  "sessions": {
+    "s_0600305f14c417": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a82cc5a9-45c0-4dd2-95fb-c949c138d958",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
