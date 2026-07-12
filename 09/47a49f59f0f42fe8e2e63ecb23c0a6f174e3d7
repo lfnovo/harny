@@ -1,0 +1,26 @@
+src/harness/engine/CLAUDE.md
+  s_0bd7632f7c5be7::t_8451a351d68a74 33-34
+scripts/run-probes.ts
+  s_0bd7632f7c5be7::t_8451a351d68a74 16,23-44,46-94,103,140-204
+  s_0bd7632f7c5be7::t_1394e01bad4af1 45
+  s_0bd7632f7c5be7::t_1115aa0f64fe4b 205
+scripts/probes/scripts/01-run-probes-filters.ts
+  s_0bd7632f7c5be7::t_1394e01bad4af1 38-39,42,55
+  s_0bd7632f7c5be7::t_8451a351d68a74 1-37,40-41,43-54,56-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0947a49f59f0f42fe8e2e63ecb23c0a6f174e3d7",
+  "prompts": {},
+  "sessions": {
+    "s_0bd7632f7c5be7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f57c4-cb32-7052-b2e9-5f8c9be9bc72",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
