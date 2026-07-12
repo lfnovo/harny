@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_0bd7632f7c5be7::t_cd8c1a48bd60db 13
+.github/workflows/publish.yml
+  s_0bd7632f7c5be7::t_cd8c1a48bd60db 16,22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "74ebb14230ad6a5f15457e5c8a063399c4a5f9e3",
+  "prompts": {},
+  "sessions": {
+    "s_0bd7632f7c5be7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f57c4-cb32-7052-b2e9-5f8c9be9bc72",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
