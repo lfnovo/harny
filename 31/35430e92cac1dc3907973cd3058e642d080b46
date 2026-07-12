@@ -1,0 +1,23 @@
+src/harness/engine/runtime/runEngineWorkflow.ts
+  s_16e766c772d3a0::t_13d183043ff4f6 3-6
+  s_16e766c772d3a0::t_2d4de1471b9960 47
+src/harness/engine/runtime/runEngineWorkflow.test.ts
+  s_16e766c772d3a0::t_f9a463449ea40a 3
+  s_16e766c772d3a0::t_6d38d3f7c6e14c 63-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "3135430e92cac1dc3907973cd3058e642d080b46",
+  "prompts": {},
+  "sessions": {
+    "s_16e766c772d3a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76c7bfb2-f7fb-4273-9c7b-e0f7d6db968c",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
