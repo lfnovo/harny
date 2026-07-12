@@ -4,84 +4,455 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>harny viewer</title>
-  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iIzhCN0JGRiIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iNSIgcj0iMiIgZmlsbD0iI0VDRUNGMiIvPjxsaW5lIHgxPSIxNiIgeTE9IjciIHgyPSIxNiIgeTI9IjEwIiBzdHJva2U9IiNFQ0VDRjIiIHN0cm9rZS13aWR0aD0iMiIvPjxyZWN0IHg9IjYiIHk9IjkiIHdpZHRoPSIyMCIgaGVpZ2h0PSIxNiIgcng9IjUiIGZpbGw9IiMxNDE0MUQiLz48cmVjdCB4PSIxMSIgeT0iMTQiIHdpZHRoPSIzLjIiIGhlaWdodD0iNiIgcng9IjEuNiIgZmlsbD0iI0E3OUFGRiIvPjxyZWN0IHg9IjE3LjgiIHk9IjE0IiB3aWR0aD0iMy4yIiBoZWlnaHQ9IjYiIHJ4PSIxLjYiIGZpbGw9IiNBNzlBRkYiLz48L3N2Zz4=" />
+  <script>document.documentElement.setAttribute('data-theme', 'dark');</script>
   <script src="https://cdn.jsdelivr.net/npm/marked@14.1.3/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .task-md { font-size: 0.75rem; line-height: 1.5; color: rgb(71 85 105); }
-    .task-md p { margin: 0.5em 0; }
-    .task-md p:first-child { margin-top: 0; }
-    .task-md p:last-child { margin-bottom: 0; }
-    .task-md code { background: rgb(241 245 249); padding: 0 0.25em; border-radius: 3px; font-size: 0.95em; }
-    .task-md pre { background: rgb(241 245 249); padding: 0.5em 0.75em; border-radius: 4px; overflow-x: auto; margin: 0.5em 0; }
-    .task-md pre code { background: transparent; padding: 0; }
-    .task-md ul, .task-md ol { margin: 0.5em 0; padding-left: 1.25em; }
-    .task-md li { margin: 0.15em 0; }
-    .task-md strong { color: rgb(30 41 59); font-weight: 600; }
-    .task-md a { color: rgb(79 70 229); text-decoration: underline; }
-    .task-md h1, .task-md h2, .task-md h3, .task-md h4 { font-weight: 600; color: rgb(30 41 59); margin: 0.75em 0 0.25em; }
+    :root {
+      --bg:#0B0B11; --bg-2:#101018; --surface:#14141D; --surface-2:#191924;
+      --border:#262633; --border-2:#32323F; --text:#ECECF2; --text-mut:#9A9AAB; --text-dim:#6C6C7D;
+      --accent:#8B7BFF; --accent-2:#A79AFF; --accent-bg:rgba(139,123,255,0.12); --accent-line:rgba(139,123,255,0.30);
+      --run:#5EA0FF;  --run-bg:rgba(94,160,255,0.13);
+      --wait:#F0B84D; --wait-bg:rgba(240,184,77,0.13);
+      --done:#4FD8A0; --done-bg:rgba(79,216,160,0.13);
+      --fail:#FF6E86; --fail-bg:rgba(255,110,134,0.13);
+      --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
+      --radius:12px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg:#F6F6FA; --bg-2:#FFFFFF; --surface:#FFFFFF; --surface-2:#FBFBFE;
+        --border:#E7E7EF; --border-2:#DBDBE6; --text:#1A1A24; --text-mut:#5B5B6B; --text-dim:#8C8C9C;
+        --accent:#6252E6; --accent-2:#5443D6; --accent-bg:rgba(98,82,230,0.09); --accent-line:rgba(98,82,230,0.24);
+        --run:#2B6FD6;  --run-bg:rgba(43,111,214,0.10);
+        --wait:#B47A0C; --wait-bg:rgba(180,122,12,0.10);
+        --done:#128A5A; --done-bg:rgba(18,138,90,0.10);
+        --fail:#D53A54; --fail-bg:rgba(213,58,84,0.10);
+        --shadow:0 1px 2px rgba(24,24,40,0.05), 0 10px 30px -18px rgba(24,24,40,0.18);
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg:#0B0B11; --bg-2:#101018; --surface:#14141D; --surface-2:#191924;
+      --border:#262633; --border-2:#32323F; --text:#ECECF2; --text-mut:#9A9AAB; --text-dim:#6C6C7D;
+      --accent:#8B7BFF; --accent-2:#A79AFF; --accent-bg:rgba(139,123,255,0.12); --accent-line:rgba(139,123,255,0.30);
+      --run:#5EA0FF; --run-bg:rgba(94,160,255,0.13); --wait:#F0B84D; --wait-bg:rgba(240,184,77,0.13);
+      --done:#4FD8A0; --done-bg:rgba(79,216,160,0.13); --fail:#FF6E86; --fail-bg:rgba(255,110,134,0.13);
+      --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+    :root[data-theme="light"] {
+      --bg:#F6F6FA; --bg-2:#FFFFFF; --surface:#FFFFFF; --surface-2:#FBFBFE;
+      --border:#E7E7EF; --border-2:#DBDBE6; --text:#1A1A24; --text-mut:#5B5B6B; --text-dim:#8C8C9C;
+      --accent:#6252E6; --accent-2:#5443D6; --accent-bg:rgba(98,82,230,0.09); --accent-line:rgba(98,82,230,0.24);
+      --run:#2B6FD6; --run-bg:rgba(43,111,214,0.10); --wait:#B47A0C; --wait-bg:rgba(180,122,12,0.10);
+      --done:#128A5A; --done-bg:rgba(18,138,90,0.10); --fail:#D53A54; --fail-bg:rgba(213,58,84,0.10);
+      --shadow:0 1px 2px rgba(24,24,40,0.05), 0 10px 30px -18px rgba(24,24,40,0.18);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; letter-spacing:-0.006em;
+    }
+    .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; }
+    .num  { font-variant-numeric: tabular-nums; }
+    body::before {
+      content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background: radial-gradient(120% 55% at 50% -8%, var(--accent-bg), transparent 60%);
+    }
+
+    header {
+      position:sticky; top:0; z-index:20; backdrop-filter:blur(12px);
+      background: color-mix(in srgb, var(--bg) 78%, transparent);
+      border-bottom:1px solid var(--border);
+    }
+    .bar { max-width:1120px; margin:0 auto; padding:12px 24px; display:flex; align-items:center; gap:16px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:640; letter-spacing:-0.02em; font-size:15px; text-decoration:none; color:var(--text); }
+    .ver { font-size:12px; color:var(--text-dim); }
+    .spacer { flex:1; }
+    .icon-btn { width:34px; height:34px; border-radius:9px; cursor:pointer; display:grid; place-items:center;
+                color:var(--text-mut); background:var(--surface); border:1px solid var(--border); transition:.15s; }
+    .icon-btn:hover { color:var(--text); border-color:var(--border-2); }
+    .icon-btn svg { width:16px; height:16px; }
+
+    main { position:relative; z-index:1; max-width:1120px; margin:0 auto; padding:32px 24px 80px; }
+    h1 { font-size:26px; font-weight:660; letter-spacing:-0.03em; margin:0; text-wrap:balance; }
+    .sub { color:var(--text-mut); font-size:13px; margin:6px 0 0; }
+    .eyebrow { font-size:11px; font-weight:640; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent-2); }
+
+    /* ============ HERO (empty state) ============ */
+    .hero { text-align:center; padding:14px 0 8px; }
+    .hero h1 { font-size:clamp(30px,5vw,50px); line-height:1.04; margin:16px auto 0; max-width:14ch; }
+    .hero .grad { background:linear-gradient(96deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .hero p.lede { color:var(--text-mut); font-size:16px; max-width:52ch; margin:14px auto 0; text-wrap:balance; }
+
+    .stage-wrap { display:flex; justify-content:center; margin:10px 0 6px; }
+    .stage { position:relative; width:680px; height:430px; transform-origin:top center; }
+
+    .ropes { position:absolute; inset:0; width:100%; height:100%; z-index:1; overflow:visible; }
+    .rope-path { fill:none; stroke:var(--accent-line); stroke-width:1.6; stroke-dasharray:2 7; stroke-linecap:round; opacity:.55; }
+    .flow { animation: flowfade 2.4s linear infinite; }
+    .flow.d2 { animation-delay:.8s; } .flow.d3 { animation-delay:1.6s; }
+    @keyframes flowfade { 0%{opacity:0} 12%{opacity:1} 82%{opacity:1} 100%{opacity:0} }
+
+    .node { position:absolute; z-index:2; width:176px; }
+    .node .ncard {
+      position:relative; background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; padding:11px 12px 12px; box-shadow:var(--shadow); overflow:hidden;
+      transition:border-color .4s, box-shadow .4s, transform .4s;
+    }
+    .node .nhead { display:flex; align-items:center; gap:7px; margin-bottom:9px; }
+    .node .ndot { width:8px; height:8px; border-radius:50%; background:var(--c); box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 20%,transparent); }
+    .node .nname { font-size:12.5px; font-weight:600; letter-spacing:-0.01em; }
+    .node .nact { margin-left:auto; font-size:11px; color:var(--text-dim); }
+    .node .nact .dots::after { content:""; animation:dots 1.4s steps(4,end) infinite; }
+    @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} 100%{content:""} }
+    .node .nbody { height:74px; border-radius:9px; background:var(--bg-2); border:1px solid var(--border); position:relative; overflow:hidden; }
+
+    #n-plan .ncard { animation: focusP 9s ease-in-out infinite; }
+    #n-dev  .ncard { animation: focusD 9s ease-in-out infinite; }
+    #n-val  .ncard { animation: focusV 9s ease-in-out infinite; }
+    @keyframes focusP { 0%,4%{} 8%,28%{border-color:var(--c-line); box-shadow:0 0 0 1px var(--c-line),0 0 34px -6px var(--c-glow),var(--shadow); transform:translateY(-3px);} 34%,100%{} }
+    @keyframes focusD { 0%,37%{} 41%,61%{border-color:var(--c-line); box-shadow:0 0 0 1px var(--c-line),0 0 34px -6px var(--c-glow),var(--shadow); transform:translateY(-3px);} 67%,100%{} }
+    @keyframes focusV { 0%,70%{} 74%,94%{border-color:var(--c-line); box-shadow:0 0 0 1px var(--c-line),0 0 34px -6px var(--c-glow),var(--shadow); transform:translateY(-3px);} 100%{} }
+    #n-plan { --c:var(--accent-2); --c-line:var(--accent-line); --c-glow:var(--accent); left:252px; top:0; }
+    #n-dev  { --c:var(--run); --c-line:color-mix(in srgb,var(--run) 40%,transparent); --c-glow:var(--run); left:452px; top:300px; }
+    #n-val  { --c:var(--done); --c-line:color-mix(in srgb,var(--done) 40%,transparent); --c-glow:var(--done); left:52px; top:300px; }
+
+    .pg { position:absolute; inset:0; }
+    .pg .edge { stroke:var(--accent-line); stroke-width:1.5; fill:none; stroke-dasharray:60; stroke-dashoffset:60; animation:draw 3s ease-in-out infinite; }
+    .pg .edge.e2 { animation-delay:.5s } .pg .edge.e3 { animation-delay:1s } .pg .edge.e4 { animation-delay:1.4s }
+    @keyframes draw { 0%{stroke-dashoffset:60} 40%{stroke-dashoffset:0} 86%{stroke-dashoffset:0; opacity:1} 100%{stroke-dashoffset:0; opacity:.15} }
+    .pg .pn { fill:var(--surface-2); stroke:var(--accent-2); stroke-width:1.5; transform-origin:center; animation:pop 3s ease-in-out infinite; }
+    .pg .pn.n2{animation-delay:.4s} .pg .pn.n3{animation-delay:.9s} .pg .pn.n4{animation-delay:1.3s}
+    @keyframes pop { 0%{transform:scale(0); opacity:0} 18%{transform:scale(1.15)} 30%{transform:scale(1); opacity:1} 90%{opacity:1} 100%{opacity:.2} }
+
+    .code { position:absolute; inset:0; padding:9px 10px; display:flex; flex-direction:column; gap:6px; }
+    .code .ln { height:6px; border-radius:3px; width:0; }
+    .code .ln > i { display:block; height:100%; border-radius:3px; background:var(--l); width:100%; }
+    .code .ln { animation: type 3s ease-in-out infinite; }
+    .code .l1{--l:var(--accent-2); max-width:64%; animation-delay:0s}
+    .code .l2{--l:var(--run); max-width:88%; animation-delay:.45s}
+    .code .l3{--l:var(--text-dim); max-width:52%; animation-delay:.9s}
+    .code .l4{--l:var(--done); max-width:76%; animation-delay:1.35s}
+    @keyframes type { 0%{width:0} 30%{width:var(--max,100%)} 88%{width:var(--max,100%)} 100%{width:var(--max,100%); opacity:.35} }
+
+    .scan { position:absolute; inset:0; }
+    .scan .sln { position:absolute; height:5px; border-radius:3px; background:color-mix(in srgb,var(--text-dim) 45%,transparent); left:10px; }
+    .lens { position:absolute; width:30px; height:30px; top:22px; left:0; animation:sweep 3s ease-in-out infinite; }
+    .lens .glass { fill:color-mix(in srgb,var(--done) 12%,transparent); stroke:var(--done); stroke-width:2; }
+    .lens .handle { stroke:var(--done); stroke-width:2.4; stroke-linecap:round; }
+    @keyframes sweep { 0%{left:6px} 46%{left:118px} 54%{left:118px} 100%{left:6px} }
+    .bug { position:absolute; left:120px; top:30px; color:var(--fail); animation:bugcatch 3s ease-in-out infinite; }
+    .bug svg { width:15px; height:15px; display:block; }
+    @keyframes bugcatch { 0%,38%{opacity:1; transform:scale(1)} 50%{opacity:1; transform:scale(1.25)} 60%{opacity:0; transform:scale(.4)} 100%{opacity:0} }
+    .caught { position:absolute; left:120px; top:31px; color:var(--done); opacity:0; animation:caught 3s ease-in-out infinite; }
+    .caught svg{width:14px;height:14px;display:block}
+    @keyframes caught { 0%,58%{opacity:0; transform:scale(.4)} 68%{opacity:1; transform:scale(1)} 92%{opacity:1} 100%{opacity:0} }
+
+    .mascot { position:absolute; left:50%; top:150px; transform:translateX(-50%); z-index:3; width:150px; animation:bob 5s ease-in-out infinite; }
+    @keyframes bob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-9px)} }
+    .mascot .shadow { position:absolute; left:50%; bottom:-18px; width:96px; height:16px; transform:translateX(-50%);
+                      background:radial-gradient(closest-side, rgba(0,0,0,.35), transparent); animation:shadow 5s ease-in-out infinite; }
+    @keyframes shadow { 0%,100%{opacity:.55; transform:translateX(-50%) scale(1)} 50%{opacity:.3; transform:translateX(-50%) scale(.8)} }
+    .antenna-orb { animation:orbpulse 2.4s ease-in-out infinite; transform-origin:center; }
+    @keyframes orbpulse { 0%,100%{opacity:.7} 50%{opacity:1} }
+    .eyes { animation:blink 5.5s infinite; transform-origin:center; transform-box:fill-box; }
+    @keyframes blink { 0%,92%,100%{transform:scaleY(1)} 96%{transform:scaleY(.12)} }
+    .pupils { animation:look 9s ease-in-out infinite; }
+    @keyframes look {
+      0%,6%{transform:translate(0,-2px)}
+      22%,30%{transform:translate(0,-2px)}
+      41%,61%{transform:translate(4px,2px)}
+      74%,94%{transform:translate(-4px,2px)}
+      100%{transform:translate(0,-2px)}
+    }
+
+    .agent-legend { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; max-width:760px; margin:20px auto 0; }
+    .leg { text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; }
+    .leg .lh { display:flex; align-items:center; gap:8px; font-weight:600; font-size:13px; }
+    .leg .lk { width:8px; height:8px; border-radius:50%; }
+    .leg p { margin:6px 0 0; font-size:12.5px; color:var(--text-mut); }
+
+    .install { display:inline-flex; align-items:center; gap:10px; margin:0; padding:9px 12px 9px 16px;
+               background:var(--surface); border:1px solid var(--border); border-radius:10px; font-size:13px; }
+    .install .cp { width:26px; height:26px; border-radius:7px; display:grid; place-items:center; background:var(--surface-2);
+                   border:1px solid var(--border); color:var(--text-mut); cursor:pointer; }
+    .install .cp:hover { color:var(--text); }
+    .hero-cta { display:flex; gap:12px; align-items:center; justify-content:center; margin-top:24px; flex-wrap:wrap; }
+    .cta { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; border-radius:9px; background:var(--accent);
+           color:#fff; font-size:13px; font-weight:560; text-decoration:none; border:0; cursor:pointer;
+           box-shadow:0 1px 0 rgba(255,255,255,.12) inset, 0 8px 20px -8px var(--accent); transition:.15s; }
+    .cta:hover { background:var(--accent-2); }
+
+    /* ============ shared list/detail ============ */
+    .live { display:inline-flex; align-items:center; gap:6px; color:var(--text-dim); font-size:12px; }
+    .live .pdot { width:6px; height:6px; border-radius:50%; background:var(--done); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--done) 55%,transparent)} 70%{box-shadow:0 0 0 5px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+
+    .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:22px 0 26px; }
+    .stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:17px 19px;
+            position:relative; overflow:hidden; transition:border-color .2s, transform .2s; }
+    .stat::after { content:""; position:absolute; left:0; right:0; top:0; height:1px;
+                   background:linear-gradient(90deg, transparent, color-mix(in srgb,var(--c) 50%,transparent), transparent); opacity:.65; }
+    .stat:hover { border-color:var(--border-2); transform:translateY(-1px); }
+    .stat .n { font-size:29px; font-weight:680; letter-spacing:-0.035em; line-height:1; }
+    .stat .l { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:11px; font-weight:600;
+               letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
+    .stat .k { width:7px; height:7px; border-radius:50%; background:var(--c); box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 15%,transparent); }
+
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+    .tablewrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; }
+    thead th { text-align:left; font-size:10.5px; font-weight:640; letter-spacing:0.06em; text-transform:uppercase;
+               color:var(--text-dim); padding:10px 11px; background:var(--surface-2); border-bottom:1px solid var(--border); white-space:nowrap; }
+    thead th.r { text-align:right; }
+    tbody td { padding:11px 11px; border-bottom:1px solid var(--border); font-size:12.5px; white-space:nowrap; }
+    tbody tr:last-child td { border-bottom:0; }
+    tbody tr.row { cursor:pointer; transition:background .12s; }
+    tbody tr.row:hover { background:var(--surface-2); }
+    tbody tr.row:hover td:first-child { box-shadow:inset 2px 0 0 var(--accent); }
+    .slug { font-weight:570; letter-spacing:-0.01em; }
+    td.r { text-align:right; }
+    .dim { color:var(--text-dim); } .mut { color:var(--text-mut); }
+    .cwd { color:var(--text-dim); font-size:12px; }
+
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:3px 9px 3px 8px; border-radius:999px;
+            font-size:12px; font-weight:560; line-height:1.4; background:var(--p-bg); color:var(--p);
+            box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--p) 22%,transparent); }
+    .pill .d { width:6px; height:6px; border-radius:50%; background:var(--p); }
+    .pill.spin .d { animation:pulse 1.6s infinite; }
+    .s-running{--p:var(--run);--p-bg:var(--run-bg)} .s-waiting{--p:var(--wait);--p-bg:var(--wait-bg)}
+    .s-done{--p:var(--done);--p-bg:var(--done-bg)} .s-failed{--p:var(--fail);--p-bg:var(--fail-bg)}
+    .s-pending{--p:var(--text-dim);--p-bg:color-mix(in srgb,var(--text-dim) 12%,transparent)}
+    .retry-0{color:var(--done)} .retry-1{color:var(--wait)} .retry-2{color:var(--fail)}
+
+    .back { display:inline-flex; align-items:center; gap:6px; color:var(--accent-2); text-decoration:none; font-size:13px; font-weight:520; }
+    .back:hover { text-decoration:underline; }
+    .head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:14px 0 4px; flex-wrap:wrap; }
+    .cta-out { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; background:var(--accent);
+               color:#fff; font-size:13px; font-weight:560; text-decoration:none; }
+    .metaline { color:var(--text-mut); font-size:13px; margin:4px 0 24px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+    .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
+    .panel h3 { margin:0 0 12px; font-size:11px; font-weight:640; letter-spacing:0.07em; text-transform:uppercase; color:var(--text-dim); }
+    dl { margin:0; display:grid; grid-template-columns:auto 1fr; gap:7px 14px; font-size:13px; }
+    dl dt { color:var(--text-dim); } dl dd { margin:0; color:var(--text); word-break:break-word; }
+    .section-h { display:flex; align-items:baseline; justify-content:space-between; margin:4px 0 12px; gap:12px; }
+    .section-h h2 { margin:0; font-size:15px; font-weight:620; letter-spacing:-0.01em; }
+    .section-h .meta { font-size:12.5px; color:var(--text-mut); }
+
+    .iter { margin-bottom:14px; position:relative; }
+    .iter::before { content:""; position:absolute; left:26px; top:38px; bottom:8px; width:2px; background:var(--border); z-index:0; }
+    .iter-h { display:flex; align-items:center; gap:10px; margin:0 0 8px; }
+    .iter-tag { font-size:10.5px; font-weight:660; letter-spacing:0.06em; text-transform:uppercase; color:var(--accent-2);
+                background:var(--accent-bg); border:1px solid var(--accent-line); padding:2px 8px; border-radius:6px; }
+    .iter-h .t { font-size:13px; color:var(--text-mut); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .phase { display:grid; grid-template-columns:26px 200px auto; align-items:center; gap:16px; padding:11px 14px;
+             border-radius:10px; border:1px solid transparent; transition:.12s; position:relative; z-index:1; }
+    .phase:hover { background:var(--surface-2); }
+    .phase .pmain { display:flex; flex-direction:column; gap:9px; min-width:0; }
+    .phase .pname { font-size:13px; font-weight:560; display:flex; align-items:center; }
+    .phase .pright { display:flex; flex-direction:column; align-items:flex-end; gap:3px; text-align:right; }
+    .phase .pdur { font-size:13px; color:var(--text); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+    .phase.run .pdur { color:var(--run); }
+    .phase .psid { font-size:11px; color:var(--text-dim); }
+
+    .tnode { justify-self:center; width:12px; height:12px; border-radius:50%; box-sizing:border-box;
+             background:var(--surface); border:2px solid var(--done); }
+    .tnode.run { background:var(--run); border-color:var(--run); animation:pulse 1.6s infinite; }
+    .tnode.planner { border-color:var(--accent-2); }
+    .tnode.fail { background:var(--fail); border-color:var(--fail); }
+    .tnode.parked { border-color:var(--wait); }
+    .phase.ok .tnode { background:transparent; border:0; border-radius:0; position:relative; }
+    .phase.ok .tnode::after { content:""; position:absolute; left:2.5px; top:0; width:4px; height:8px;
+                              border:solid var(--done); border-width:0 2px 2px 0; transform:rotate(45deg); }
+
+    .phase.run { display:block; }
+    .runhead { display:grid; grid-template-columns:26px 200px auto; align-items:center; gap:16px; }
+    .runmeta { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+    .runmeta .pdur { font-size:13px; color:var(--run); font-variant-numeric:tabular-nums; }
+    .runmeta .psid { font-size:11px; color:var(--text-dim); }
+    .workframe { margin:11px 0 2px 33px; max-width:300px; background:var(--bg-2); border:1px solid var(--border);
+                 border-radius:10px; padding:6px 12px; }
+    .workframe svg { display:block; width:100%; height:auto; }
+
+    .deskscene { display:block; margin-top:4px; }
+    .dv-glow  { animation:dv-glow 2.4s ease-in-out infinite; }
+    @keyframes dv-glow  { 0%,100%{opacity:.20} 50%{opacity:.46} }
+    .dv-hands { transform-box:fill-box; transform-origin:center; animation:dv-hands .5s ease-in-out infinite; }
+    @keyframes dv-hands { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.4px)} }
+    .dv-head  { transform-box:fill-box; transform-origin:center bottom; animation:dv-head 3.4s ease-in-out infinite; }
+    @keyframes dv-head  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1px)} }
+    .dv-steam { transform-box:fill-box; transform-origin:center bottom; animation:dv-steam 2.8s ease-in-out infinite; }
+    @keyframes dv-steam { 0%{opacity:0; transform:translateY(3px)} 25%{opacity:.55} 100%{opacity:0; transform:translateY(-10px)} }
+    .sc-edge  { stroke-dasharray:60; stroke-dashoffset:60; animation:draw 3s ease-in-out infinite; }
+    .sc-node  { transform-box:fill-box; transform-origin:center; animation:pop 3s ease-in-out infinite; }
+    .sc-point { transform-box:fill-box; transform-origin:right center; animation:sc-point 2.6s ease-in-out infinite; }
+    @keyframes sc-point { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+    .sc-arm   { transform-box:fill-box; transform-origin:right center; animation:sc-arm 3s ease-in-out infinite; }
+    @keyframes sc-arm { 0%,100%{transform:rotate(-4.5deg)} 50%{transform:rotate(4.5deg)} }
+    .sc-bug   { transform-box:fill-box; transform-origin:center; animation:bugcatch 3s ease-in-out infinite; }
+    .sc-catch { transform-box:fill-box; transform-origin:center; animation:caught 3s ease-in-out infinite; }
+
+    details.task { border-top:1px solid var(--border); }
+    details.task:first-of-type { border-top:0; }
+    summary { list-style:none; cursor:pointer; padding:13px 16px; display:grid; grid-template-columns:44px 1fr auto auto 70px; gap:12px; align-items:center; transition:background .12s; }
+    summary::-webkit-details-marker { display:none; }
+    summary:hover { background:var(--surface-2); }
+    summary .tid { font-size:12px; color:var(--text-dim); }
+    summary .ttitle { font-size:13px; font-weight:540; }
+    .task-body { padding:4px 16px 16px 72px; color:var(--text-mut); font-size:12.5px; }
+    .events { display:grid; gap:2px; }
+    .ev { display:flex; gap:10px; align-items:baseline; font-size:12.5px; padding:4px 0; }
+    .ev .when { color:var(--text-dim); min-width:60px; } .ev .ph { color:var(--text-mut); min-width:92px; }
+    .ev .msg { font-weight:500; } .ev .msg.pass { color:var(--done); } .ev .msg.fail { color:var(--fail); }
+
+    .pipe { display:inline-flex; align-items:center; }
+    .pipe .st { width:9px; height:9px; border-radius:50%; border:1.5px solid var(--border-2); background:transparent; flex:0 0 auto; }
+    .pipe .st.on { background:var(--sc); border-color:var(--sc); }
+    .pipe .st.bad { background:var(--fail); border-color:var(--fail); }
+    .pipe .st.act { background:var(--sc); border-color:var(--sc); animation:pulse 1.6s infinite; }
+    .pipe .cn { width:16px; height:2px; background:var(--border-2); flex:0 0 auto; }
+    .pipe .cn.on { background:var(--accent-line); }
+
+    .ribbon { display:flex; align-items:center; gap:0; background:var(--surface); border:1px solid var(--border);
+              border-radius:14px; padding:14px 18px; margin:0 0 24px; box-shadow:var(--shadow); overflow-x:auto; position:relative; }
+    .ribbon::before { content:""; position:absolute; inset:0; border-radius:14px; pointer-events:none;
+                      background:radial-gradient(120% 120% at 50% 0%, var(--run-bg), transparent 55%); opacity:.6; }
+    .rb-stage { display:flex; align-items:center; gap:11px; padding:8px 14px; border-radius:11px; flex:0 0 auto; position:relative; z-index:1; }
+    .rb-stage .ic { width:32px; height:32px; border-radius:9px; display:grid; place-items:center;
+                    background:var(--surface-2); border:1px solid var(--border); color:var(--text-dim); }
+    .rb-stage .ic svg { width:17px; height:17px; }
+    .rb-stage .rn { font-size:13px; font-weight:600; letter-spacing:-0.01em; }
+    .rb-stage .rs { font-size:11.5px; color:var(--text-dim); }
+    .rb-stage.on .ic { color:var(--sc); border-color:color-mix(in srgb,var(--sc) 40%,transparent); background:color-mix(in srgb,var(--sc) 12%,transparent); }
+    .rb-stage.on .rs { color:var(--sc); }
+    .rb-stage.act { background:color-mix(in srgb,var(--sc) 9%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sc) 34%,transparent); }
+    .rb-stage.act .ic { color:#fff; background:var(--sc); border-color:var(--sc); animation:glowpulse 1.9s ease-in-out infinite; }
+    .rb-stage.act .rs { color:var(--sc); }
+    @keyframes glowpulse { 0%,100%{box-shadow:0 0 0 0 transparent} 50%{box-shadow:0 0 16px 0 var(--sc)} }
+    .rb-cn { flex:1 1 28px; height:2px; min-width:22px; background:var(--border-2); position:relative; z-index:1; }
+    .rb-cn.on { background:var(--accent-line); }
+    .rb-cn.flow::after { content:""; position:absolute; top:50%; left:0; width:7px; height:7px; margin-top:-3.5px;
+                         border-radius:50%; background:var(--run); box-shadow:0 0 10px 1px var(--run); animation:cnflow 1.7s linear infinite; }
+    @keyframes cnflow { 0%{left:0; opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:100%; opacity:0} }
+    .rb-stage .mini { margin-top:6px; height:3px; width:56px; border-radius:2px; overflow:hidden; position:relative;
+                      background:color-mix(in srgb,var(--sc) 22%,transparent); }
+    .rb-stage .mini::after { content:""; position:absolute; top:0; bottom:0; left:0; width:42%; border-radius:2px;
+                             background:var(--sc); animation:mini 1.2s ease-in-out infinite; }
+    @keyframes mini { 0%{transform:translateX(-110%)} 100%{transform:translateX(280%)} }
+
+    .animate .reveal { animation:revealUp .55s cubic-bezier(.2,.7,.2,1) both; animation-delay:calc(var(--i,0)*70ms); }
+    @keyframes revealUp { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
+    .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 10px; border-radius:999px;
+            background:var(--surface); border:1px solid var(--border); color:var(--text-mut); }
+    .chip .cd { width:6px; height:6px; border-radius:50%; background:var(--run); animation:pulse 1.6s infinite; }
+    .live-hd { display:inline-flex; width:6px; height:6px; border-radius:50%; background:var(--done); margin-left:8px; vertical-align:middle; animation:pulse 1.8s infinite; }
+
+    .gg { position:relative; }
+    .gg::before { content:""; position:absolute; left:5px; top:14px; bottom:14px; width:2px; background:var(--accent-line); }
+    .commit { display:flex; gap:10px; align-items:baseline; padding-left:22px; position:relative; padding-top:7px; padding-bottom:7px; }
+    .commit::before { content:""; position:absolute; left:0; top:8px; width:12px; height:12px; border-radius:50%;
+                      box-sizing:border-box; background:var(--surface); border:2px solid var(--accent); }
+    .commit .sha { color:var(--accent-2); font-size:12px; } .commit .csub { font-size:13px; }
+
+    /* markdown task descriptions */
+    .task-md { font-size:0.78rem; line-height:1.55; color:var(--text-mut); }
+    .task-md p { margin:0.5em 0; } .task-md p:first-child { margin-top:0; } .task-md p:last-child { margin-bottom:0; }
+    .task-md code { background:var(--surface-2); padding:0 0.25em; border-radius:3px; font-size:0.95em; font-family:ui-monospace,monospace; }
+    .task-md pre { background:var(--surface-2); padding:0.5em 0.75em; border-radius:6px; overflow-x:auto; margin:0.5em 0; }
+    .task-md pre code { background:transparent; padding:0; }
+    .task-md ul, .task-md ol { margin:0.5em 0; padding-left:1.25em; }
+    .task-md li { margin:0.15em 0; }
+    .task-md strong { color:var(--text); font-weight:600; }
+    .task-md a { color:var(--accent-2); text-decoration:underline; }
+    .task-md h1, .task-md h2, .task-md h3, .task-md h4 { font-weight:600; color:var(--text); margin:0.75em 0 0.25em; }
+
+    @media (max-width:720px) {
+      .summary { grid-template-columns:repeat(2,1fr); }
+      .grid2 { grid-template-columns:1fr; }
+      .agent-legend { grid-template-columns:1fr; }
+      .phase, .runhead { grid-template-columns:26px 1fr auto; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <header class="border-b border-slate-200 bg-white">
-    <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-      <a href="#/" class="text-sm font-semibold text-slate-700 hover:text-slate-900">harny</a>
-      <span id="version" class="text-xs text-slate-500 font-mono"></span>
+<body>
+  <header>
+    <div class="bar">
+      <a class="brand" href="#/">
+        <svg viewBox="0 0 40 40" width="26" height="26" fill="none" aria-hidden="true">
+          <rect x="6" y="10" width="28" height="21" rx="7" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
+          <line x1="20" y1="10" x2="20" y2="5" stroke="var(--accent-line)" stroke-width="2"/>
+          <circle cx="20" cy="4" r="2.4" fill="var(--accent)"/>
+          <rect x="14" y="16" width="4" height="7" rx="2" fill="var(--accent-2)"/>
+          <rect x="22" y="16" width="4" height="7" rx="2" fill="var(--accent-2)"/>
+        </svg>
+        harny <span class="ver mono" id="version"></span>
+      </a>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="themeBtn" title="Toggle theme" onclick="toggleTheme()" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path class="sun" d="M12 3v2M12 19v2M5 5l1.5 1.5M17.5 17.5L19 19M3 12h2M19 12h2M5 19l1.5-1.5M17.5 6.5L19 5"/>
+          <circle class="sun" cx="12" cy="12" r="3.6"/>
+          <path class="moon" style="display:none" d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>
+        </svg>
+      </button>
     </div>
   </header>
-  <div id="app" class="max-w-6xl mx-auto p-6">
-    <p class="text-slate-500">loading…</p>
-  </div>
+  <main><div id="app"><p class="mut">loading…</p></div></main>
 
   <script>
-    // Tiny vanilla SPA — hash-based routing.
     const app = document.getElementById('app');
+    const nowIso = () => new Date().toISOString();
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-    const STATUS_COLORS = {
-      running: 'bg-blue-100 text-blue-800 ring-blue-200',
-      waiting_human: 'bg-amber-100 text-amber-800 ring-amber-200',
-      done: 'bg-emerald-100 text-emerald-800 ring-emerald-200',
-      failed: 'bg-rose-100 text-rose-800 ring-rose-200',
-    };
-    const PHASE_STATUS_COLORS = {
-      running: 'bg-blue-100 text-blue-800',
-      completed: 'bg-emerald-100 text-emerald-800',
-      failed: 'bg-rose-100 text-rose-800',
-      parked: 'bg-amber-100 text-amber-800',
-    };
-    const TASK_STATUS_COLORS = {
-      pending: 'bg-slate-100 text-slate-700',
-      in_progress: 'bg-blue-100 text-blue-800',
-      done: 'bg-emerald-100 text-emerald-800',
-      failed: 'bg-rose-100 text-rose-800',
-    };
+    // Poll refreshes DATA only: skip re-render when the server payload is
+    // unchanged, and tick live time fields (elapsed / durations / "N ago")
+    // in place so the DOM stays stable and animations never restart.
+    let lastListSig = null, lastDetailSig = null, detailAnimate = true;
+    const msOf = (iso) => (iso ? new Date(iso).getTime() : null);
+    function liveDur(startIso, endIso) {
+      if (endIso) return `<span>${fmtDuration(durationMs(startIso, endIso))}</span>`;
+      const s = msOf(startIso);
+      return `<span data-dur-start="${s}">${fmtDuration(Date.now() - s)}</span>`;
+    }
+    function agoSpan(iso) {
+      return `<span data-iso="${escapeHtml(iso)}" title="${escapeHtml(fmtTime(iso))}">${escapeHtml(fmtRelative(iso))}</span>`;
+    }
+    function updateTimers() {
+      const now = Date.now();
+      document.querySelectorAll('[data-dur-start]').forEach(el => {
+        const s = parseInt(el.dataset.durStart, 10);
+        if (s) el.textContent = fmtDuration(now - s);
+      });
+      document.querySelectorAll('[data-iso]').forEach(el => { el.textContent = fmtRelative(el.dataset.iso); });
+    }
 
-    function badge(text, classes) {
-      return `<span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${classes}">${text}</span>`;
+    // --- theme ---------------------------------------------------------------
+    function currentTheme() {
+      return document.documentElement.getAttribute('data-theme')
+        || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     }
-    function statusBadge(status) {
-      return badge(status, STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800 ring-slate-200');
+    function applyIcon(theme) {
+      const dark = theme === 'dark';
+      document.querySelectorAll('#themeBtn .sun').forEach(e => e.style.display = dark ? '' : 'none');
+      document.querySelector('#themeBtn .moon').style.display = dark ? 'none' : '';
     }
-    function phaseBadge(status) {
-      const cls = PHASE_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-800';
-      const dotColor = status === 'running' ? 'bg-blue-500 animate-pulse'
-        : status === 'completed' ? 'bg-emerald-500'
-        : status === 'failed' ? 'bg-rose-500'
-        : status === 'parked' ? 'bg-amber-500'
-        : 'bg-slate-400';
-      return `<span class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${cls}"><span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span>${status}</span>`;
+    function toggleTheme() {
+      const next = currentTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      applyIcon(next);
     }
-    function taskBadge(status) {
-      return badge(status, TASK_STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-700');
-    }
+    applyIcon(currentTheme());
+
+    // --- formatting ----------------------------------------------------------
     function fmtTime(iso) {
       if (!iso) return '—';
       const d = new Date(iso);
-      const date = d.toISOString().split('T')[0];
-      const time = d.toTimeString().slice(0, 8);
-      return `${date} ${time}`;
+      return `${d.toISOString().split('T')[0]} ${d.toTimeString().slice(0, 8)}`;
     }
     function fmtRelative(iso) {
       if (!iso) return '—';
@@ -93,8 +464,7 @@
       if (m < 60) return `${m}m ago`;
       const h = Math.floor(m / 60);
       if (h < 24) return `${h}h ago`;
-      const d = Math.floor(h / 24);
-      return `${d}d ago`;
+      return `${Math.floor(h / 24)}d ago`;
     }
     function durationMs(a, b) {
       if (!a || !b) return null;
@@ -111,31 +481,24 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
       })[c]);
     }
-
-    // Task descriptions come from an LLM — sanitize to block rogue HTML.
+    function truncate(s, n) {
+      const str = String(s ?? '');
+      return str.length > n ? str.slice(0, n) + '…' : str;
+    }
     marked.setOptions({ breaks: true, gfm: true });
     function renderMarkdown(s) {
       if (!s) return '';
       return DOMPurify.sanitize(marked.parse(String(s)));
     }
 
-    function truncate(s, n) {
-      const str = String(s ?? '');
-      return str.length > n ? str.slice(0, n) + '…' : str;
-    }
-
     function eventSubstance(e, state, plan) {
       if (e.event !== 'phase_end') return { text: e.event, kind: 'info' };
       const phase = e.phase ?? '';
       if (phase === 'planner') {
-        const text = (plan && Array.isArray(plan.tasks))
-          ? plan.tasks.length + ' tasks planned'
-          : 'planner done';
+        const text = (plan && Array.isArray(plan.tasks)) ? plan.tasks.length + ' tasks planned' : 'planner done';
         return { text, kind: 'info' };
       }
-      // Multiple phases share a name (one per task); match by ended_at.
-      const findEntry = () => (state.phases ?? [])
-        .find(p => p.name === phase && p.ended_at === e.at);
+      const findEntry = () => (state.phases ?? []).find(p => p.name === phase && p.ended_at === e.at);
       if (phase.startsWith('developer')) {
         const entry = findEntry();
         if (entry && entry.verdict) {
@@ -153,10 +516,7 @@
             const v = JSON.parse(entry.verdict);
             const pass = v.verdict === 'pass';
             const reason = Array.isArray(v.reasons) ? v.reasons[0] : '';
-            return {
-              text: (pass ? 'PASS' : 'FAIL') + (reason ? ': ' + truncate(reason, 80) : ''),
-              kind: pass ? 'pass' : 'fail',
-            };
+            return { text: (pass ? 'PASS' : 'FAIL') + (reason ? ': ' + truncate(reason, 80) : ''), kind: pass ? 'pass' : 'fail' };
           } catch {}
         }
         return { text: 'validator done', kind: 'info' };
@@ -164,88 +524,340 @@
       return { text: e.event, kind: 'info' };
     }
 
+    // --- shared bits ---------------------------------------------------------
+    function statusPill(status) {
+      const map = { running: ['s-running', 'spin'], waiting_human: ['s-waiting', ''], done: ['s-done', ''], failed: ['s-failed', ''] };
+      const [cls, spin] = map[status] || ['s-pending', ''];
+      return `<span class="pill ${cls} ${spin}"><span class="d"></span>${escapeHtml(status)}</span>`;
+    }
+    function pipeHtml(status, phase) {
+      const order = ['planner', 'developer', 'validator'];
+      const colors = ['var(--accent-2)', 'var(--run)', 'var(--done)'];
+      const p = (phase || '').toLowerCase();
+      let idx = order.findIndex(k => p.startsWith(k));
+      const st = ['', '', ''];
+      if (status === 'done') { st[0] = st[1] = st[2] = 'on'; }
+      else if (status === 'failed') { if (idx < 0) idx = 0; for (let i = 0; i < 3; i++) st[i] = i < idx ? 'on' : (i === idx ? 'bad' : ''); }
+      else if (status === 'running' || status === 'waiting_human') { if (idx < 0) idx = 0; for (let i = 0; i < 3; i++) st[i] = i < idx ? 'on' : (i === idx ? 'act' : ''); }
+      let h = '<span class="pipe" title="planner · developer · validator">';
+      for (let i = 0; i < 3; i++) {
+        const c = st[i] === 'bad' ? 'st bad' : (st[i] ? 'st ' + st[i] : 'st');
+        h += `<i class="${c}" style="--sc:${colors[i]}"></i>`;
+        if (i < 2) h += `<i class="cn${st[i] === 'on' ? ' on' : ''}"></i>`;
+      }
+      return h + '</span>';
+    }
+
+    const IC = [
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 7l3 9M16 7l-3 9"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
+    ];
+    function ribbonHtml(state, plan) {
+      const order = ['planner', 'developer', 'validator'];
+      const colors = ['var(--accent-2)', 'var(--run)', 'var(--done)'];
+      const verbs = ['planning', 'writing code', 'checking'];
+      const status = state.lifecycle.status;
+      const phases = (state.phases || []).filter(p => p.name !== 'committing');
+      const last = phases[phases.length - 1];
+      let idx = last ? order.findIndex(k => last.name.startsWith(k)) : -1;
+      if (idx < 0) idx = 0;
+      const running = status === 'running' || status === 'waiting_human';
+      const tasks = (plan && Array.isArray(plan.tasks)) ? plan.tasks.length : null;
+      let h = '';
+      for (let i = 0; i < 3; i++) {
+        let cls = '';
+        if (status === 'done') cls = 'on';
+        else if (running) cls = i < idx ? 'on' : (i === idx ? 'act' : '');
+        else cls = i <= idx ? 'on' : '';
+        const sub = cls === 'act' ? verbs[i] : cls === 'on' ? (i === 0 && tasks != null ? `${tasks} tasks planned` : 'done') : 'waiting';
+        const mini = cls === 'act' ? '<div class="mini"></div>' : '';
+        h += `<div class="rb-stage ${cls}" style="--sc:${colors[i]}"><span class="ic">${IC[i]}</span><div><div class="rn">${cap(order[i])}</div><div class="rs">${sub}</div>${mini}</div></div>`;
+        if (i < 2) {
+          const on = status === 'done' || i < idx;
+          const flow = running && i === idx - 1;
+          h += `<div class="rb-cn${on ? ' on' : ''}${flow ? ' flow' : ''}"></div>`;
+        }
+      }
+      return `<div class="ribbon reveal" style="--i:1">${h}</div>`;
+    }
+
+    // --- agent scenes (shown on the active phase) ----------------------------
+    const SCENE_DEV = `<svg class="deskscene" viewBox="0 0 180 96" fill="none" aria-label="developer coding">
+      <defs><filter id="scGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.5"/></filter></defs>
+      <rect x="6" y="76" width="168" height="7" rx="3.5" fill="var(--surface-2)" stroke="var(--border)"/>
+      <rect x="30" y="66" width="12" height="10" rx="2" fill="var(--surface)" stroke="var(--border-2)" stroke-width="1.3"/>
+      <path d="M36 66 q-2 -8 -5 -10 M36 66 q2 -9 6 -11 M36 66 q0 -6 0 -11" stroke="var(--done)" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <ellipse class="dv-glow" cx="90" cy="50" rx="34" ry="19" fill="var(--run)" filter="url(#scGlow)"/>
+      <rect x="78" y="26" width="24" height="12" rx="6" fill="var(--run)"/>
+      <g class="dv-head">
+        <circle cx="90" cy="17" r="10" fill="#CDA06E"/>
+        <path d="M80 17 a10 10 0 0 1 20 0 z" fill="var(--accent-2)"/>
+        <circle cx="85.5" cy="19" r="3.1" fill="none" stroke="#3a3a46" stroke-width="1.2"/>
+        <circle cx="94.5" cy="19" r="3.1" fill="none" stroke="#3a3a46" stroke-width="1.2"/>
+        <line x1="88.6" y1="19" x2="91.4" y2="19" stroke="#3a3a46" stroke-width="1.2"/>
+        <circle cx="85.5" cy="19.7" r="1" fill="#2a2a33"/><circle cx="94.5" cy="19.7" r="1" fill="#2a2a33"/>
+        <path d="M87 24 q3 2 6 0" stroke="#8a6a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      </g>
+      <rect x="87" y="64" width="6" height="10" fill="var(--border-2)"/>
+      <rect x="77" y="73" width="26" height="4" rx="2" fill="var(--border-2)"/>
+      <rect x="64" y="34" width="52" height="30" rx="5" fill="var(--surface-2)" stroke="var(--border-2)" stroke-width="1.5"/>
+      <rect x="69" y="38" width="8" height="8" rx="2" fill="var(--run)" opacity=".5"/>
+      <circle cx="92" cy="49" r="2.4" fill="var(--text-dim)"/>
+      <rect x="70" y="70" width="40" height="5" rx="2" fill="var(--surface)" stroke="var(--border-2)"/>
+      <rect class="dv-hands" x="79" y="67" width="9" height="5" rx="2.5" fill="#CDA06E"/>
+      <rect class="dv-hands" style="animation-delay:.25s" x="92" y="67" width="9" height="5" rx="2.5" fill="#CDA06E"/>
+      <path class="dv-steam" d="M140 50 q3.5 -4 0 -8" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round"/>
+      <path class="dv-steam" style="animation-delay:.9s" d="M146 50 q3.5 -4 0 -8" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round"/>
+      <rect x="134" y="56" width="16" height="18" rx="3" fill="var(--surface)" stroke="var(--border-2)" stroke-width="1.5"/>
+      <rect x="136.5" y="58" width="11" height="4" rx="2" fill="#8B5A32"/>
+      <path d="M150 60 q7 1.5 0 9" stroke="var(--border-2)" stroke-width="2" fill="none"/>
+    </svg>`;
+    const SCENE_PLANNER = `<svg class="deskscene" viewBox="0 0 180 96" fill="none" aria-label="planner sketching the plan">
+      <rect x="6" y="76" width="168" height="7" rx="3.5" fill="var(--surface-2)" stroke="var(--border)"/>
+      <rect x="14" y="14" width="94" height="54" rx="5" fill="var(--surface-2)" stroke="var(--border-2)" stroke-width="1.5"/>
+      <rect x="22" y="21" width="34" height="3.4" rx="1.7" fill="var(--accent-2)"/>
+      <path class="sc-edge" d="M34 40 L64 40" stroke="var(--accent-line)" stroke-width="1.6"/>
+      <path class="sc-edge" style="animation-delay:.5s" d="M34 40 L50 55" stroke="var(--accent-line)" stroke-width="1.6"/>
+      <path class="sc-edge" style="animation-delay:1s" d="M64 40 L84 55" stroke="var(--accent-line)" stroke-width="1.6"/>
+      <circle class="sc-node" cx="34" cy="40" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+      <circle class="sc-node" style="animation-delay:.4s" cx="64" cy="40" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+      <circle class="sc-node" style="animation-delay:.9s" cx="50" cy="55" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+      <circle class="sc-node" style="animation-delay:1.3s" cx="84" cy="55" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
+      <rect x="120" y="46" width="30" height="30" rx="12" fill="var(--accent)"/>
+      <g class="dv-head">
+        <circle cx="135" cy="36" r="10" fill="#CDA06E"/>
+        <path d="M125 36 a10 10 0 0 1 20 0 z" fill="var(--accent-2)"/>
+        <circle cx="131" cy="38" r="1.1" fill="#2a2a33"/><circle cx="139" cy="38" r="1.1" fill="#2a2a33"/>
+        <path d="M132 42 q3 2 6 0" stroke="#8a6a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      </g>
+      <g class="sc-point">
+        <line x1="123" y1="54" x2="104" y2="46" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="103" cy="45" r="2.6" fill="#CDA06E"/>
+      </g>
+    </svg>`;
+    const SCENE_VALIDATOR = `<svg class="deskscene" viewBox="0 0 180 96" fill="none" aria-label="validator hunting bugs">
+      <rect x="6" y="76" width="168" height="7" rx="3.5" fill="var(--surface-2)" stroke="var(--border)"/>
+      <rect x="16" y="16" width="82" height="54" rx="5" fill="var(--surface-2)" stroke="var(--border-2)" stroke-width="1.5"/>
+      <rect x="24" y="24" width="46" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
+      <rect x="24" y="32" width="60" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
+      <rect x="24" y="40" width="38" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
+      <rect x="24" y="48" width="54" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
+      <rect x="24" y="56" width="30" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
+      <g transform="translate(74 44)"><g class="sc-bug" stroke="var(--fail)" stroke-width="2" stroke-linecap="round">
+        <ellipse cx="0" cy="0" rx="4.5" ry="5.5" fill="var(--fail)" opacity=".25" stroke="none"/>
+        <path d="M0 -5 V5 M-4.5 0 H4.5 M-3.5 -3.5 L-6 -5 M3.5 -3.5 L6 -5 M-3.5 3.5 L-6 5 M3.5 3.5 L6 5"/>
+      </g></g>
+      <g transform="translate(74 44)"><path class="sc-catch" d="M-4 0 l3 3 l6 -8" stroke="var(--done)" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
+      <rect x="120" y="46" width="30" height="30" rx="12" fill="var(--done)"/>
+      <g class="dv-head">
+        <circle cx="135" cy="36" r="10" fill="#CDA06E"/>
+        <path d="M125 36 a10 10 0 0 1 20 0 z" fill="var(--accent-2)"/>
+        <circle cx="131" cy="38" r="1.1" fill="#2a2a33"/><circle cx="139" cy="38" r="1.1" fill="#2a2a33"/>
+        <path d="M132 42 q3 2 6 0" stroke="#8a6a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      </g>
+      <g class="sc-arm">
+        <line x1="122" y1="54" x2="78" y2="52" stroke="var(--done)" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="66" cy="44" r="11" fill="color-mix(in srgb,var(--done) 10%,transparent)" stroke="var(--done)" stroke-width="2.4"/>
+        <line x1="74" y1="52" x2="79" y2="57" stroke="var(--done)" stroke-width="3.2" stroke-linecap="round"/>
+        <circle cx="76" cy="52" r="2.6" fill="#CDA06E"/>
+      </g>
+    </svg>`;
+    function sceneFor(name) {
+      const n = (name || '').toLowerCase();
+      if (n.startsWith('planner')) return SCENE_PLANNER;
+      if (n.startsWith('validator')) return SCENE_VALIDATOR;
+      return SCENE_DEV;
+    }
+
+    // --- empty-state hero ----------------------------------------------------
+    const MASCOT = `<svg viewBox="0 0 150 150" width="150" height="150" fill="none" aria-label="Harny the harness bot" role="img">
+      <line x1="75" y1="34" x2="75" y2="20" stroke="var(--accent-line)" stroke-width="2.5"/>
+      <circle class="antenna-orb" cx="75" cy="15" r="6" fill="var(--accent)"/>
+      <circle class="antenna-orb" cx="75" cy="15" r="10" fill="var(--accent)" opacity="0.18"/>
+      <rect x="16" y="34" width="118" height="86" rx="27" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
+      <rect x="16" y="34" width="118" height="40" rx="27" fill="#fff" opacity="0.03"/>
+      <rect x="29" y="47" width="92" height="58" rx="18" fill="var(--bg)"/>
+      <g class="eyes"><g class="pupils" fill="var(--accent-2)">
+        <rect x="51" y="63" width="13" height="19" rx="6.5"/>
+        <rect x="86" y="63" width="13" height="19" rx="6.5"/>
+      </g></g>
+      <path d="M64 93 Q75 100 86 93" stroke="var(--accent-2)" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="16" cy="88" r="4" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
+      <circle cx="134" cy="88" r="4" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
+    </svg>`;
+    function heroHtml() {
+      return `<div class="hero">
+        <span class="eyebrow">Harness engineering, watched live</span>
+        <h1>Meet <span class="grad">Harny</span> — the bot that runs your <span class="grad">agent loop</span></h1>
+        <p class="lede">One harness pulls three agents in a tight loop: a planner drafts the work, a developer writes the code, a validator hunts the bugs. Harny holds the strings and commits only what passes.</p>
+        <div class="stage-wrap"><div class="stage" id="stage">
+          <svg class="ropes" viewBox="0 0 680 430" xmlns:xlink="http://www.w3.org/1999/xlink" preserveAspectRatio="none">
+            <path id="rope-p" class="rope-path" d="M340 200 C340 176 340 158 340 128"/>
+            <path id="rope-d" class="rope-path" d="M392 300 C432 322 470 326 516 316"/>
+            <path id="rope-v" class="rope-path" d="M288 300 C248 322 210 326 164 316"/>
+            <circle class="flow" r="3.6" fill="var(--accent)"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath xlink:href="#rope-p"/></animateMotion></circle>
+            <circle class="flow d2" r="3.6" fill="var(--run)"><animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite"><mpath xlink:href="#rope-d"/></animateMotion></circle>
+            <circle class="flow d3" r="3.6" fill="var(--done)"><animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite"><mpath xlink:href="#rope-v"/></animateMotion></circle>
+          </svg>
+          <div class="node" id="n-plan"><div class="ncard"><div class="nhead"><span class="ndot"></span><span class="nname">Planner</span><span class="nact">planning<span class="dots"></span></span></div><div class="nbody"><svg class="pg" viewBox="0 0 176 74" width="100%" height="100%">
+            <path class="edge" d="M40 20 L86 20"/><path class="edge e2" d="M40 20 L64 46"/><path class="edge e3" d="M86 20 L118 46"/><path class="edge e4" d="M64 46 L118 46"/>
+            <circle class="pn n1" cx="40" cy="20" r="6"/><circle class="pn n2" cx="86" cy="20" r="6"/><circle class="pn n3" cx="64" cy="46" r="6"/><circle class="pn n4" cx="118" cy="46" r="6"/>
+          </svg></div></div></div>
+          <div class="node" id="n-dev"><div class="ncard"><div class="nhead"><span class="ndot"></span><span class="nname">Developer</span><span class="nact">writing<span class="dots"></span></span></div><div class="nbody"><div class="code">
+            <div class="ln l1" style="--max:64%"><i></i></div><div class="ln l2" style="--max:88%"><i></i></div><div class="ln l3" style="--max:52%"><i></i></div><div class="ln l4" style="--max:76%"><i></i></div>
+          </div></div></div></div>
+          <div class="node" id="n-val"><div class="ncard"><div class="nhead"><span class="ndot"></span><span class="nname">Validator</span><span class="nact">checking<span class="dots"></span></span></div><div class="nbody"><div class="scan">
+            <div class="sln" style="top:16px; width:120px"></div><div class="sln" style="top:32px; width:96px"></div><div class="sln" style="top:48px; width:132px"></div>
+            <div class="bug"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v8M8 12h8M5 12H3M21 12h-2M6 6l1.5 1.5M18 6l-1.5 1.5"/><ellipse cx="12" cy="12" rx="5" ry="6" fill="currentColor" opacity="0.25"/></svg></div>
+            <div class="caught"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></div>
+            <svg class="lens" viewBox="0 0 30 30"><circle class="glass" cx="12" cy="12" r="9"/><line class="handle" x1="19" y1="19" x2="26" y2="26"/></svg>
+          </div></div></div></div>
+          <div class="mascot">${MASCOT}<div class="shadow"></div></div>
+        </div></div>
+        <div class="agent-legend">
+          <div class="leg"><div class="lh"><span class="lk" style="background:var(--accent-2)"></span>Planner</div><p>Reads the repo and drafts <span class="mono">plan.json</span> — ordered tasks with acceptance criteria.</p></div>
+          <div class="leg"><div class="lh"><span class="lk" style="background:var(--run)"></span>Developer</div><p>Implements one task at a time and proposes a commit message. Never commits itself.</p></div>
+          <div class="leg"><div class="lh"><span class="lk" style="background:var(--done)"></span>Validator</div><p>Read-only, runs against the working tree. On pass, the harness commits the work.</p></div>
+        </div>
+        <div class="hero-cta">
+          <button class="cta" onclick="location.hash='#/runs'">Open the dashboard →</button>
+          <span class="install">
+            <span class="mono dim">bunx @lfnovo/harny "&lt;prompt&gt;"</span>
+            <span class="cp" title="Copy" onclick="navigator.clipboard && navigator.clipboard.writeText('bunx @lfnovo/harny')" aria-label="Copy">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </span>
+          </span>
+        </div>
+      </div>`;
+    }
+    function fitStage() {
+      const stage = document.getElementById('stage');
+      if (!stage) return;
+      const avail = Math.min(stage.parentElement.clientWidth, 680);
+      const scale = Math.min(1, avail / 680);
+      stage.style.transform = `scale(${scale})`;
+      stage.parentElement.style.height = (430 * scale) + 'px';
+    }
+    window.addEventListener('resize', fitStage);
+
+    // --- data ----------------------------------------------------------------
     async function fetchJSON(path) {
       const res = await fetch(path);
       if (!res.ok) throw new Error(`${path}: ${res.status}`);
       return res.json();
     }
 
-    // --- Routes --------------------------------------------------------------
-
     let pollHandle = null;
-    function stopPoll() {
-      if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
-    }
+    function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } }
 
-    // Polling redraws full innerHTML — remember <details> open state across draws.
     const openDetails = new Set();
     function bindDetailsTracking(root) {
       root.querySelectorAll('details[data-detail-id]').forEach((el) => {
         const id = el.getAttribute('data-detail-id');
         if (openDetails.has(id)) el.open = true;
-        el.addEventListener('toggle', () => {
-          if (el.open) openDetails.add(id);
-          else openDetails.delete(id);
-        });
+        el.addEventListener('toggle', () => { if (el.open) openDetails.add(id); else openDetails.delete(id); });
       });
     }
 
-    async function renderRunList() {
+    // --- run list ------------------------------------------------------------
+    function statCard(v, n, label) {
+      return `<div class="stat" style="--c:var(--${v})"><div class="n num">${n}</div><div class="l"><span class="k"></span>${label}</div></div>`;
+    }
+    async function renderRunList(forceTable) {
       stopPoll();
       const draw = async () => {
         try {
           const { runs } = await fetchJSON('/api/runs');
-          if (runs.length === 0) {
-            app.innerHTML = '<h1 class="text-2xl font-semibold mb-2">Runs</h1><p class="text-slate-500">No runs yet. Start one with <code class="bg-slate-200 px-1 rounded">bunx @lfnovo/harny "&lt;prompt&gt;"</code></p>';
+          if (runs.length === 0 && !forceTable) {
+            if (!document.getElementById('stage')) {
+              app.innerHTML = heroHtml();
+              fitStage();
+              if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                const ropes = app.querySelector('.ropes');
+                if (ropes && ropes.pauseAnimations) ropes.pauseAnimations();
+              }
+            }
+            lastListSig = JSON.stringify(runs);
             return;
           }
+          const sig = JSON.stringify(runs);
+          if (sig === lastListSig && app.querySelector('table')) return;
+          lastListSig = sig;
+          const c = { running: 0, waiting_human: 0, done: 0, failed: 0 };
+          runs.forEach(r => { if (c[r.status] !== undefined) c[r.status]++; });
           const rows = runs.map(r => {
-            const dur = fmtDuration(durationMs(r.started_at, r.ended_at ?? new Date().toISOString()));
-            const retryCls = r.retries === 0 ? 'text-emerald-700' : r.retries <= 2 ? 'text-amber-700' : 'text-rose-700';
-            const cwdParts = r.cwd.split('/').filter(Boolean);
-            const cwdShort = cwdParts.length > 2 ? '…/' + cwdParts.slice(-2).join('/') : r.cwd;
-            return `
-              <tr class="hover:bg-slate-100 cursor-pointer" onclick="location.hash='#/runs/${r.cwd_hash}/${encodeURIComponent(r.task_slug)}'">
-                <td class="px-3 py-2 text-xs text-slate-500">${escapeHtml(r.short_id)}</td>
-                <td class="px-3 py-2 text-xs whitespace-nowrap" title="${escapeHtml(fmtTime(r.started_at))}">${escapeHtml(fmtRelative(r.started_at))}</td>
-                <td class="px-3 py-2 text-xs">${escapeHtml(r.workflow)}</td>
-                <td class="px-3 py-2 text-sm font-medium whitespace-nowrap">${escapeHtml(r.task_slug)}</td>
-                <td class="px-3 py-2">${statusBadge(r.status)}</td>
-                <td class="px-3 py-2 text-xs text-slate-600">${escapeHtml(r.current_phase ?? '—')}</td>
-                <td class="px-3 py-2 text-xs ${retryCls}" title="${r.retries} phase retr${r.retries === 1 ? 'y' : 'ies'}">${r.retries}</td>
-                <td class="px-3 py-2 text-xs text-slate-500 text-right tabular-nums">${dur}</td>
-                <td class="px-3 py-2 text-xs text-slate-400 font-mono whitespace-nowrap" title="${escapeHtml(r.cwd)}">${escapeHtml(cwdShort)}</td>
-              </tr>
-            `;
+            const retryCls = r.retries === 0 ? 'retry-0' : r.retries <= 2 ? 'retry-1' : 'retry-2';
+            const project = r.cwd.split('/').filter(Boolean).pop() || r.cwd;
+            return `<tr class="row" onclick="location.hash='#/runs/${r.cwd_hash}/${encodeURIComponent(r.task_slug)}'">
+              <td class="mono dim">${escapeHtml(r.short_id)}</td>
+              <td class="mut">${agoSpan(r.started_at)}</td>
+              <td class="mut">${escapeHtml(r.workflow)}</td>
+              <td class="slug">${escapeHtml(r.task_slug)}</td>
+              <td>${statusPill(r.status)}</td>
+              <td>${pipeHtml(r.status, r.current_phase)}</td>
+              <td class="num ${retryCls}" title="${r.retries} phase retr${r.retries === 1 ? 'y' : 'ies'}">${r.retries}</td>
+              <td class="r num mut">${liveDur(r.started_at, r.ended_at)}</td>
+              <td class="cwd mono" title="${escapeHtml(r.cwd)}">${escapeHtml(project)}</td>
+            </tr>`;
           }).join('');
+          const emptyRow = rows ? '' : `<tr><td colspan="9" style="padding:26px 12px; text-align:center; color:var(--text-mut)">No runs yet — start one with <code class="mono" style="background:var(--surface-2); padding:1px 6px; border-radius:5px">bunx @lfnovo/harny "&lt;prompt&gt;"</code></td></tr>`;
           app.innerHTML = `
-            <h1 class="text-2xl font-semibold mb-1">Runs</h1>
-            <p class="text-sm text-slate-500 mb-4">${runs.length} run${runs.length === 1 ? '' : 's'} across all projects. Auto-refreshes every 3s.</p>
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-              <table class="min-w-full divide-y divide-slate-200">
-                <thead class="bg-slate-50">
-                  <tr class="text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    <th class="px-3 py-2">Run</th>
-                    <th class="px-3 py-2">Started</th>
-                    <th class="px-3 py-2">Workflow</th>
-                    <th class="px-3 py-2">Slug</th>
-                    <th class="px-3 py-2">Status</th>
-                    <th class="px-3 py-2">Phase</th>
-                    <th class="px-3 py-2">Retries</th>
-                    <th class="px-3 py-2 text-right">Duration</th>
-                    <th class="px-3 py-2">CWD</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200">${rows}</tbody>
-              </table>
+            <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+              <div><h1>Runs</h1><p class="sub">${runs.length} run${runs.length === 1 ? '' : 's'} across all projects</p></div>
+              <span class="live"><span class="pdot"></span>Auto-refreshing every 3s</span>
             </div>
-          `;
+            <div class="summary">
+              ${statCard('run', c.running, 'Running')}
+              ${statCard('wait', c.waiting_human, 'Waiting on you')}
+              ${statCard('done', c.done, 'Done')}
+              ${statCard('fail', c.failed, 'Failed')}
+            </div>
+            <div class="card"><div class="tablewrap"><table>
+              <thead><tr><th>Run</th><th>Started</th><th>Workflow</th><th>Slug</th><th>Status</th><th>Pipeline</th><th>Retries</th><th class="r">Duration</th><th>Project</th></tr></thead>
+              <tbody>${rows || emptyRow}</tbody>
+            </table></div></div>`;
         } catch (e) {
-          app.innerHTML = `<p class="text-rose-700">Error: ${escapeHtml(e.message)}</p>`;
+          app.innerHTML = `<p style="color:var(--fail)">Error: ${escapeHtml(e.message)}</p>`;
         }
       };
       await draw();
       pollHandle = setInterval(draw, 3000);
+    }
+
+    // --- run detail ----------------------------------------------------------
+    function phaseRow(p) {
+      const dur = liveDur(p.started_at, p.ended_at);
+      const sid = p.session_id ? p.session_id.slice(0, 8) : '—';
+      const name = p.attempt > 1 ? `${p.name} #${p.attempt}` : p.name;
+      if (p.status === 'running') {
+        return `<div class="phase run">
+          <div class="runhead">
+            <span class="tnode run"></span>
+            <span class="pname">${escapeHtml(name)} <span class="pill s-running spin" style="margin-left:8px"><span class="d"></span>running</span></span>
+            <span class="runmeta"><span class="pdur">${dur}</span><span class="psid mono" title="session id">${escapeHtml(sid)}</span></span>
+          </div>
+          <div class="workframe">${sceneFor(p.name)}</div>
+        </div>`;
+      }
+      const ok = p.status === 'completed';
+      const phaseCls = ok ? 'phase ok' : p.status === 'failed' ? 'phase' : 'phase';
+      let nodeCls = 'tnode';
+      if (!ok) {
+        if (p.status === 'failed') nodeCls += ' fail';
+        else if (p.status === 'parked') nodeCls += ' parked';
+        else if (p.name.startsWith('planner')) nodeCls += ' planner';
+      }
+      return `<div class="${phaseCls}">
+        <span class="${nodeCls}"></span>
+        <div class="pmain"><span class="pname">${escapeHtml(name)}</span></div>
+        <div class="pright"><span class="pdur">${dur}</span><span class="psid mono" title="session id">${escapeHtml(sid)}</span></div>
+      </div>`;
+    }
+    function iterTitle(group) {
+      const dev = group.find(p => p.name.startsWith('developer') && p.verdict);
+      if (dev) { try { const v = JSON.parse(dev.verdict); const s = (v.commit_message || '').split('\n')[0].trim(); if (s) return truncate(s, 70); } catch {} }
+      return '';
     }
 
     async function renderRunDetail(cwdHash, slug) {
@@ -258,228 +870,147 @@
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/sibling-branches`).catch(() => ({ siblingBranches: [] })),
           ]);
 
-          // The detail API pre-bakes phoenix.url server-side (Phoenix has no
-          // CORS so the browser can't resolve project name → GraphQL id).
-          // ONE trace per run — link goes in the header.
-          // Hide `committing` phases — sub-second and the SHA is in plan tasks.
-          // Insert an "Iteration N" header row before each developer to group
-          // visually, with the task title when resolvable from the verdict.
+          const sig = JSON.stringify({ state, plan, commits, gitErr, siblingBranches });
+          if (sig === lastDetailSig && app.querySelector('.head')) return;
+          const animate = detailAnimate;
+          detailAnimate = false;
+          lastDetailSig = sig;
+
           const visiblePhases = state.phases.filter(p => p.name !== 'committing');
-          let iter = 0;
-          const phasesRows = visiblePhases.map(p => {
-            const dur = fmtDuration(durationMs(p.started_at, p.ended_at));
-            const name = p.attempt > 1 ? `${p.name} #${p.attempt}` : p.name;
-            let header = '';
-            if (p.name === 'developer') {
-              iter += 1;
-              let taskTitle = '';
-              if (p.verdict) {
-                try {
-                  const v = JSON.parse(p.verdict);
-                  const subject = (v.commit_message ?? '').split('\n')[0].trim();
-                  if (subject) taskTitle = ` — ${truncate(subject, 80)}`;
-                } catch {}
-              }
-              header = `<tr class="bg-slate-50"><td colspan="4" class="px-3 py-1.5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Iteration ${iter}${escapeHtml(taskTitle)}</td></tr>`;
-            }
-            const fullId = p.session_id ?? '';
-            const shortId = fullId ? fullId.slice(0, 8) : '—';
-            return header + `
-              <tr class="hover:bg-slate-50">
-                <td class="px-3 py-2 text-sm font-medium">${escapeHtml(name)}</td>
-                <td class="px-3 py-2">${phaseBadge(p.status)}</td>
-                <td class="px-3 py-2 text-xs text-right tabular-nums">${dur}</td>
-                <td class="px-3 py-2 text-xs text-slate-400 font-mono" title="${escapeHtml(fullId)}">${escapeHtml(shortId)}</td>
-              </tr>
-            `;
+          const groups = [];
+          let curGroup = [];
+          visiblePhases.forEach(p => {
+            if (p.name.startsWith('developer') && curGroup.some(x => x.name.startsWith('developer'))) { groups.push(curGroup); curGroup = []; }
+            curGroup.push(p);
+          });
+          if (curGroup.length) groups.push(curGroup);
+          const phasesHtml = groups.map((g, i) => {
+            const title = iterTitle(g);
+            return `<div class="iter"><div class="iter-h"><span class="iter-tag">Iteration ${i + 1}</span>${title ? `<span class="t">${escapeHtml(title)}</span>` : ''}</div>${g.map(phaseRow).join('')}</div>`;
           }).join('');
 
-          // Plan section — workflows that produce a plan.json (feature-dev) get
-          // a per-task table here. Workflows without plan.json (e.g. docs) skip.
+          const elapsedHtml = liveDur(state.origin.started_at, state.lifecycle.ended_at);
+          const iterN = (plan && plan.iterations_global != null) ? plan.iterations_global : groups.length;
+          const tasksKpi = (plan && Array.isArray(plan.tasks) && plan.tasks.length) ? `${plan.tasks.filter(t => t.status === 'done').length}/${plan.tasks.length}` : '—';
+          const retriesKpi = visiblePhases.reduce((n, p) => n + Math.max(0, (p.attempt || 1) - 1), 0);
+
+          let phoenixLink;
+          if (state.phoenix && state.phoenix.url) phoenixLink = `<a class="cta-out" href="${escapeHtml(state.phoenix.url)}" target="_blank" rel="noopener">Open trace in Phoenix ↗</a>`;
+          else if (state.phoenix) phoenixLink = `<span class="mut" style="font-size:12px" title="Project not yet visible in Phoenix — try again in a few seconds">trace pending</span>`;
+          else phoenixLink = `<span class="mut" style="font-size:12px">no Phoenix trace</span>`;
+
           let planHtml = '';
           if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0) {
-            const tasksDone = plan.tasks.filter(t => t.status === 'done').length;
-            const tasksFailed = plan.tasks.filter(t => t.status === 'failed').length;
-            const planSummary = plan.summary ? `<p class="text-xs text-slate-600 mb-3">${escapeHtml(plan.summary)}</p>` : '';
+            const done = plan.tasks.filter(t => t.status === 'done').length;
+            const failed = plan.tasks.filter(t => t.status === 'failed').length;
+            const summaryLine = `${done}/${plan.tasks.length} done${failed ? ` · <span style="color:var(--fail)">${failed} failed</span>` : ''}${plan.iterations_global != null ? ` · ${plan.iterations_global} global iter${plan.iterations_global === 1 ? '' : 's'}` : ''}`;
             const taskRows = plan.tasks.map(t => {
-              const desc = t.description && t.description !== t.title
-                ? `<details class="mt-1 group" data-detail-id="task-${escapeHtml(t.id)}-desc"><summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-700 select-none list-none flex items-center gap-1"><span class="inline-block transition-transform group-open:rotate-90">▸</span> Details</summary><div class="task-md mt-2 ml-4 max-w-prose">${renderMarkdown(t.description)}</div></details>`
-                : '';
-              const acceptance = (t.acceptance ?? []).length
-                ? `<details class="mt-1 group" data-detail-id="task-${escapeHtml(t.id)}-acceptance"><summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-700 select-none list-none flex items-center gap-1"><span class="inline-block transition-transform group-open:rotate-90">▸</span> ${t.acceptance.length} acceptance criteria</summary><ul class="mt-1 ml-4 list-disc text-xs text-slate-500 space-y-0.5">${t.acceptance.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul></details>`
-                : '';
-              const sha = t.commit_sha ? `<span class="font-mono text-xs text-slate-500" title="${escapeHtml(t.commit_sha)}">${escapeHtml(t.commit_sha.slice(0,8))}</span>` : '<span class="text-xs text-slate-400">—</span>';
-              const attemptsCls = t.attempts <= 1 ? 'text-emerald-700' : t.attempts <= 2 ? 'text-amber-700' : 'text-rose-700';
-              return `
-                <tr>
-                  <td class="px-3 py-2 text-xs font-mono text-slate-500 align-top">${escapeHtml(t.id)}</td>
-                  <td class="px-3 py-2 align-top">
-                    <div class="text-sm font-medium">${escapeHtml(t.title)}</div>
-                    ${desc}
-                    ${acceptance}
-                  </td>
-                  <td class="px-3 py-2 align-top">${taskBadge(t.status)}</td>
-                  <td class="px-3 py-2 text-xs ${attemptsCls} align-top">${t.attempts}</td>
-                  <td class="px-3 py-2 align-top">${sha}</td>
-                </tr>
-              `;
+              const pillCls = t.status === 'done' ? 's-done' : t.status === 'failed' ? 's-failed' : t.status === 'in_progress' ? 's-running spin' : 's-pending';
+              const attemptsCls = t.attempts <= 1 ? 'retry-0' : t.attempts <= 2 ? 'retry-1' : 'retry-2';
+              const sha = t.commit_sha ? `<span class="mono dim" title="${escapeHtml(t.commit_sha)}">${escapeHtml(t.commit_sha.slice(0, 8))}</span>` : '<span class="dim">—</span>';
+              const desc = (t.description && t.description !== t.title) ? `<div class="task-md">${renderMarkdown(t.description)}</div>` : '';
+              const acc = (t.acceptance ?? []).length ? `<ul style="margin:8px 0 0; padding-left:16px; color:var(--text-dim); font-size:12px">${t.acceptance.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>` : '';
+              const body = (desc || acc) ? `<div class="task-body">${desc}${acc}</div>` : '';
+              return `<details class="task" data-detail-id="task-${escapeHtml(t.id)}"><summary><span class="tid mono">${escapeHtml(t.id)}</span><span class="ttitle">${escapeHtml(t.title)}</span><span class="pill ${pillCls}"><span class="d"></span>${escapeHtml(t.status)}</span><span class="num ${attemptsCls}">${t.attempts}</span>${sha}</summary>${body}</details>`;
             }).join('');
-            planHtml = `
-              <div class="flex items-baseline justify-between mb-2">
-                <h2 class="text-sm font-semibold text-slate-700">Plan tasks</h2>
-                <span class="text-xs text-slate-500">${tasksDone}/${plan.tasks.length} done${tasksFailed ? ` · <span class="text-rose-600">${tasksFailed} failed</span>` : ''} · ${plan.iterations_global} global iter${plan.iterations_global === 1 ? '' : 's'}</span>
-              </div>
-              ${planSummary}
-              <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
-                <table class="min-w-full divide-y divide-slate-200">
-                  <thead class="bg-slate-50 text-left text-xs uppercase text-slate-700">
-                    <tr><th class="px-3 py-2">ID</th><th class="px-3 py-2">Title / acceptance</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Attempts</th><th class="px-3 py-2">Commit</th></tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-200">${taskRows}</tbody>
-                </table>
-              </div>
-            `;
-          }
-
-          let phoenixHeaderLink = '';
-          if (state.phoenix && state.phoenix.url) {
-            phoenixHeaderLink = `<a href="${state.phoenix.url}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm hover:bg-indigo-700">Open trace in Phoenix ↗</a>`;
-          } else if (state.phoenix) {
-            phoenixHeaderLink = `<span class="text-xs text-slate-400" title="Project not yet visible in Phoenix — try again in a few seconds">trace pending</span>`;
-          } else {
-            phoenixHeaderLink = `<span class="text-xs text-slate-400">no Phoenix trace (HARNY_PHOENIX_URL not set when run started)</span>`;
-          }
-
-          const commitsHtml = (gitErr || commits.length === 0)
-            ? `<p class="text-xs text-slate-400">${escapeHtml(gitErr ?? 'No commits yet on this branch.')}</p>`
-            : `<ul class="space-y-1">${commits.map(c => `
-                <li class="text-sm">
-                  <span class="font-mono text-xs text-slate-500">${escapeHtml(c.sha)}</span>
-                  <span class="text-xs text-slate-400 ml-2" title="${escapeHtml(fmtTime(c.date))}">${escapeHtml(fmtRelative(c.date))}</span>
-                  <div class="text-sm">${escapeHtml(c.subject)}</div>
-                </li>
-              `).join('')}</ul>`;
-
-          let siblingSection = '';
-          if (Array.isArray(siblingBranches) && siblingBranches.length > 0) {
-            const entries = siblingBranches.map(s => `
-              <div class="mb-3 last:mb-0">
-                <div class="font-mono text-sm font-medium text-amber-900">${escapeHtml(s.branch)}</div>
-                <ul class="ml-4 mt-1 list-disc text-xs text-amber-800 space-y-0.5">${s.files.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
-              </div>
-            `).join('');
-            siblingSection = `<h2 class="text-sm font-semibold mb-2 text-slate-700">Sibling branches</h2><div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">${entries}</div>`;
+            planHtml = `<div class="section-h reveal" style="--i:4"><h2>Plan tasks</h2><span class="meta">${summaryLine}</span></div><div class="card reveal" style="--i:4; margin-bottom:24px">${taskRows}</div>`;
           }
 
           let pendingHtml = '';
           if (state.pending_question) {
             const pq = state.pending_question;
-            const opts = (pq.options ?? []);
-            const optsHtml = opts.length
-              ? `<pre class="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 overflow-auto">${escapeHtml(JSON.stringify(opts, null, 2))}</pre>`
-              : '';
-            pendingHtml = `
-              <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                <div class="flex items-center gap-2 mb-2">
-                  <h2 class="text-sm font-semibold text-amber-900">Waiting for human input</h2>
-                  ${badge(pq.kind, 'bg-amber-100 text-amber-800 ring-amber-200')}
-                </div>
-                <p class="text-sm text-amber-900">${escapeHtml(pq.prompt)}</p>
-                ${optsHtml}
-                <p class="mt-3 text-xs text-amber-700">Answer in your terminal: <code class="bg-amber-100 px-1 rounded">harny answer ${escapeHtml(state.run_id.slice(0,8))}</code></p>
-              </div>
-            `;
+            const opts = (pq.options ?? []).length ? `<pre class="mono" style="margin:8px 0 0; font-size:12px; background:var(--surface-2); padding:8px 10px; border-radius:8px; overflow:auto">${escapeHtml(JSON.stringify(pq.options, null, 2))}</pre>` : '';
+            pendingHtml = `<div class="panel" style="border-color:color-mix(in srgb,var(--wait) 40%,var(--border)); background:var(--wait-bg); margin-bottom:24px">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px"><h3 style="margin:0; color:var(--wait)">Waiting for human input</h3><span class="pill s-waiting"><span class="d"></span>${escapeHtml(pq.kind || 'question')}</span></div>
+              <p style="margin:0; color:var(--text)">${escapeHtml(pq.prompt)}</p>${opts}
+              <p class="mut" style="margin:10px 0 0; font-size:12px">Answer in your terminal: <code class="mono" style="background:var(--surface-2); padding:1px 6px; border-radius:5px">harny answer ${escapeHtml(state.run_id.slice(0, 8))}</code></p>
+            </div>`;
           }
 
-          const recentHistory = state.history.slice(-12).reverse();
+          let siblingHtml = '';
+          if (Array.isArray(siblingBranches) && siblingBranches.length > 0) {
+            const entries = siblingBranches.map(s => `<div style="margin-bottom:10px"><div class="mono" style="font-weight:600; color:var(--wait)">${escapeHtml(s.branch)}</div><ul style="margin:4px 0 0; padding-left:18px; color:var(--text-mut); font-size:12px">${s.files.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul></div>`).join('');
+            siblingHtml = `<div class="section-h"><h2>Sibling branches</h2></div><div class="panel" style="border-color:color-mix(in srgb,var(--wait) 40%,var(--border)); margin-bottom:24px">${entries}</div>`;
+          }
 
-          app.innerHTML = `
-            <a href="#/" class="text-sm text-indigo-600 hover:underline">← all runs</a>
-            <div class="flex items-center justify-between mt-2 mb-1 flex-wrap gap-2">
-              <h1 class="text-2xl font-semibold">${escapeHtml(state.origin.task_slug)}</h1>
-              ${phoenixHeaderLink}
+          const commitsHtml = (gitErr || commits.length === 0)
+            ? `<p class="mut" style="font-size:12px">${escapeHtml(gitErr || 'No commits yet on this branch.')}</p>`
+            : `<div class="gg">${commits.map(c => `<div class="commit"><span class="sha mono">${escapeHtml(c.sha)}</span><div><div class="csub">${escapeHtml(c.subject)}</div><span class="dim" style="font-size:12px" data-iso="${escapeHtml(c.date)}" title="${escapeHtml(fmtTime(c.date))}">${escapeHtml(fmtRelative(c.date))}</span></div></div>`).join('')}</div>`;
+
+          const recent = state.history.slice(-12).reverse();
+          const eventsHtml = recent.map(e => {
+            const sub = eventSubstance(e, state, plan);
+            const cls = sub.kind === 'pass' ? 'pass' : sub.kind === 'fail' ? 'fail' : '';
+            return `<div class="ev"><span class="when" data-iso="${escapeHtml(e.at)}" title="${escapeHtml(fmtTime(e.at))}">${escapeHtml(fmtRelative(e.at))}</span><span class="ph">${escapeHtml(e.phase || '')}</span><span class="msg ${cls}">${escapeHtml(sub.text)}</span></div>`;
+          }).join('');
+          const liveHd = state.lifecycle.status === 'running' ? '<span class="live-hd"></span>' : '';
+
+          app.innerHTML = `<div class="${animate ? 'animate' : ''}">
+            <a class="back" href="#/">← all runs</a>
+            <div class="head reveal" style="--i:0">
+              <div>
+                <h1>${escapeHtml(state.origin.task_slug)}</h1>
+                <div class="metaline"><span>${escapeHtml(state.origin.workflow)}</span><span class="dim">·</span>${statusPill(state.lifecycle.status)}<span class="dim">·</span><span class="mono dim">${escapeHtml(state.run_id)}</span><span class="chip"><span class="cd"></span>elapsed ${elapsedHtml}</span></div>
+              </div>
+              ${phoenixLink}
             </div>
-            <p class="text-sm text-slate-500 mb-4">${escapeHtml(state.origin.workflow)} · ${statusBadge(state.lifecycle.status)} · <span class="font-mono text-xs">${escapeHtml(state.run_id)}</span></p>
-
             ${pendingHtml}
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div class="bg-white border border-slate-200 rounded-lg p-4">
-                <h2 class="text-sm font-semibold mb-2 text-slate-700">Origin</h2>
-                <dl class="text-xs space-y-1">
-                  <div><dt class="inline text-slate-500">prompt:</dt> <dd class="inline">${escapeHtml(state.origin.prompt)}</dd></div>
-                  <div><dt class="inline text-slate-500">started:</dt> <dd class="inline">${escapeHtml(fmtTime(state.origin.started_at))}</dd></div>
-                  <div><dt class="inline text-slate-500">by:</dt> <dd class="inline">${escapeHtml(state.origin.user)}@${escapeHtml(state.origin.host)}</dd></div>
-                </dl>
-              </div>
-              <div class="bg-white border border-slate-200 rounded-lg p-4">
-                <h2 class="text-sm font-semibold mb-2 text-slate-700">Environment</h2>
-                <dl class="text-xs space-y-1">
-                  <div><dt class="inline text-slate-500">cwd:</dt> <dd class="inline font-mono">${escapeHtml(state.environment.cwd)}</dd></div>
-                  <div><dt class="inline text-slate-500">branch:</dt> <dd class="inline font-mono">${escapeHtml(state.environment.branch)}</dd></div>
-                  <div><dt class="inline text-slate-500">isolation:</dt> <dd class="inline">${escapeHtml(state.environment.isolation)}</dd></div>
-                  <div><dt class="inline text-slate-500">mode:</dt> <dd class="inline">${escapeHtml(state.environment.mode)}</dd></div>
-                  ${state.lifecycle.ended_at ? `<div><dt class="inline text-slate-500">ended:</dt> <dd class="inline">${escapeHtml(fmtTime(state.lifecycle.ended_at))} (${escapeHtml(state.lifecycle.ended_reason ?? '')})</dd></div>` : ''}
-                </dl>
-              </div>
+            <div class="section-h reveal" style="--i:1; margin-top:8px"><h2>Live pipeline</h2><span class="meta">${escapeHtml(state.lifecycle.status)}${state.lifecycle.ended_reason ? ` · ${escapeHtml(state.lifecycle.ended_reason)}` : ''}</span></div>
+            ${ribbonHtml(state, plan)}
+            <div class="summary reveal" style="--i:2; margin:0 0 26px">
+              <div class="stat" style="--c:var(--accent)"><div class="n num">${elapsedHtml}</div><div class="l"><span class="k"></span>Elapsed</div></div>
+              <div class="stat" style="--c:var(--run)"><div class="n num">${iterN}</div><div class="l"><span class="k"></span>Iterations</div></div>
+              <div class="stat" style="--c:var(--done)"><div class="n num">${tasksKpi}</div><div class="l"><span class="k"></span>Tasks done</div></div>
+              <div class="stat" style="--c:var(--wait)"><div class="n num">${retriesKpi}</div><div class="l"><span class="k"></span>Retries</div></div>
             </div>
-
+            <div class="grid2 reveal" style="--i:3">
+              <div class="panel"><h3>Origin</h3><dl>
+                <dt>prompt</dt><dd>${escapeHtml(state.origin.prompt)}</dd>
+                <dt>started</dt><dd class="mono">${escapeHtml(fmtTime(state.origin.started_at))}</dd>
+                <dt>by</dt><dd class="mono">${escapeHtml(state.origin.user)}@${escapeHtml(state.origin.host)}</dd>
+              </dl></div>
+              <div class="panel"><h3>Environment</h3><dl>
+                <dt>cwd</dt><dd class="mono">${escapeHtml(state.environment.cwd)}</dd>
+                <dt>branch</dt><dd class="mono">${escapeHtml(state.environment.branch)}</dd>
+                <dt>isolation</dt><dd>${escapeHtml(state.environment.isolation)}</dd>
+                <dt>mode</dt><dd>${escapeHtml(state.environment.mode)}</dd>
+                ${state.lifecycle.ended_at ? `<dt>ended</dt><dd class="mono">${escapeHtml(fmtTime(state.lifecycle.ended_at))}${state.lifecycle.ended_reason ? ` (${escapeHtml(state.lifecycle.ended_reason)})` : ''}</dd>` : ''}
+              </dl></div>
+            </div>
             ${planHtml}
-
-            <h2 class="text-sm font-semibold mb-2 text-slate-700">Phases</h2>
-            <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
-              <table class="min-w-full divide-y divide-slate-200">
-                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-700">
-                  <tr><th class="px-3 py-2">Name</th><th class="px-3 py-2">Status</th><th class="px-3 py-2 text-right">Duration</th><th class="px-3 py-2">Session</th></tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200">${phasesRows || '<tr><td colspan="4" class="px-3 py-2 text-xs text-slate-400">No phases yet.</td></tr>'}</tbody>
-              </table>
+            <div class="section-h reveal" style="--i:5"><h2>Phases</h2><span class="meta">grouped by iteration</span></div>
+            <div class="card reveal" style="--i:5; padding:14px; margin-bottom:24px">${phasesHtml || '<p class="mut" style="padding:8px">No phases yet.</p>'}</div>
+            ${siblingHtml}
+            <div class="grid2 reveal" style="--i:6">
+              <div class="panel"><h3>Commits on ${escapeHtml(state.environment.branch)}</h3>${commitsHtml}</div>
+              <div class="panel"><h3>Recent events${liveHd}</h3><div class="events">${eventsHtml || '<p class="mut" style="font-size:12px">No events yet.</p>'}</div></div>
             </div>
-
-            ${siblingSection}
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div class="bg-white border border-slate-200 rounded-lg p-4">
-                <h2 class="text-sm font-semibold mb-3 text-slate-700">Commits on ${escapeHtml(state.environment.branch)}</h2>
-                ${commitsHtml}
-              </div>
-              <div class="bg-white border border-slate-200 rounded-lg p-4">
-                <h2 class="text-sm font-semibold mb-3 text-slate-700">Recent events</h2>
-                <ul class="space-y-1">
-                  ${recentHistory.map(e => {
-                    const sub = eventSubstance(e, state, plan);
-                    const cls = sub.kind === 'pass' ? 'text-emerald-700' : sub.kind === 'fail' ? 'text-rose-700' : '';
-                    return `<li class="text-xs"><span class="text-slate-400" title="${escapeHtml(fmtTime(e.at))}">${escapeHtml(fmtRelative(e.at))}</span> · <span class="text-slate-600">${escapeHtml(e.phase)}</span> · <span class="font-medium ${cls}">${escapeHtml(sub.text)}</span></li>`;
-                  }).join('')}
-                </ul>
-              </div>
-            </div>
-          `;
+          </div>`;
           bindDetailsTracking(app);
         } catch (e) {
-          app.innerHTML = `<a href="#/" class="text-sm text-indigo-600 hover:underline">← all runs</a><p class="mt-4 text-rose-700">Error: ${escapeHtml(e.message)}</p>`;
+          app.innerHTML = `<a class="back" href="#/">← all runs</a><p style="margin-top:16px; color:var(--fail)">Error: ${escapeHtml(e.message)}</p>`;
         }
       };
       await draw();
       pollHandle = setInterval(draw, 3000);
     }
 
+    // --- routing -------------------------------------------------------------
     function route() {
       openDetails.clear();
+      lastListSig = null; lastDetailSig = null; detailAnimate = true;
       const hash = location.hash || '#/';
-      const detailMatch = hash.match(/^#\/runs\/([^/]+)\/(.+)$/);
-      if (detailMatch) {
-        renderRunDetail(detailMatch[1], decodeURIComponent(detailMatch[2]));
-      } else {
-        renderRunList();
-      }
+      const m = hash.match(/^#\/runs\/([^/]+)\/(.+)$/);
+      if (m) renderRunDetail(m[1], decodeURIComponent(m[2]));
+      else if (hash === '#/runs') renderRunList(true);
+      else renderRunList();
     }
-
     window.addEventListener('hashchange', route);
     route();
+    setInterval(updateTimers, 1000);
 
     fetchJSON('/api/meta')
-      .then(({ version }) => { document.getElementById('version').textContent = `v${version}`; })
+      .then(({ version }) => { const el = document.getElementById('version'); if (el) el.textContent = `v${version}`; })
       .catch(() => {});
   </script>
 </body>
