@@ -30,6 +30,8 @@ Each probe scenario is wrapped in `Promise.race` against a 1500ms hard deadline.
 
 **Canonical starting point:** `scripts/probes/_template.ts`. Copy it (do not edit in place) and rename to `NN-<description>.ts`. The CI runner at `scripts/run-probes.ts` filters by `/^\d+[a-z]?-.+\.ts$/`, so the underscore prefix keeps the template itself out of the suite.
 
+When validating changes that span multiple probes, use `bun scripts/run-probes.ts --subdir <name>`; run `bun scripts/run-probes.ts --help` for selectors and dry-run options.
+
 ## feature-dev phase count invariant (add56e6)
 
 The feature-dev machine emits **4 PhaseEntry** values per attempt: `planner`, `developer`, `validator`, `committing`. Only the 3 SDK-backed phases (planner, developer, validator) produce `phase_end` history events — `committing` is a transient git-commit step recorded via `appendPhase`/`updatePhase` but no history event. Probes that assert exact counts must expect 4 phases and 3 `phase_end` events. See `scripts/probes/testing/03-engine-state-writes-dry.ts` for the canonical dry-run.
