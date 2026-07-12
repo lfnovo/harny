@@ -1,0 +1,21 @@
+src/harness/engine/workflows/featureDev.test.ts
+  s_99bb8af4a5d12a::t_fa6254d6166788 135
+  s_99bb8af4a5d12a::t_ff73238595bb3b 550-551,553-554
+  s_99bb8af4a5d12a::t_6154b9de4faae2 106-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "7bbc3e959d4cfc3e642200589fad04756e0b8d04",
+  "prompts": {},
+  "sessions": {
+    "s_99bb8af4a5d12a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6922af2-d5cc-4b05-acc0-f4dd89986ac9",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
