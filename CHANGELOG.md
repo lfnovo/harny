@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-13
+
 ### Added
 - Declarative YAML DAG runtime with statically validated `agent`, `command`, `foreach`, `human`, `commit`, `pull_request`, and `cancel` nodes.
 - Provider-neutral `AgentProvider` boundary with Claude and official Codex SDK implementations and capability validation.
