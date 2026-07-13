@@ -62,10 +62,14 @@ Avoid prescribing files, function names or implementation unless the user suppli
 
 ## 5. Dispatch
 
-Run from the repository in the background:
+Run from the repository in the background. Never interpolate raw user text directly into shell syntax. Preserve the prompt verbatim in a single-quoted heredoc whose delimiter does not occur in the prompt, and shell-escape every other dynamic argument:
 
 ```bash
-cd <cwd> && harny [--workflow <id-or-path>] --name <slug> [--mode async] "<prompt>"
+prompt="$(cat <<'HARNY_PROMPT_EOF'
+<prompt verbatim>
+HARNY_PROMPT_EOF
+)"
+cd <shell-escaped-cwd> && harny [--workflow <shell-escaped-id-or-path>] --name <shell-escaped-slug> [--mode async] "$prompt"
 ```
 
 For PR feedback:
@@ -74,7 +78,7 @@ For PR feedback:
 cd <cwd> && harny pr fix <number>
 ```
 
-Capture process output and the run ID/slug. Never place tokens or API keys on the command line.
+Capture process output, the slug and the separate persisted run ID. `harny show <slug>` resolves the run and exposes its full ID; use its first eight characters only as a compact display prefix. Never place tokens or API keys on the command line.
 
 ## 6. Monitor without busy polling
 
@@ -102,7 +106,7 @@ Do not answer on the user's behalf.
 Return:
 
 ```text
-Run: <slug> (<run-id-prefix>)
+Run: <slug> (<first 8 characters of the persisted run ID>)
 Workflow: <workflow>
 Status: <done | failed | cancelled | waiting_human>
 Branch: <branch-or-none>

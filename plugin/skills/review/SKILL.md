@@ -1,6 +1,6 @@
 ---
 name: review
-description: Post-mortem a Harny 0.5 run from run.json v4, audit events, normalized attempt transcripts, ChangeSets, and provider usage. Use after failed, retried, slow, costly, paused, mixed-provider, or otherwise surprising runs.
+description: Analyze a Harny 0.5 run from run.json v4, audit events, normalized attempt transcripts, ChangeSets, and provider usage. Use after failed, retried, slow, costly, paused, mixed-provider, or otherwise surprising runs.
 allowed-tools: Bash, Read, Write, Agent
 ---
 

@@ -9,7 +9,7 @@
     {
       "name": "harny",
       "source": "./plugin",
-      "description": "Claude Code skills and an orchestrator agent for Harny workflows, run review, repository readiness, PR delivery, and release management.",
+      "description": "Claude Code skills and an orchestrator agent for Harny workflows, including run analysis, repository readiness, PR delivery, and release management.",
       "version": "0.3.0",
       "author": {
         "name": "Luis Novo"

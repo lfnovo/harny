@@ -1,8 +1,9 @@
 import { readFile, readdir, stat } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { loadWorkflowFile } from "../../../src/harness/workflow/loader.js";
 
-const ROOT = new URL("../../..", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const PLUGIN = join(ROOT, "plugin");
 const DEADLINE_MS = 1500;
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
@@ -44,7 +45,10 @@ async function validate(): Promise<void> {
   assert(workflow.nodes.some((node) => node.type === "cancel"), "approval recipe must fail closed on rejection");
 }
 
+let failures = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 try { await Promise.race([validate(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("hard deadline exceeded")), DEADLINE_MS); })]); console.log("PASS plugin-contract"); }
-catch (error) { console.log(`FAIL plugin-contract: ${(error as Error).message}`); process.exit(1); }
+catch (error) { console.log(`FAIL plugin-contract: ${(error as Error).message}`); failures++; }
 finally { if (timer) clearTimeout(timer); }
+
+process.exit(failures > 0 ? 1 : 0);
