@@ -13,7 +13,7 @@ The action was completely executed.
 - CLAUDE.md has a bullet documenting the invariant.
 - Sibling-mirror or prompt-level guards exist.
 
-**Example.** Entry: "dispatcher convention should be enforced." Verification: `§8.4` literally documented in engine CLAUDE.md, all 3 dispatchers have top-of-file comment, pattern enshrined.
+**Example.** Entry: "provider guards should be enforced." Verification: the workflow validator checks declared capabilities and the provider contract tests preserve the invariant.
 
 **Action:** DISCARD. No further work needed.
 
@@ -54,7 +54,7 @@ Action pointed at a file that no longer exists, yet the intent was captured by a
 - Entry references a file/doc/section that has been moved or deleted.
 - The intent is now visible elsewhere (sibling-mirror rule, CLAUDE.md absorption, code-as-template).
 
-**Example.** L7 (Phoenix parity) pointed at `engine-design.md §9` (now in `specs/`) but the pattern is visible in `runEngineWorkflow.ts` which serves as template.
+**Example.** Observability parity should point at the current scheduler/provider boundary and its probes, not a retired design document.
 
 **Action:** DISCARD. Distinguish from "target dead AND intent not preserved" (which would be OPEN ISSUE).
 

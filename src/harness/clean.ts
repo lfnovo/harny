@@ -82,24 +82,25 @@ export async function cleanRun(
   const stateDir = planDir(primaryCwd, slug);
   const branch = `harny/${slug}`;
   const statePath = join(stateDir, "state.json");
+  const runPath = join(stateDir, "run.json");
 
   let stateRaw: string | null = null;
   try {
     stateRaw = await readFile(statePath, "utf8");
   } catch {
-    // state.json missing or unreadable — skip pid check
+    try { stateRaw = await readFile(runPath, "utf8"); } catch { /* no readable run state */ }
   }
 
   if (stateRaw !== null) {
-    let state: { lifecycle?: { status?: string; pid?: number } } = {};
+    let state: { lifecycle?: { status?: string; pid?: number }; run?: { status?: string; pid?: number }; workspace?: { branch?: string; worktree_path?: string | null } } = {};
     try {
       state = JSON.parse(stateRaw) as typeof state;
     } catch {
       // malformed state.json — proceed with cleanup
     }
 
-    const status = state.lifecycle?.status;
-    const pid = state.lifecycle?.pid;
+    const status = state.lifecycle?.status ?? state.run?.status;
+    const pid = state.lifecycle?.pid ?? state.run?.pid;
 
     if (status === "running" && typeof pid === "number" && pid > 0) {
       if (!isPidAlive(pid)) {
@@ -163,8 +164,8 @@ export async function pruneRegistry(verbose: boolean): Promise<number> {
   const pointers = await listPointers();
   let removed = 0;
   for (const p of pointers) {
-    const statePath = statePathFor(p.cwd, p.task_slug);
-    if (!existsSync(statePath)) {
+    const sourcePath = p.state_schema_version === 3 ? join(p.cwd, ".harny", p.task_slug, "run.json") : statePathFor(p.cwd, p.task_slug);
+    if (!existsSync(sourcePath)) {
       await deletePointer(p.run_id);
       removed++;
       if (verbose) console.log(`[clean] pruned unreachable pointer: ${p.run_id} (${p.cwd})`);

@@ -1,9 +1,9 @@
 import { runHarness } from "../harness/orchestrator.js";
-import { getWorkflow } from "../harness/workflows/index.js";
 import { resolveAssistant } from "./context.js";
 import type { RunnerContext } from "./context.js";
 import type { IsolationMode, RunMode } from "../harness/types.js";
 import { printRunSummary } from "./summary.js";
+import { loadWorkflow } from "../harness/workflow/loader.js";
 
 type RunArgs = {
   workflow: string | null;
@@ -15,9 +15,10 @@ type RunArgs = {
 
 export async function handleRun(parsed: RunArgs, ctx: RunnerContext): Promise<void> {
   const workflowArgRaw = parsed.workflow ?? "feature-dev";
-  const [workflowId = "feature-dev", variant] = workflowArgRaw.split(":");
+  const isPath = workflowArgRaw.startsWith(".") || workflowArgRaw.startsWith("/") || /\.ya?ml$/i.test(workflowArgRaw);
+  const [workflowId = "feature-dev", variant] = isPath ? [workflowArgRaw, undefined] : workflowArgRaw.split(":");
   try {
-    getWorkflow(workflowId);
+    await loadWorkflow(workflowId, { cwd: (await resolveAssistant(ctx.assistantName)).cwd });
   } catch (err) {
     console.error((err as Error).message);
     process.exit(1);

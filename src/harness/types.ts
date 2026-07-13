@@ -17,9 +17,9 @@ export type IsolationMode = "worktree" | "inline";
  * - silent: AskUserQuestion is stripped from allowedTools before the SDK sees
  *   it (belt-and-suspenders deny on any stray call). Agent must make a
  *   defensible default.
- * - async: AskUserQuestion calls are parked in state.pending_question and the
- *   run exits waiting_human. NOTE: engine workflows do not yet implement
- *   resume — a parked run is currently discard-only via `harny clean <slug>`.
+ * - async: questions are persisted in run.json and the run exits
+ *   waiting_human. `harny answer` resumes the workflow and provider session
+ *   when the selected provider supports it.
  */
 export type RunMode = "interactive" | "silent" | "async";
 

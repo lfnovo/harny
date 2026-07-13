@@ -1,6 +1,6 @@
 ---
 name: review
-description: Post-mortem of a single harny run. Reads state.json + plan.json + per-phase transcripts. Emits a leaves-to-trunk review with evidence-backed proposals (triaged NOW-blocks/NOW-quick/BACKLOG). Use after failed, retried, slow, or novel runs.
+description: Post-mortem of a Harny run. Reads run.json v3, events and transcripts (or historical v2 state/plan). Emits evidence-backed proposals. Use after failed, retried, slow, or novel runs.
 allowed-tools: Bash, Read, Write, Agent
 ---
 
@@ -34,14 +34,14 @@ Use sub-agents aggressively to keep the main context window clean. Transcripts c
 ### Step 1 — Map the run
 
 Read in main context:
-- `<cwd>/.harny/<slug>/state.json` — phases, history, status, ended_reason, problems.
-- `<cwd>/.harny/<slug>/plan.json` — task list with verdict history (feature-dev workflow).
+- `<cwd>/.harny/<slug>/run.json` — authoritative nodes, attempts, artifacts, ChangeSets and outcome.
+- `<cwd>/.harny/<slug>/events.jsonl` — append-only audit trail. Fall back to v2 state/plan only for historical runs.
 
 Record: workflow, total wall-clock, attempt counts per phase, terminal status, agent-emitted `problems[]`.
 
 ### Step 2 — Locate phase transcripts
 
-For each entry in `state.json:phases[]`, the SDK transcript lives at:
+For each agent node attempt in `run.json`, use its persisted provider/session reference to locate the provider transcript. For historical v2, use `state.json:phases[]`:
 
 ```
 ~/.claude/projects/<encoded-cwd>/<session_id>.jsonl
@@ -157,4 +157,4 @@ After confirmation, invite the architect to append each "Inbox captures" line vi
 
 - **Run dir gone** (`harny clean` was run) — state and plan are unrecoverable. The transcripts may still exist under `~/.claude/projects/<encoded-cwd>/`. Tell the architect what's missing; offer to do a partial review from the transcripts alone.
 - **Multiple matching slugs** for the prefix — list them, ask which one.
-- **Workflow is not feature-dev** — `plan.json` may not exist or have a different shape. Adapt: read whatever is there.
+- **Workflow is not feature-dev** — the plan artifact may be absent or have a different shape. Adapt to the typed artifacts that exist.

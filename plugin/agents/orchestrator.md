@@ -87,8 +87,8 @@ Run the CLI with `run_in_background: true`. Capture the background task ID for m
 
 Once dispatched:
 
-- Wait for harny to create `<cwd>/.harny/<slug>/state.json`.
-- Tail `state.json` periodically (read it, parse JSON, check `status` and `phases[]`).
+- Wait for harny to create `<cwd>/.harny/<slug>/run.json`.
+- Inspect `run.json` and `events.jsonl` periodically; use `harny show <slug>` for a schema-neutral view.
 - Report progress at meaningful moments — phase transitions, validator failures, retry attempts. Do NOT poll every second; use `ScheduleWakeup` for long runs or just await the background process completion notification.
 - Watch for terminal status: `done`, `failed`, `waiting_human`.
 

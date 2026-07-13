@@ -204,7 +204,7 @@ If returning to this work after a context compaction:
 1. Read your project's `CLAUDE.md` — invariants, gotchas, key paths.
 2. Re-read this skill — policy + operational HOW.
 3. Check `git log --oneline -20` — what was last committed.
-4. Check `.harny/` for the most recent run; read its `state.json` + `review.md` (if `/review` was invoked).
+4. Check `.harny/` for the most recent run; read `run.json` + `events.jsonl` + `review.md` (if `/review` was invoked). Use historical v2 state only when `run.json` is absent.
 5. Scan open GitHub Issues + Discussions for pending architectural decisions.
 6. Ask the user: "what's the next decision we're making?" Don't assume.
 

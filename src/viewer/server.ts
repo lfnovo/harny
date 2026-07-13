@@ -1,5 +1,5 @@
 /**
- * Viewer server — read-only HTTP wrapper over the per-run state.json files.
+ * Viewer server — read-only HTTP wrapper over v3 runs and historical v2 state.
  *
  * Spawned by `harny ui`. Lives only as long as the parent CLI process.
  * No writes, no auth, binds to 127.0.0.1 only.
@@ -8,9 +8,11 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { listAllRuns, listRunsInCwd, statePathFor } from "../harness/state/filesystem.js";
+import { listRunsInCwd, statePathFor } from "../harness/state/filesystem.js";
+import { listHistoricalRuns, listV3RunsInCwd } from "../harness/state/v3/discovery.js";
+import type { HistoricalRun } from "../harness/state/v3/reader.js";
+import { normalizeV2Run, normalizeV3Run } from "../harness/state/v3/reader.js";
 import { planFilePath } from "../harness/state/plan.js";
-import type { State } from "../harness/state/schema.js";
 
 function cwdHashOf(cwd: string): string {
   return Buffer.from(cwd).toString("base64url");
@@ -19,9 +21,16 @@ function cwdFromHash(hash: string): string {
   return Buffer.from(hash, "base64url").toString("utf8");
 }
 
-async function findOneRun(cwd: string, slug: string): Promise<State | null> {
-  const states = await listRunsInCwd(cwd);
-  return states.find((s) => s.origin.task_slug === slug) ?? null;
+async function findOneRun(cwd: string, slug: string): Promise<HistoricalRun | null> {
+  const indexed = (await listHistoricalRuns()).find((run) => run.cwd === cwd && (run.schema_version === 2 ? run.raw.origin.task_slug : run.raw.run.task_slug) === slug); if (indexed) return indexed;
+  const v3 = (await listV3RunsInCwd(cwd)).find((run) => run.run.task_slug === slug); if (v3) return normalizeV3Run(v3);
+  const v2 = (await listRunsInCwd(cwd)).find((run) => run.origin.task_slug === slug); return v2 ? normalizeV2Run(v2) : null;
+}
+
+function viewerState(run: HistoricalRun): any {
+  if (run.schema_version === 2) return run.raw;
+  const value = run.raw; const plan = value.artifacts.plan?.value;
+  return { schema_version: 3, run_id: value.run.id, origin: { prompt: value.origin.prompt, workflow: value.run.workflow, task_slug: value.run.task_slug, started_at: value.run.started_at, host: value.origin.host, user: value.origin.user, features: null }, environment: { cwd: value.workspace.primary_cwd, branch: value.workspace.branch, isolation: value.workspace.isolation, worktree_path: value.workspace.worktree_path, mode: "async" }, lifecycle: { status: value.run.status === "paused" ? "waiting_human" : value.run.status, current_phase: Object.values(value.nodes).find((node) => node.status === "running")?.id ?? null, ended_at: value.run.ended_at, ended_reason: value.run.ended_reason, pid: value.run.pid }, phases: Object.values(value.nodes).map((node) => ({ name: node.id, attempt: node.attempts.at(-1)?.number ?? 1, started_at: node.attempts.at(-1)?.started_at ?? value.run.started_at, ended_at: node.attempts.at(-1)?.ended_at ?? null, status: node.status === "paused" ? "parked" : node.status === "skipped" ? "completed" : node.status, verdict: null, session_id: node.attempts.at(-1)?.session?.id ?? null })), history: [], pending_question: value.pending_human ? { id: value.pending_human.node_id, kind: "user_input", prompt: value.pending_human.question, options: value.pending_human.options, asked_at: value.pending_human.asked_at, phase_session_id: value.pending_human.session?.id ?? null, tool_use_id: null, phase_name: value.pending_human.node_id } : null, workflow_state: {}, workflow_chosen: { id: value.run.workflow, variant: "default" }, phoenix: value.artifacts.phoenix?.value, plan };
 }
 
 const baseBranchCache = new Map<string, string>();
@@ -192,20 +201,20 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       }
 
       if (path === "/api/runs") {
-        const runs = await listAllRuns();
+        const runs = await listHistoricalRuns();
         const summarized = runs.map((r) => ({
-          run_id: r.run_id,
-          short_id: r.run_id.slice(0, 8),
-          cwd: r.environment.cwd,
-          cwd_hash: cwdHashOf(r.environment.cwd),
-          task_slug: r.origin.task_slug,
-          workflow: r.origin.workflow,
-          status: r.lifecycle.status,
-          current_phase: r.lifecycle.current_phase,
-          started_at: r.origin.started_at,
-          ended_at: r.lifecycle.ended_at,
-          phases_total: r.phases.length,
-          retries: r.phases.length - new Set(r.phases.map((p) => p.name)).size,
+          run_id: r.id,
+          short_id: r.id.slice(0, 8),
+          cwd: r.cwd,
+          cwd_hash: cwdHashOf(r.cwd),
+          task_slug: r.schema_version === 2 ? r.raw.origin.task_slug : r.raw.run.task_slug,
+          workflow: r.workflow,
+          status: r.status === "paused" ? "waiting_human" : r.status,
+          current_phase: null,
+          started_at: r.started_at,
+          ended_at: r.ended_at,
+          phases_total: r.schema_version === 2 ? r.raw.phases.length : Object.keys(r.raw.nodes).length,
+          retries: 0,
         }));
         return jsonRes({ runs: summarized });
       }
@@ -214,11 +223,13 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       if (detailMatch) {
         const cwd = cwdFromHash(detailMatch[1]!);
         const slug = detailMatch[2]!;
-        const run = await findOneRun(cwd, slug);
-        if (!run) return jsonRes({ error: "not found" }, 404);
+        const historical = await findOneRun(cwd, slug);
+        if (!historical) return jsonRes({ error: "not found" }, 404);
+        const run = viewerState(historical);
         let plan: unknown = null;
         const planPath = planFilePath(cwd, slug);
-        if (existsSync(planPath)) {
+        if (historical.schema_version === 3) plan = historical.raw.artifacts.plan?.value ?? null;
+        else if (existsSync(planPath)) {
           try {
             plan = JSON.parse(await readFile(planPath, "utf8"));
           } catch {
@@ -253,9 +264,9 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       if (siblingMatch) {
         const cwd = cwdFromHash(siblingMatch[1]!);
         const slug = siblingMatch[2]!;
-        const run = await findOneRun(cwd, slug);
-        if (!run) return jsonRes({ error: "not found" }, 404);
-        const branch = run.environment.branch;
+        const historical = await findOneRun(cwd, slug);
+        if (!historical) return jsonRes({ error: "not found" }, 404);
+        const branch = historical.branch;
         if (!branch) return jsonRes({ siblingBranches: [] });
 
         // Get files modified by the run's latest commit.
@@ -305,7 +316,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         const slug = logMatch[2]!;
         const run = await findOneRun(cwd, slug);
         if (!run) return jsonRes({ error: "not found" }, 404);
-        const branch = run.environment.branch;
+        const branch = run.branch;
         if (!branch) return jsonRes({ commits: [] });
         const log = await gitLog(cwd, branch);
         return jsonRes(log);

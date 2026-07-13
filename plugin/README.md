@@ -1,6 +1,6 @@
-# harny (Claude Code plugin)
+# harny plugin
 
-Claude Code plugin for using [harny](https://github.com/lfnovo/harny) in any repository.
+Plugin for operating [harny](https://github.com/lfnovo/harny)'s declarative Claude/Codex workflows from a coding-agent conversation.
 
 Ships skills, an orchestrator agent, and onboarding so you can use harny from a Claude Code conversation without memorizing CLI flags or operational lore.
 

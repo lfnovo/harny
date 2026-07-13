@@ -34,9 +34,13 @@ describe("parseArgs: subcommand show", () => {
   test("--since= form", () => {
     expect((parseArgs(["show", "abc123", "--since=10m"]).registryCmd as any).since).toBe("10m");
   });
+  test("text and JSON answers", () => {
+    expect(parseArgs(["answer", "run-xyz", "yes", "please"]).registryCmd).toMatchObject({ kind: "answer", runId: "run-xyz", text: "yes please" });
+    expect(parseArgs(["answer", "run-xyz", "--json", '{"approved":true}']).registryCmd).toMatchObject({ kind: "answer", runId: "run-xyz", json: '{"approved":true}' });
+  });
 });
 
-describe("parseArgs: subcommand answer", () => {
+  describe("parseArgs: subcommand answer", () => {
   test("runId positional", () => {
     const cmd = parseArgs(["answer", "run-xyz"]).registryCmd as any;
     expect(cmd?.kind).toBe("answer");
@@ -56,6 +60,16 @@ describe("parseArgs: subcommand ui", () => {
   });
   test("--port= form", () => {
     expect((parseArgs(["ui", "--port=3000"]).registryCmd as any).port).toBe(3000);
+  });
+});
+
+describe("parseArgs: pr fix", () => {
+  test("parses a positive PR number", () => {
+    expect(parseArgs(["pr", "fix", "42"]).registryCmd).toEqual({ kind: "pr-fix", number: 42 });
+  });
+  test("rejects missing or invalid PR numbers", () => {
+    expect(parseArgs(["pr", "fix"]).registryCmd).toBeNull();
+    expect(parseArgs(["pr", "fix", "0"]).registryCmd).toBeNull();
   });
 });
 

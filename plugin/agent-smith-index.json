@@ -66,7 +66,7 @@
       {
         "name": "review",
         "path": "skills/review/SKILL.md",
-        "description": "Post-mortem of a single harny run. Reads state.json + plan.json + per-phase transcripts. Emits a leaves-to-trunk review with evidence-backed proposals (triaged NOW-blocks/NOW-quick/BACKLOG). Use after failed, retried, slow, or novel runs.",
+        "description": "Post-mortem of a Harny run. Reads run.json v3, events and transcripts, with a historical v2 fallback. Emits evidence-backed improvement proposals.",
         "allowedTools": [
           "Bash",
           "Read",

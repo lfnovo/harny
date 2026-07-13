@@ -1,24 +1,24 @@
 # harny
 
-TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "harness engineering" pattern: a planner → developer → validator loop orchestrated externally, with file-based handoff through `plan.json`. Published as `@lfnovo/harny`; runs via `bunx @lfnovo/harny` or `harny` after global install.
+Local-first TypeScript runtime for declarative, auditable AI development workflows. It supports Claude and Codex providers, persisted DAG execution, resumable human review, ChangeSet-safe commits, and optional draft PR delivery.
 
 ## What you're editing (orientation)
 
 - **Code** lives under `bin/`, `src/runner.ts`, `src/harness/`, `src/viewer/`.
-- **Before editing the engine** (`src/harness/engine/`) read `src/harness/engine/CLAUDE.md` — engine conventions (dispatcher contract, sibling-mirror rule, probe shape) live there.
+- **Workflow runtime** lives in `src/harness/workflow/`; provider adapters live in `src/harness/providers/`.
 - **Before editing observability** (`src/harness/observability/`) read `src/harness/observability/CLAUDE.md` — Phoenix instrumentation has non-obvious workarounds.
 - **Operational skills** (architect + operator flows) live in `.claude/skills/harny-*`; full documentation strategy in `specs/documentation.md` (gitignored).
 
 ## Critical invariants (don't break these)
 
-- **Harness is the sole writer of `plan.json`.** Agents return Zod-validated verdicts; the harness merges them.
-- **Harness is the sole committer.** Developer proposes a `commit_message`; harness commits only after validator passes, composing `<dev>\n\ntask=<id>\n<role>: <evidence>`.
+- **`run.json` v3 is authoritative.** Plans and provider outputs are typed artifacts; v2 state remains read-only for historical inspection.
+- **Harness is the sole committer.** The developer produces a ChangeSet and the validator approves that exact ID/hash before the privileged commit executor stages its recorded paths.
 - **Validator is read-only on code** (no Edit/Write). Runs against the uncommitted working tree.
-- **Retry = resume, reset = fresh.** Fail-without-reset resumes the prior developer session with only the new validator feedback. Reset does `git reset --hard <pre-phase-sha> && git clean -fd`; `.harny/<slug>/` survives (gitignored).
+- **Implemented diff = validated diff = committed diff.** Any changed content or newly appearing path after validation fails the run.
 - **Dev `blocked` is fatal.** Plan marked `failed`, loop aborts.
-- **Branch only shows committed work.** Before returning on any terminal state, the tree is reset to the last commit.
+- **Provider capabilities are checked before workspace or provider effects.** Workflows cannot request unsupported structured output, resume, guards, or questions.
 - **`.harny/.gitignore` is tracked, not runtime-written.** Ships as `*` + `!.gitignore`.
-- **`plan.json` shares the lifecycle key of `state.json` v2 — no independent version number.** If a stale `plan.json` on disk fails validation, run `harny clean` to migrate.
+- **Historical v2 is read-only.** `ls`, `show`, and the viewer may read `state.json`/`plan.json`; only v3 `run.json` can resume.
 
 ## Workflow essentials
 
@@ -33,10 +33,12 @@ TypeScript task launcher built on the Claude Agent SDK. Implements Anthropic's "
 
 - `bin/harny.ts` — published bin entrypoint.
 - `src/runner.ts` — CLI entry, arg parsing, subcommands (`clean|ls|show|answer|ui`).
-- `src/harness/orchestrator.ts` — run lifecycle, git/worktree setup, dispatches to engine.
+- `src/harness/orchestrator.ts` — run lifecycle, Git/worktree setup, and declarative runtime dispatch.
 - `src/harness/sessionRecorder.ts` — `runPhase<T>()`, SDK seam.
-- `src/harness/state/` — `state.json` (v2) + `plan.json` I/O, cross-run helpers.
-- `src/harness/engine/` — XState workflows. See subtree CLAUDE.md.
+- `src/harness/state/v3/` — atomic `run.json`, append-only events, artifacts, attempts, ChangeSets, and deliverables.
+- `src/harness/workflow/` — YAML loader, static validation, persisted scheduler, executors, and bundled workflows.
+- `src/harness/providers/` — provider-neutral contract plus Claude and Codex adapters.
+- `src/harness/forge/` — privileged, idempotent GitHub draft-PR delivery.
 - `src/harness/observability/` — Phoenix instrumentation. See subtree CLAUDE.md.
 - `src/viewer/` — read-only HTTP + SPA, booted via `harny ui`.
 - `src/harness/workflows/composeCommit.ts` — commit-message composer.

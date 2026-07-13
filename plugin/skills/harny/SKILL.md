@@ -18,7 +18,7 @@ The skill teaches the **mental model** and **routes you** to the focused skill t
 
 ## What harny is
 
-[harny](https://github.com/lfnovo/harny) is a TypeScript task launcher built on the Claude Agent SDK. It runs a **planner → developer → validator** loop on your behalf, with the orchestrator (harny) committing only after the validator passes.
+[harny](https://github.com/lfnovo/harny) is a local-first declarative workflow runtime for Claude and Codex. Its default workflow runs a **planner → developer → validator** loop, with Harny committing only the exact validated ChangeSet.
 
 In practical terms: instead of telling Claude "do this thing in my repo and figure out when you're done", you tell harny "do this thing, and the validator command tells you when you're done." Harny handles iteration, retries, branch management, and commits.
 
@@ -30,7 +30,7 @@ In practical terms: instead of telling Claude "do this thing in my repo and figu
 
 When you invoke `harny --name <slug> "<your prompt>"`:
 
-1. **Planner** reads your prompt + the repo's `CLAUDE.md` and produces a plan (`plan.json`) with one or more tasks.
+1. **Planner** reads your prompt and repository guidance and produces a typed plan artifact with one or more tasks.
 2. **Developer** executes one task at a time, making code changes.
 3. **Validator** runs your validator command (typecheck, tests, lint, etc.). Read-only — no Edit/Write.
 4. **If validator passes**, harny composes a commit message (developer's intent + validator's evidence) and commits.
@@ -39,8 +39,8 @@ When you invoke `harny --name <slug> "<your prompt>"`:
 
 State of the run lives at `<cwd>/.harny/<slug>/`:
 
-- `state.json` — phases, status, history.
-- `plan.json` — task list with verdict history.
+- `run.json` — authoritative v3 snapshot with nodes, attempts, artifacts, ChangeSets and deliverables.
+- `events.jsonl` — append-only audit events. Historical v2 `state.json`/`plan.json` remains readable.
 - `transcripts/` — per-phase SDK transcript pointers.
 - The whole `.harny/` directory is gitignored — per-clone, never committed.
 
@@ -181,11 +181,11 @@ harny clean <slug> --force         # SIGTERM the running process group, then cle
 harny clean <slug> --force --kill  # SIGTERM, then SIGKILL after 5s, then clean
 ```
 
-With no flags, `clean` refuses if `state.json` shows `status=running` with a live PID. Stale PIDs (process already gone) are detected and cleanup proceeds with a warning. `--force` terminates the process group; add `--kill` only if the process ignores SIGTERM.
+With no flags, `clean` refuses if the run snapshot shows a live running PID. Stale PIDs are materialized as failures. `--force` terminates the process group; add `--kill` only if the process ignores SIGTERM.
 
 ### When to run
 
-- **Schema migration.** A stale `plan.json` or `state.json` from an older harny version may fail validation on a fresh dispatch. Cleaning the offending slug is the official migration path.
+- **Schema migration.** v2 runs are historical and read-only. New runs use `run.json` v3; clean an old slug before reusing it.
 - **Slug reuse.** You want to re-dispatch with the same `--name <slug>` and the previous run left a worktree/branch behind.
 - **Aborted run with no recoverable signal.** A failed run whose transcripts and verdicts you've already triaged (or that has no insight worth keeping).
 - **Throwaway experimentation.** Sandbox repo where run history has no value.

@@ -25,7 +25,7 @@ Opt-in observability via Arize OpenInference. `setupPhoenix({ workflowId, runId,
 
 Viewer server renders "Open trace in Phoenix" deep-links in the run header. Phoenix's UI doesn't expose CORS, so the viewer resolves project name → GraphQL global ID **server-side** (cached 30s) when building URLs. See `src/viewer/server.ts` for the resolver.
 
-State read: `state.phoenix.{project, trace_id}` from `state.json`.
+State read: the `phoenix` trace artifact from authoritative `run.json` v3. Historical v2 observability fields remain readable only through the compatibility reader.
 
 ## Gotchas
 

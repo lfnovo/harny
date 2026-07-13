@@ -23,12 +23,13 @@ import type { State } from "./schema.js";
 
 export const RunPointerSchema = z.object({
   schema_version: z.literal(1),
+  state_schema_version: z.union([z.literal(2), z.literal(3)]).default(2),
   run_id: z.string(),
   cwd: z.string(),
   task_slug: z.string(),
   workflow: z.string(),
   started_at: z.string(),
-  status: z.enum(["running", "waiting_human", "done", "failed"]),
+  status: z.enum(["running", "waiting_human", "paused", "done", "failed", "cancelled"]),
   ended_at: z.string().nullable(),
 });
 
@@ -67,6 +68,7 @@ export function pointerPath(runId: string): string {
 export function pointerFromState(state: State): RunPointer {
   return {
     schema_version: 1,
+    state_schema_version: 2,
     run_id: state.run_id,
     cwd: state.environment.cwd,
     task_slug: state.origin.task_slug,
@@ -75,6 +77,11 @@ export function pointerFromState(state: State): RunPointer {
     status: state.lifecycle.status,
     ended_at: state.lifecycle.ended_at,
   };
+}
+
+export async function writePointerV3(state: import("./v3/schema.js").RunV3): Promise<void> {
+  const pointer: RunPointer = { schema_version: 1, state_schema_version: 3, run_id: state.run.id, cwd: state.workspace.primary_cwd, task_slug: state.run.task_slug, workflow: state.run.workflow, started_at: state.run.started_at, status: state.run.status, ended_at: state.run.ended_at };
+  await writeJsonAtomic(pointerPath(state.run.id), pointer);
 }
 
 export async function writePointer(state: State): Promise<void> {

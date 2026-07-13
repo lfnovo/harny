@@ -72,6 +72,7 @@ describe("registry: pointer I/O", () => {
     const p = pointerFromState(s);
     expect(p).toEqual({
       schema_version: 1,
+      state_schema_version: 2,
       run_id: "run-a",
       cwd: "/cwd-a",
       task_slug: "slug-a",

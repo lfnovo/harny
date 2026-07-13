@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+### Added
+- Declarative YAML DAG runtime with statically validated `agent`, `command`, `foreach`, `human`, `commit`, `pull_request`, and `cancel` nodes.
+- Provider-neutral `AgentProvider` boundary with Claude and Codex CLI implementations and capability validation.
+- Authoritative atomic `run.json` v3 snapshots plus append-only `events.jsonl`, typed artifacts, node attempts, ChangeSets, deliverables, parent runs, and pending human input.
+- Async human parking and `harny answer`, draft GitHub PR delivery through `feature-pr`, and manual `harny pr fix <number>` with PR leases and remote-head protection.
+- Project/global/bundled workflow and Markdown-command precedence, plus explicit `--workflow ./path.yaml` loading.
+
+### Changed
+- The deterministic declarative scheduler is now the default runtime. XState remains only as a temporary private `HARNY_RUNTIME=xstate` fallback during the stability window.
+- New runs use v3 exclusively; v2 `state.json`/`plan.json` runs remain readable but cannot be resumed.
+- Commits stage only a content-addressed ChangeSet that was verified unchanged before and after validation.
+- Dead run PIDs are materialized as terminal failures. CLI discovery, viewer, scan, summary, and cleanup understand both v2 and v3.
+
 ## [0.4.0] — 2026-07-12
 
 ### Added

@@ -1,5 +1,7 @@
 import type { State } from "../harness/state/schema.js";
 import { loadPlan } from "../harness/state/plan.js";
+import type { RunV3 } from "../harness/state/v3/schema.js";
+import type { Plan } from "../harness/types.js";
 
 export function parseGitHubCompareUrl(
   originUrl: string | null | undefined,
@@ -93,7 +95,7 @@ async function resolveOriginUrl(cwd: string): Promise<string | null> {
 const SEP = "─".repeat(60);
 
 export async function printRunSummary(
-  result: { status: string; branch: string; state: State | null; planPath?: string | null },
+  result: { status: string; branch: string; state: State | RunV3 | null; planPath?: string | null },
   cwd: string,
 ): Promise<void> {
   const { status, branch, state, planPath } = result;
@@ -112,8 +114,8 @@ export async function printRunSummary(
     resolveLatestCommit(cwd, branch),
   ]);
 
-  let plan = null;
-  if (planPath) {
+  let plan: Plan | null = state.schema_version === 3 ? (state.artifacts.plan?.value as Plan | undefined) ?? null : null;
+  if (!plan && planPath) {
     try {
       plan = await loadPlan(planPath);
     } catch {
@@ -125,12 +127,18 @@ export async function printRunSummary(
   const totalTasks = plan?.tasks.length ?? 0;
 
   const compareUrl = parseGitHubCompareUrl(originUrl, branch, defaultBranch);
-  const duration = humanDuration(state.origin.started_at, state.lifecycle.ended_at);
+  const isV3 = state.schema_version === 3;
+  const startedAt = isV3 ? state.run.started_at : state.origin.started_at;
+  const endedAt = isV3 ? state.run.ended_at : state.lifecycle.ended_at;
+  const workflow = isV3 ? state.run.workflow : state.origin.workflow;
+  const slug = isV3 ? state.run.task_slug : state.origin.task_slug;
+  const endedReason = isV3 ? state.run.ended_reason : state.lifecycle.ended_reason;
+  const duration = humanDuration(startedAt, endedAt);
 
   console.log(SEP);
   console.log(`status:    ${status}`);
-  console.log(`workflow:  ${state.origin.workflow}`);
-  console.log(`slug:      ${state.origin.task_slug}`);
+  console.log(`workflow:  ${workflow}`);
+  console.log(`slug:      ${slug}`);
   console.log(`branch:    ${branch}`);
   console.log(`duration:  ${duration}`);
 
@@ -138,10 +146,11 @@ export async function printRunSummary(
     console.log(`tasks:     ${doneTasks}/${totalTasks} done`);
   }
 
-  if (state.phases.length > 0) {
+  const phases = isV3 ? Object.values(state.nodes).map((node) => ({ name: node.id, attempt: node.attempts.at(-1)?.number ?? 1, status: node.status })) : state.phases;
+  if (phases.length > 0) {
     console.log("");
     console.log("phases:");
-    for (const phase of state.phases) {
+    for (const phase of phases) {
       const mark = phase.status === "completed" ? "done" : phase.status;
       console.log(`  ${phase.name} (attempt ${phase.attempt}): ${mark}`);
     }
@@ -149,7 +158,7 @@ export async function printRunSummary(
 
   if (status === "done") {
     console.log("");
-    console.log(`review:    harny show ${state.origin.task_slug}`);
+    console.log(`review:    harny show ${slug}`);
     console.log(`checkout:  git checkout ${branch}`);
     if (latestCommit !== null) {
       console.log(`commit:    ${latestCommit.sha} ${latestCommit.subject}`);
@@ -158,12 +167,12 @@ export async function printRunSummary(
       console.log(`compare:   ${compareUrl}`);
     }
   } else {
-    if (state.lifecycle.ended_reason) {
+    if (endedReason) {
       console.log("");
-      console.log(`reason:    ${state.lifecycle.ended_reason}`);
+      console.log(`reason:    ${endedReason}`);
     }
     console.log("");
-    console.log(`diagnose:  harny show ${state.origin.task_slug}`);
+    console.log(`diagnose:  harny show ${slug}`);
   }
 
   console.log(SEP);
