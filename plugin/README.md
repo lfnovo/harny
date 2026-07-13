@@ -1,6 +1,6 @@
 # harny plugin
 
-Plugin for operating [harny](https://github.com/lfnovo/harny)'s declarative Claude/Codex workflows from a coding-agent conversation.
+Claude Code plugin for operating [Harny](https://github.com/lfnovo/harny)'s declarative Claude/Codex workflows from an architect conversation.
 
 Ships skills, an orchestrator agent, and onboarding so you can use harny from a Claude Code conversation without memorizing CLI flags or operational lore.
 
@@ -50,23 +50,24 @@ npm install -g @lfnovo/harny
 | `/harny:check-repo` | Walk you through the readiness checklist for adopting harny in a repo |
 | `/harny:learn` | Capture a one-line learning to the local inbox (no analysis) |
 | `/harny:drain` | Triage accumulated learnings into Issues / AGENTS.md edits / discards |
-| `/harny:review` | Post-mortem of a single harny run (state + plan + transcripts) |
-| `/harny:release` | Orchestrate a release cycle across multiple harny runs |
+| `/harny:review` | Post-mortem of one run using `run.json`, audit events, transcripts, and usage |
+| `/harny:release` | Coordinate runs, draft PRs, review fixes, merge approval, tags, and publication |
 
 ### Agent
 
 | Invocation | What it does |
 |---|---|
-| `Task(subagent_type: "orchestrator", ...)` | Manages the harny CLI on your behalf — turns natural-language intent into a CLI invocation, handles env quirks, monitors the run, reports back |
+| `@orchestrator <intent>` | Selects `feature-dev`, `feature-pr`, an explicit workflow, or `pr fix`; dispatches and monitors without merging or cleaning |
 
 ## Conventions
 
 - Skills are stateless. State lives in `<cwd>/.harny/` per the harny CLI conventions.
 - The orchestrator agent never auto-invokes `review` or `learn` — it only suggests them. You stay in control of when to triage.
 - `check-repo` writes nothing by default — it produces a scorecard you review and act on.
+- The plugin never stores provider secrets. Logical provider connections live in `~/.harny/providers.json`; secret values remain in environment variables.
 
 ## Versioning
 
-The plugin uses semver, independent of the `@lfnovo/harny` CLI version. CLI breaking changes do not bump the plugin and vice-versa, except where the plugin actually depends on a specific CLI feature.
+The plugin uses semver independently from the CLI. Plugin `0.3.0` is aligned with Harny CLI `0.5.x` contracts (`run.json` v4 and workflow schema v2).
 
 See `.claude-plugin/plugin.json` for the current version.

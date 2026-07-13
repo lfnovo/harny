@@ -1,0 +1,68 @@
+version: 2
+name: feature-pr-approval
+defaults:
+  provider: claude
+  timeout: 1800000
+workspace:
+  isolation: worktree
+outcome:
+  type: pull_request
+nodes:
+  - id: planner
+    type: agent
+    command: planner
+    provider: codex
+    requires: [structured_output]
+  - id: tasks
+    type: foreach
+    items: "${{ nodes.planner.outputs.tasks }}"
+    as: task
+    max_items: 100
+    depends_on: [planner]
+    steps:
+      - id: developer
+        type: agent
+        command: developer
+        requires: [structured_output, tool_guards]
+        guards: [no_git_history, no_forge_effects]
+      - id: validator
+        type: agent
+        command: validator
+        depends_on: [developer]
+        requires: [structured_output, tool_guards]
+        guards: [read_only]
+        retry: { max_attempts: 3, return_to: developer }
+      - id: commit
+        type: commit
+        message: feature-dev
+        changeset: developer
+        depends_on: [validator]
+  - id: final_validator
+    type: agent
+    command: final_validator
+    depends_on: [tasks]
+    requires: [structured_output, tool_guards]
+    guards: [read_only]
+  - id: approval
+    type: human
+    question: 'Publish this validated branch as a draft PR? Answer with --json {"approved":true} or {"approved":false}.'
+    timeout: 86400000
+    depends_on: [final_validator]
+  - id: pull_request
+    type: pull_request
+    title: "Harny feature"
+    body: "Created by Harny after human approval"
+    base: "${{ inputs.base }}"
+    head: "${{ inputs.branch }}"
+    draft: true
+    existing: allow
+    depends_on: [approval]
+    when:
+      equals: ["${{ nodes.approval.outputs.approved }}", true]
+  - id: rejected
+    type: cancel
+    reason: Draft PR publication was rejected
+    depends_on: [approval]
+    when:
+      not:
+        equals: ["${{ nodes.approval.outputs.approved }}", true]

@@ -43,9 +43,9 @@ The output of this step is the user's final validator command. Pin it.
 
 ---
 
-## 2. Safe-reset hygiene
+## 2. Workspace hygiene
 
-**Why.** Reset does `git reset --hard <pre-phase-sha> && git clean -fd`. Anything not tracked, gitignored, or under `.harny/` is gone after reset.
+**Why.** Worktree isolation starts from committed history, while inline workflows share the current checkout. Untracked human work can be invisible to a new worktree, collide with generated paths, or make a later merge ambiguous. Harny's ChangeSet protects validated content; it does not decide ownership of pre-existing local work.
 
 **Checks.**
 - Working tree clean by default.
@@ -55,7 +55,7 @@ The output of this step is the user's final validator command. Pin it.
 - `.gitignore` covers IDE files, OS files, build outputs, and personal scratch conventions.
 - No committed secrets (`*-credentials.json`, `.env` not gitignored).
 
-**Diagnostic.** "If I run `git stash && git clean -fd` right now, do you lose anything you care about?"
+**Diagnostic.** "Is every local file either committed, intentionally ignored, or safely reproducible before Harny creates an isolated worktree?"
 
 **Calibration.**
 - 🟢 Clean tree. No floating scratch files. Gitignore complete.
@@ -66,7 +66,7 @@ The output of this step is the user's final validator command. Pin it.
 
 ## 3. Deterministic install (cold worktree works)
 
-**Why.** With `--isolation worktree`, harny creates a fresh worktree and runs install from scratch. Hidden install steps break this.
+**Why.** With `--isolation worktree`, Harny creates a fresh worktree. Bun projects receive the built-in cold install; other ecosystems still need deterministic, agent-runnable setup. Hidden install steps break validation.
 
 **Checks.**
 - One canonical install command works from a clean clone.
@@ -106,7 +106,7 @@ The output of this step is the user's final validator command. Pin it.
 
 ## 5. Task granularity / architectural modularity
 
-**Why.** The planner produces tasks; the developer executes one at a time. If every change touches 30+ files across many modules, context explodes and resets become expensive.
+**Why.** The planner produces tasks and the scheduler executes them sequentially. If every change touches 30+ files across many modules, context and validation cost explode.
 
 **Checks.**
 - Typical changes touch a small, predictable number of files (rule of thumb: 2–10).
@@ -208,7 +208,7 @@ The output of this step is the user's final validator command. Pin it.
 
 ## 10. Repo hygiene & secrets
 
-**Why.** Harny phases get broad tool access. Credentials in tracked files, or personal data in untracked files that survive resets, is risky.
+**Why.** Agent nodes can receive broad tool access. Credentials in tracked files or sensitive local artifacts inside the workspace are risky even when Harny keeps provider secrets out of YAML and fingerprints.
 
 **Checks.**
 - No committed secrets (API keys, credentials, private certs).

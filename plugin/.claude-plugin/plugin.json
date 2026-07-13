@@ -1,7 +1,7 @@
 {
   "name": "harny",
-  "version": "0.2.0",
-  "description": "Claude Code skills and agent for using harny in any repository — capture learnings, run post-mortems, evaluate repo readiness, and orchestrate harness runs from natural language.",
+  "version": "0.3.0",
+  "description": "Claude Code skills and an orchestrator agent for declarative Harny workflows across Claude and Codex, including run analysis, PR delivery, and release management.",
   "author": {
     "name": "Luis Novo"
   },
@@ -10,6 +10,7 @@
   "license": "MIT",
   "keywords": [
     "claude-code",
+    "codex",
     "harny",
     "harness",
     "agent",
