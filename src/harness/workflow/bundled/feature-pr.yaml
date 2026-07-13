@@ -27,7 +27,7 @@ nodes:
         type: agent
         command: developer
         requires: [structured_output, tool_guards]
-        guards: [no_plan_writes, no_git_history]
+        guards: [no_plan_writes, no_git_history, no_forge_effects]
       - id: validator
         type: agent
         command: validator

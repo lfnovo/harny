@@ -52,6 +52,8 @@ export type PhaseGuards = {
   noPlanWrites?: boolean;
   /** Deny Bash commands that mutate git history inside the phase cwd. */
   noGitHistory?: boolean;
+  /** Deny forge publication commands; only privileged executors may publish. */
+  noForgeEffects?: boolean;
 };
 
 const WRITE_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit"] as const;
@@ -59,6 +61,9 @@ const WRITE_TOOLS_MATCHER = WRITE_TOOLS.join("|");
 
 const FORBIDDEN_GIT_COMMAND =
   /\bgit\s+(?:[^;|&\s]+\s+)*?(commit|push|reset|rebase|merge|revert|cherry-pick|tag|am)(?:\s|;|\||&|$)|--amend\b/;
+
+const FORBIDDEN_FORGE_COMMAND =
+  /\bgh\s+pr\s+(create|edit|merge|ready|close|reopen|comment|review)(?:\s|;|\||&|$)|\bgh\s+api\b[^;|&]*(?:(?:--method|-X)\s*(POST|PUT|PATCH|DELETE)\b|(?:-f|-F|--field|--raw-field|--input)(?:\s|=))/i;
 
 function denyPreToolUse(reason: string): HookJSONOutput {
   return {
@@ -136,6 +141,17 @@ function developerGitCommitter(phaseCwd: string): HookCallback {
   };
 }
 
+function developerForgePublisher(): HookCallback {
+  return async (input) => {
+    if (input.hook_event_name !== "PreToolUse" || input.tool_name !== "Bash") return allowPreToolUse();
+    const command = readStringField(input.tool_input, "command");
+    if (command == null || !FORBIDDEN_FORGE_COMMAND.test(command)) return allowPreToolUse();
+    return denyPreToolUse(
+      "Pull-request publication is a privileged workflow effect. Do not mutate pull requests or call write-capable forge APIs from an agent; the pull_request executor will publish after validated commits.",
+    );
+  };
+}
+
 function operatesOutsidePrimary(command: string, primaryResolved: string): boolean {
   const cdMatch = command.match(/^\s*cd\s+(['"]?)([^'"&;|\s]+)\1/);
   if (cdMatch) {
@@ -184,10 +200,13 @@ export function buildGuardHooks(args: {
   if (writeMatchers.length > 0) {
     preToolUse.push({ matcher: WRITE_TOOLS_MATCHER, hooks: writeMatchers });
   }
-  if (args.guards.noGitHistory) {
+  const bashHooks: HookCallback[] = [];
+  if (args.guards.noGitHistory) bashHooks.push(developerGitCommitter(args.phaseCwd));
+  if (args.guards.noForgeEffects) bashHooks.push(developerForgePublisher());
+  if (bashHooks.length > 0) {
     preToolUse.push({
       matcher: "Bash",
-      hooks: [developerGitCommitter(args.phaseCwd)],
+      hooks: bashHooks,
     });
   }
 

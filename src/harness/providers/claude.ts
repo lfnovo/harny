@@ -79,7 +79,7 @@ function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
 
 function toPhaseGuards(guards: string[] | undefined): PhaseGuards {
   const set = new Set(guards ?? []);
-  return { readOnly: set.has("read_only"), noPlanWrites: set.has("no_plan_writes"), noGitHistory: set.has("no_git_history") };
+  return { readOnly: set.has("read_only"), noPlanWrites: set.has("no_plan_writes"), noGitHistory: set.has("no_git_history"), noForgeEffects: set.has("no_forge_effects") };
 }
 
 function normalizeResult<T>(result: PhaseRunResult<T>): AgentResult<T> {

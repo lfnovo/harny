@@ -67,9 +67,10 @@ export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
   model: 'sonnet',
   mcpServers: {},
   // Enforces two CLAUDE.md invariants at the SDK layer: "harness is sole
-  // writer of plan.json" and "harness is sole committer". Escape hatches
+  // writer of plan.json", "harness is sole committer", and privileged PR
+  // delivery. Escape hatches
   // for throwaway paths (cd /tmp/..., git -C /tmp/...) live in guardHooks.ts.
-  guards: { noPlanWrites: true, noGitHistory: true },
+  guards: { noPlanWrites: true, noGitHistory: true, noForgeEffects: true },
 };
 
 export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {

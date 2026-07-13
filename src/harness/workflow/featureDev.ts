@@ -30,7 +30,7 @@ export const featureDevWorkflow: NormalizedWorkflowDefinition = WorkflowDefiniti
     { id: "planner", type: "agent", command: "planner", depends_on: [], requires: ["structured_output"], inputs: {} },
     { id: "persist_plan", type: "command", command: ["persist_plan"], depends_on: ["planner"], inputs: {} },
     { id: "tasks", type: "foreach", items: "${{ nodes.planner.outputs.tasks }}", as: "task", max_items: 100, depends_on: ["persist_plan"], inputs: {}, steps: [
-      { id: "developer", type: "agent", command: "developer", depends_on: [], requires: ["structured_output", "tool_guards"], guards: ["no_plan_writes", "no_git_history"], inputs: {} },
+      { id: "developer", type: "agent", command: "developer", depends_on: [], requires: ["structured_output", "tool_guards"], guards: ["no_plan_writes", "no_git_history", "no_forge_effects"], inputs: {} },
       { id: "validator", type: "agent", command: "validator", depends_on: ["developer"], requires: ["structured_output", "tool_guards"], guards: ["read_only"], retry: { max_attempts: 3, return_to: "developer" }, inputs: {} },
       { id: "commit", type: "commit", message: "feature-dev", changeset: "developer", depends_on: ["validator"], inputs: {} },
     ] },
@@ -60,7 +60,7 @@ export async function runNextFeatureDev(args: {
     if (!provider) throw new Error(`provider not registered: ${node.provider ?? workflow.defaults.provider}`);
     if (node.command === "planner") {
       const result = await callAgent(provider, node, context, "planner", 1, {
-        phase: "planner", cwd: args.cwd, prompt: args.userPrompt,
+        phase: "planner", cwd: args.cwd, prompt: plannerRequest(args.userPrompt, workflow.outcome.type),
         systemPrompt: resolvePrompt("feature-dev", args.variant, "planner", args.primaryCwd),
         schema: PlannerVerdictSchema, allowedTools: DEFAULT_PLANNER.allowedTools, model: DEFAULT_PLANNER.model,
       });
@@ -146,6 +146,14 @@ function createPlan(args: { primaryCwd: string; cwd: string; taskSlug: string; u
     tasks: output.tasks.map((task) => ({ ...task, status: "pending", attempts: 0, commit_sha: null, history: [] })), metadata: { ...(session ? { planner_session_id: session.id } : {}) } };
 }
 function taskPrompt(verb: string, task: PlannerOutput["tasks"][number]): string { return `${verb} task: ${task.title}\n\n${task.description}\n\nAcceptance criteria:\n${task.acceptance.map((item) => `- ${item}`).join("\n")}`; }
+function plannerRequest(userPrompt: string, outcome: NormalizedWorkflowDefinition["outcome"]["type"]): string {
+  const delivery = outcome === "pull_request"
+    ? "After all implementation tasks are validated and committed, the workflow's privileged pull_request executor will push the branch and create or update the draft PR."
+    : outcome === "branch"
+      ? "After each implementation task is validated, the workflow's privileged commit executor will create the commit."
+      : "The workflow has no external deliverable.";
+  return `${userPrompt}\n\nWorkflow-managed effects (not planner tasks): ${delivery} Never create tasks that commit, push, publish/update a pull request, merge, or deploy. Agents may only implement and validate repository changes.`;
+}
 function addHistory(task: PlanTask, role: string, session?: AgentSession) { if (session) task.history.push({ role, provider: session.provider, session_id: session.id, at: new Date().toISOString() }); }
 function sessionFromHistory(task: PlanTask, role: string): AgentSession | undefined { const entry = [...task.history].reverse().find((item) => item.role === role); return entry ? { id: entry.session_id, provider: typeof entry.provider === "string" ? entry.provider : "claude" } : undefined; }
 async function runAgentPhase<T>(store: Pick<FeatureRunPersistence, "appendPhase" | "updatePhase" | "setPhaseProvider">, provider: AgentProvider, name: string, attempt: number, request: Parameters<AgentProvider["run"]>[0] & { schema: z.ZodType<T> }, session?: AgentSession) {

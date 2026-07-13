@@ -210,6 +210,27 @@ describe("guardHooks: noGitHistory (developer)", () => {
   });
 });
 
+describe("guardHooks: noForgeEffects (developer)", () => {
+  test.each([
+    "gh pr create --draft --base main",
+    "gh pr edit 42 --title changed",
+    "gh pr merge 42 --squash",
+    "gh pr comment 42 --body done",
+    "gh api repos/o/r/pulls -X POST -f title=x",
+    "gh api repos/o/r/pulls -f title=x",
+  ])("denies privileged forge mutation: %s", async (command) => {
+    expect(await evaluate({ noForgeEffects: true }, "Bash", { command })).toBe("deny");
+  });
+
+  test.each([
+    "gh pr view 42 --json url",
+    "gh pr list --state open",
+    "gh api repos/o/r/pulls/42",
+  ])("allows read-only forge inspection: %s", async (command) => {
+    expect(await evaluate({ noForgeEffects: true }, "Bash", { command })).toBe("allow");
+  });
+});
+
 describe("guardHooks: combos (multiple flags compose additively)", () => {
   test("noPlanWrites + noGitHistory — plan.json denied", async () => {
     expect(

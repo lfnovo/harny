@@ -16,7 +16,7 @@ nodes:
     command: review_fixer
     depends_on: [collect_feedback]
     requires: [structured_output, tool_guards]
-    guards: [no_git_history]
+    guards: [no_git_history, no_forge_effects]
   - id: validator
     type: agent
     command: validator

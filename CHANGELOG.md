@@ -12,7 +12,7 @@ All notable changes to this project are documented here. The format loosely foll
 - Project/global/bundled workflow and Markdown-command precedence, plus explicit `--workflow ./path.yaml` loading.
 
 ### Changed
-- The deterministic declarative scheduler is now the default runtime. XState remains only as a temporary private `HARNY_RUNTIME=xstate` fallback during the stability window.
+- The deterministic declarative scheduler is now the only runtime; the XState engine and its private runtime switch were removed.
 - New runs use v3 exclusively; v2 `state.json`/`plan.json` runs remain readable but cannot be resumed.
 - Commits stage only a content-addressed ChangeSet that was verified unchanged before and after validation.
 - Dead run PIDs are materialized as terminal failures. CLI discovery, viewer, scan, summary, and cleanup understand both v2 and v3.

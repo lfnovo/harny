@@ -26,10 +26,11 @@ async function v3(cwd: string, slug: string, workflow = "feature-dev") {
 
 class FeatureProvider implements AgentProvider {
   id = "claude"; capabilities = { structuredOutput: true, resume: true, toolGuards: true, interactiveQuestions: true };
-  calls: string[] = []; validations = 0; developments = 0;
+  calls: string[] = []; prompts: string[] = []; validations = 0; developments = 0;
   constructor(private cwd: string, private options: { tasks?: number; validator?: ("pass" | "fail" | "blocked")[]; developerBlocked?: boolean; noChanges?: boolean; unauthorizedCommit?: boolean } = {}) {}
   async run<T>(request: AgentRequest<T>): Promise<AgentResult<T>> {
     this.calls.push(request.phase ?? "agent");
+    this.prompts.push(request.prompt);
     let output: unknown;
     if (request.phase === "planner") output = { summary: "feature", tasks: Array.from({ length: this.options.tasks ?? 1 }, (_, index) => ({ id: `t${index + 1}`, title: `Build ${index + 1}`, description: "Build it", acceptance: ["works"] })) };
     else if (request.phase === "developer") {
@@ -93,13 +94,13 @@ test("next feature-dev treats an empty ChangeSet as a successful no-op", async (
   const plan = (await saved.store.load())!.artifacts.plan!.value as import("../types.js").Plan; expect(plan.tasks[0]?.commit_sha).toBeNull();
 });
 
-test("feature-pr creates a draft PR only after commit and verifies its head", async () => {
-  const { cwd, git } = await makeRepo(); const sha = async () => await git("rev-parse", "HEAD"); let created: PullRequestSpec | null = null;
+test("feature-pr keeps publication out of agent tasks and creates a draft PR only after commit", async () => {
+  const { cwd, git } = await makeRepo(); const sha = async () => await git("rev-parse", "HEAD"); let created: PullRequestSpec | null = null; const provider = new FeatureProvider(cwd, { validator: ["pass"] });
   const forge: ForgeProvider = { id: "github", async findPullRequest() { return null; }, async createPullRequest(spec) { created = spec; return { repository: spec.repository, number: 9, url: "https://github.com/o/r/pull/9", base: spec.base, head: spec.head, headSha: spec.expectedHeadSha, draft: spec.draft }; }, async updatePullRequest(_pr: PullRequestArtifact, _spec: PullRequestSpec) { throw new Error("not expected"); } };
-  const result = await runNextFeatureDev({ provider: new FeatureProvider(cwd, { validator: ["pass"] }), persistence: (await v3(cwd, "with-pr", "feature-pr")).persistence, cwd, primaryCwd: cwd, taskSlug: "with-pr", userPrompt: "implement", variant: "default", workflowId: "feature-pr", forge,
+  const result = await runNextFeatureDev({ provider, persistence: (await v3(cwd, "with-pr", "feature-pr")).persistence, cwd, primaryCwd: cwd, taskSlug: "with-pr", userPrompt: "implement and publish a draft PR", variant: "default", workflowId: "feature-pr", forge,
     prGit: async (args) => args[0] === "remote" ? "git@github.com:o/r.git" : args[0] === "ls-remote" ? `${await sha()}\trefs/heads/harny/with-pr` : "",
   });
-  expect(result.status).toBe("done"); expect(created).not.toBeNull(); expect(created!.draft).toBe(true); expect(created!.head).toBe("harny/with-pr"); expect(created!.expectedHeadSha).toBe(await sha());
+  expect(result.status).toBe("done"); expect(provider.prompts[0]).toContain("privileged pull_request executor"); expect(provider.prompts[0]).toContain("Never create tasks that commit, push, publish/update a pull request"); expect(created).not.toBeNull(); expect(created!.draft).toBe(true); expect(created!.head).toBe("harny/with-pr"); expect(created!.expectedHeadSha).toBe(await sha());
 });
 
 test("next feature-dev uses run.json v3 as the sole authoritative state", async () => {

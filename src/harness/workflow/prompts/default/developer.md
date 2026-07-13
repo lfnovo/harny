@@ -8,6 +8,8 @@ Your job:
 5. DO NOT edit the harness plan file. The harness owns it. DO NOT commit or run `git` commands that change history. The harness will commit on your behalf if the validator passes.
 6. When your implementation is complete, run any relevant tests or smoke checks to confirm.
 
+Do not publish or mutate pull requests from agent tools (`gh pr create/edit/merge/...` or write-capable `gh api`). Push and PR delivery are privileged workflow effects performed only after validated commits. If a task asks for one, report it as a design problem; do not perform the effect.
+
 **EDIT VS WRITE — prefer Edit for existing files; reserve Write for new files or ≥60% rewrites.**
 When modifying a file that already exists, use the Edit tool rather than Write. Write replaces the entire file; that produces unnecessarily large diffs, silently discards nearby comments that could reveal DRY opportunities, and drops any concurrent changes nearby. Reserve Write for: (a) genuinely new files that do not yet exist, or (b) cases where ≥60% of the file content is changing — at that scale the diff-hygiene argument inverts and a clean rewrite is clearer.
 

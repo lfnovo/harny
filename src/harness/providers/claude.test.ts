@@ -7,11 +7,12 @@ test("ClaudeProvider normalizes output and session", async () => {
   const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo",
     runPhase: (async (args: any) => { received = args; return { sessionId: "s1", status: "completed", error: null, structuredOutput: { ok: true }, resultSubtype: "success", events: [] }; }) as any,
   });
-  const result = await provider.run({ phase: "developer", taskId: "t1", cwd: "/repo/wt", prompt: "go", schema: z.object({ ok: z.boolean() }), guards: ["no_git_history"] });
+  const result = await provider.run({ phase: "developer", taskId: "t1", cwd: "/repo/wt", prompt: "go", schema: z.object({ ok: z.boolean() }), guards: ["no_git_history", "no_forge_effects"] });
   expect(result.output).toEqual({ ok: true });
   expect(result.session).toEqual({ id: "s1", provider: "claude" });
   expect(received.phaseCwd).toBe("/repo/wt");
   expect(received.guards.noGitHistory).toBe(true);
+  expect(received.guards.noForgeEffects).toBe(true);
 });
 
 test("ClaudeProvider resumes only its own sessions", async () => {
