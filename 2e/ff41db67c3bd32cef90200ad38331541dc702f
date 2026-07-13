@@ -1,0 +1,22 @@
+src/harness/orchestrator.ts
+  s_361086fd550cc0::t_59bc446168735e 67-69,84
+src/harness/orchestrator.test.ts
+  s_361086fd550cc0::t_59bc446168735e 27,71-74
+  s_361086fd550cc0::t_9460ae945079c0 75-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "2eff41db67c3bd32cef90200ad38331541dc702f",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
