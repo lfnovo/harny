@@ -1,0 +1,55 @@
+src/harness/guardHooks.ts
+  s_361086fd550cc0::t_80be432c5f9bea 136-141
+src/harness/forge/pullRequestExecutor.ts
+  s_361086fd550cc0::t_80be432c5f9bea 11-13
+src/harness/orchestrator.ts
+  s_361086fd550cc0::t_80be432c5f9bea 65-67,82,132-133
+src/harness/transcripts/types.ts
+  s_361086fd550cc0::t_ea88744bd1651d 16
+  s_361086fd550cc0::t_80be432c5f9bea 7-15,17-23
+src/harness/forge/forge.test.ts
+  s_361086fd550cc0::t_80be432c5f9bea 40,45
+  s_361086fd550cc0::t_9fccff998e7ee5 46
+src/harness/state/registry.ts
+  s_361086fd550cc0::t_80be432c5f9bea 29-32
+src/harness/orchestrator.test.ts
+  s_361086fd550cc0::t_09c06b341c44b3 65-70
+src/harness/state/runDiscovery.ts
+  s_361086fd550cc0::t_80be432c5f9bea 2,14
+src/harness/guardHooks.test.ts
+  s_361086fd550cc0::t_80be432c5f9bea 9
+src/harness/state/registry.test.ts
+  s_361086fd550cc0::t_09c06b341c44b3 5,13
+src/harness/providers/claude.test.ts
+  s_361086fd550cc0::t_09c06b341c44b3 54-60
+src/harness/providers/claude.ts
+  s_361086fd550cc0::t_80be432c5f9bea 59,89,94,100-101,106
+  s_361086fd550cc0::t_9288c2ccef69fc 107
+src/harness/transcripts/store.test.ts
+  s_361086fd550cc0::t_09c06b341c44b3 6,49-56
+  s_3a2ca5b6a73ebf::t_01f5b3b325ce0d 57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "945d8ff83529d5a88e30fcbc29ad89a69e0b3443",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    },
+    "s_3a2ca5b6a73ebf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e869f14f-11ac-4ee6-9949-11416ccae65b",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
