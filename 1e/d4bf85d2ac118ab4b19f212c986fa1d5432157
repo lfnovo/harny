@@ -1,0 +1,29 @@
+plugin/skills/review/SKILL.md
+  s_361086fd550cc0::t_87255294d6443a 3
+plugin/agent-smith-index.json
+  s_361086fd550cc0::t_87255294d6443a 73
+plugin/agents/orchestrator.md
+  s_361086fd550cc0::t_87255294d6443a 65,68-72,81,109
+scripts/probes/plugin/01-contract.ts
+  s_361086fd550cc0::t_87255294d6443a 2,6,48,51,53-54
+.claude-plugin/marketplace.json
+  s_361086fd550cc0::t_87255294d6443a 12
+plugin/.claude-plugin/plugin.json
+  s_361086fd550cc0::t_87255294d6443a 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "1ed4bf85d2ac118ab4b19f212c986fa1d5432157",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
