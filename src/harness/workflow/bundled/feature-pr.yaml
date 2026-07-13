@@ -1,0 +1,53 @@
+version: 2
+name: feature-pr
+defaults:
+  provider: claude
+  timeout: 1800000
+workspace:
+  isolation: worktree
+outcome:
+  type: pull_request
+nodes:
+  - id: planner
+    type: agent
+    command: planner
+    requires: [structured_output]
+  - id: tasks
+    type: foreach
+    items: "${{ nodes.planner.outputs.tasks }}"
+    as: task
+    max_items: 100
+    depends_on: [planner]
+    steps:
+      - id: developer
+        type: agent
+        command: developer
+        requires: [structured_output, tool_guards]
+        guards: [no_git_history, no_forge_effects]
+      - id: validator
+        type: agent
+        command: validator
+        depends_on: [developer]
+        requires: [structured_output, tool_guards]
+        guards: [read_only]
+        retry: { max_attempts: 3, return_to: developer }
+      - id: commit
+        type: commit
+        message: feature-dev
+        changeset: developer
+        depends_on: [validator]
+  - id: final_validator
+    type: agent
+    command: final_validator
+    depends_on: [tasks]
+    requires: [structured_output, tool_guards]
+    guards: [read_only]
+  - id: pull_request
+    type: pull_request
+    title: "Harny feature"
+    body: "Created by Harny"
+    base: "${{ inputs.base }}"
+    head: "${{ inputs.branch }}"
+    draft: true
+    existing: allow
+    depends_on: [final_validator]

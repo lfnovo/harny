@@ -1,7 +1,7 @@
 /**
  * Probe: cleanRun with force=true terminates a live child process, then cleans.
  *
- * Spawns a 30s-sleeping child, writes state.json with its pid, calls cleanRun
+ * Spawns a 30s-sleeping child, writes run.json with its pid, calls cleanRun
  * with force=true, and asserts the child is dead within the deadline.
  *
  * RUN
@@ -51,19 +51,8 @@ try {
       const stateDir = join(primaryCwd, ".harny", slug);
       await mkdir(stateDir, { recursive: true });
 
-      const state = {
-        schema_version: 2,
-        run_id: "test-run",
-        origin: { prompt: "x", workflow: "feature-dev", task_slug: slug, started_at: new Date().toISOString(), host: "localhost", user: "test", features: null },
-        environment: { cwd: primaryCwd, branch: `harny/${slug}`, isolation: "inline", worktree_path: null, mode: "silent" },
-        lifecycle: { status: "running", current_phase: null, ended_at: null, ended_reason: null, pid: childPid },
-        phases: [],
-        history: [],
-        pending_question: null,
-        workflow_state: {},
-        workflow_chosen: null,
-      };
-      await writeFile(join(stateDir, "state.json"), JSON.stringify(state), "utf8");
+      const state = { schema_version: 4, run: { pid: childPid }, execution: { status: "running" } };
+      await writeFile(join(stateDir, "run.json"), JSON.stringify(state), "utf8");
 
       // Should terminate the child and clean up
       await cleanRun(primaryCwd, slug, false, { force: true });

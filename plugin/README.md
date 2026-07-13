@@ -1,6 +1,6 @@
-# harny (Claude Code plugin)
+# harny plugin
 
-Claude Code plugin for using [harny](https://github.com/lfnovo/harny) in any repository.
+Plugin for operating [harny](https://github.com/lfnovo/harny)'s declarative Claude/Codex workflows from a coding-agent conversation.
 
 Ships skills, an orchestrator agent, and onboarding so you can use harny from a Claude Code conversation without memorizing CLI flags or operational lore.
 
@@ -49,7 +49,7 @@ npm install -g @lfnovo/harny
 | `/harny:harny` | Onboarding + router — start here if you've never used harny |
 | `/harny:check-repo` | Walk you through the readiness checklist for adopting harny in a repo |
 | `/harny:learn` | Capture a one-line learning to the local inbox (no analysis) |
-| `/harny:drain` | Triage accumulated learnings into Issues / CLAUDE.md edits / discards |
+| `/harny:drain` | Triage accumulated learnings into Issues / AGENTS.md edits / discards |
 | `/harny:review` | Post-mortem of a single harny run (state + plan + transcripts) |
 | `/harny:release` | Orchestrate a release cycle across multiple harny runs |
 

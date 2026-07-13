@@ -1,34 +1,24 @@
 import { randomUUID } from "node:crypto";
 import { hostname, userInfo } from "node:os";
-import { coldInstallWorktree } from "./coldInstall.js";
-import { planFilePath, worktreePathFor } from "./state/plan.js";
 import { realGitOps, type GitOps } from "./gitOps.js";
-import { FilesystemStateStore } from "./state/filesystem.js";
-import type { State } from "./state/schema.js";
-import { setupPhoenix, withRunSpan } from "./observability/phoenix.js";
-import { getWorkflow } from "./workflows/index.js";
-import { runEngineWorkflow } from "./engine/runtime/runEngineWorkflow.js";
 import type { IsolationMode, LogMode, RunMode } from "./types.js";
+import type { AgentProvider } from "./providers/types.js";
+import { createConfiguredProviders } from "./providers/config.js";
+import { loadWorkflow } from "./workflow/loader.js";
+import { validateWorkflow } from "./workflow/validate.js";
+import { runDeclarativeWorkflow } from "./workflow/declarativeRunner.js";
+import { RunWorkflowPersistence } from "./workflow/persistence.js";
+import { RunStore } from "./state/runStore.js";
+import type { RunSnapshot } from "./state/runSchema.js";
+import { patchPointer, writePointer } from "./state/registry.js";
+import { LocalWorkspaceProvider, type WorkspaceProvider } from "./workspace/provider.js";
+import type { ForgeProvider } from "./forge/types.js";
+import type { PullRequestGitRunner } from "./forge/pullRequestExecutor.js";
 
-function defaultTaskSlug(): string {
-  const now = new Date();
-  const iso = now.toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
-  return `run-${iso}`;
-}
+function defaultTaskSlug(): string { return `run-${new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "")}`; }
+export function isPidAlive(pid: number): boolean { try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code !== "ESRCH"; } }
 
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ESRCH") return false;
-    if (code === "EPERM") return true;
-    return true;
-  }
-}
-
-export async function runHarness(args: {
+export interface HarnessRequest {
   cwd: string;
   userPrompt: string;
   taskSlug?: string;
@@ -38,186 +28,110 @@ export async function runHarness(args: {
   mode?: RunMode;
   logMode?: LogMode;
   gitOps?: GitOps;
-}): Promise<{ status: "done" | "failed" | "exhausted" | "waiting_human"; planPath: string; branch: string }> {
+  agentProvider?: AgentProvider;
+  agentProviders?: readonly AgentProvider[];
+  workspaceProvider?: WorkspaceProvider;
+  inputs?: Readonly<Record<string, unknown>>;
+  parentRunId?: string;
+  startPoint?: string;
+  forge?: ForgeProvider;
+  prGit?: PullRequestGitRunner;
+}
+
+export interface HarnessResult { status: "done" | "failed" | "cancelled" | "waiting_human"; branch: string; state: RunSnapshot | null; }
+
+/** Creates and executes every workflow through the same declarative runtime. */
+export async function runHarness(args: HarnessRequest): Promise<HarnessResult> {
   const primaryCwd = args.cwd;
   const git = args.gitOps ?? realGitOps;
   const taskSlug = args.taskSlug?.trim() || defaultTaskSlug();
   const logMode = args.logMode ?? "compact";
-  const log = (msg: string) => { if (logMode !== "quiet") console.log(msg); };
-  const warn = (msg: string) => { if (logMode !== "quiet") console.warn(msg); };
-
-  const workflow = getWorkflow(args.workflowId ?? "feature-dev");
+  const log = (message: string) => { if (logMode !== "quiet") console.log(message); };
+  const warn = (message: string) => { if (logMode !== "quiet") console.warn(message); };
+  const requestedWorkflow = args.workflowId ?? "feature-dev";
+  const definition = (await loadWorkflow(requestedWorkflow, { cwd: primaryCwd })).definition;
+  const isolation = args.isolation ?? definition.workspace.isolation;
+  const needsBranch = definition.outcome.type !== "none" || isolation === "worktree";
   const variant = args.variant ?? "default";
-  const mode: RunMode = args.mode ?? (process.stdin.isTTY ? "interactive" : "silent");
-  const isolation: IsolationMode = args.isolation ?? "worktree";
-
-  log(`[harny] cwd=${primaryCwd} isolation=${isolation}`);
-  log(`[harny] workflow=${workflow.id} task=${taskSlug}`);
-  log(`[harny] user prompt >>>`);
-  log(args.userPrompt);
-  log(`[harny] user prompt <<<`);
-
-  await git.assertIsGitRepo(primaryCwd);
-  await git.assertHasInitialCommit(primaryCwd);
-
-  // Idempotent rerun guard: if state.json already exists at this slug, refuse
-  // gracefully so we don't clobber an in-progress or completed run.
-  const probeStore = new FilesystemStateStore(primaryCwd, taskSlug);
-  const existing = await probeStore.getState();
-  if (existing) {
-    if (existing.lifecycle.status === "done" || existing.lifecycle.status === "failed") {
-      log(
-        `[harny] run already complete (status=${existing.lifecycle.status}, ended_at=${existing.lifecycle.ended_at ?? "?"}). Use \`harny clean ${taskSlug}\` then rerun.`,
-      );
-      return { status: existing.lifecycle.status, planPath: planFilePath(primaryCwd, taskSlug), branch: existing.environment.branch };
-    }
-    if (existing.lifecycle.status === "running") {
-      if (isPidAlive(existing.lifecycle.pid)) {
-        throw new Error(
-          `Run ${taskSlug} appears to still be running (pid=${existing.lifecycle.pid}). If it's actually dead, \`harny clean ${taskSlug}\` and retry.`,
-        );
-      } else {
-        throw new Error(
-          `Run ${taskSlug} crashed mid-execution (pid=${existing.lifecycle.pid} no longer exists). Run \`harny clean ${taskSlug}\` to discard state and retry.`,
-        );
-      }
-    }
-    if (existing.lifecycle.status === "waiting_human") {
-      throw new Error(
-        `Run ${taskSlug} is parked waiting for input. Engine workflows don't yet support resume — use \`harny clean ${taskSlug}\` to discard.`,
-      );
-    }
-  }
-
-  let phaseCwd = primaryCwd;
-  let worktreePath: string | null = null;
-  const branch = workflow.needsBranch ? `harny/${taskSlug}` : "";
-
-  if (workflow.needsBranch) {
-    await git.assertBranchAbsent(primaryCwd, branch);
-    if (workflow.needsWorktree && isolation !== "inline") {
-      worktreePath = worktreePathFor(primaryCwd, taskSlug);
-      await git.assertWorktreePathAbsent(worktreePath);
-      await git.addWorktree(primaryCwd, worktreePath, branch);
-      phaseCwd = worktreePath;
-      log(`[harny] worktree=${worktreePath}`);
-      await coldInstallWorktree({ worktreePath, primaryCwd });
-    } else {
-      await git.assertCleanTree(primaryCwd);
-      await git.createBranch(primaryCwd, branch);
-      phaseCwd = primaryCwd;
-    }
-  } else if (!workflow.needsWorktree && isolation === "inline") {
-    await git.assertCleanTree(primaryCwd);
-  }
-
-  const planPath = planFilePath(primaryCwd, taskSlug);
+  const mode = args.mode ?? (process.stdin.isTTY ? "interactive" : "silent");
   const runId = randomUUID();
 
-  const store = new FilesystemStateStore(primaryCwd, taskSlug);
+  const providers = await createProviders(args, { workflowId: definition.name, runId, taskSlug, primaryCwd, mode, logMode });
+  validateWorkflow(definition, providers);
+  log(`[harny] cwd=${primaryCwd} isolation=${isolation}`);
+  log(`[harny] workflow=${definition.name} task=${taskSlug}`);
+  await git.assertIsGitRepo(primaryCwd);
+  await git.assertHasInitialCommit(primaryCwd);
+  if (args.inputs?.base !== undefined && (typeof args.inputs.base !== "string" || args.inputs.base.trim() === "")) throw new Error("inputs.base must be a non-empty branch name");
+  const needsPullRequest = definition.nodes.some((node) => node.type === "pull_request");
+  const normalizedInputs: Record<string, unknown> = { ...(args.inputs ?? {}) };
+  if (typeof args.inputs?.base === "string") normalizedInputs.base = args.inputs.base.trim();
+  else if (needsPullRequest) normalizedInputs.base = await discoverBaseBranch(primaryCwd);
+
+  const store = new RunStore(primaryCwd, taskSlug);
+  const existing = await store.load();
+  if (existing) return handleExisting(existing, store, log);
+
+  const workspaceProvider = args.workspaceProvider ?? new LocalWorkspaceProvider(git);
+  const workspace = await workspaceProvider.prepare({ primaryCwd, taskSlug, isolation, needsBranch, startPoint: args.startPoint });
+  if (workspace.worktreePath) log(`[harny] worktree=${workspace.worktreePath}`);
   const startedAt = new Date().toISOString();
-  const initialState: State = {
-    schema_version: 2,
-    run_id: runId,
-    origin: {
-      prompt: args.userPrompt,
-      workflow: workflow.id,
-      task_slug: taskSlug,
-      started_at: startedAt,
-      host: hostname(),
-      user: userInfo().username,
-      features: null,
-    },
-    environment: {
-      cwd: primaryCwd,
-      branch,
-      isolation,
-      worktree_path: worktreePath,
-      mode,
-    },
-    lifecycle: {
-      status: "running",
-      current_phase: null,
-      ended_at: null,
-      ended_reason: null,
-      pid: process.pid,
-    },
-    phases: [],
-    history: [
-      { at: startedAt, phase: "harness", event: "run_started" },
-    ],
-    pending_question: null,
-    workflow_state: {},
-    workflow_chosen: null,
+  const created: RunSnapshot = {
+    schema_version: 4,
+    run: { id: runId, task_slug: taskSlug, workflow: definition.name, started_at: startedAt, ended_at: null, ended_reason: null, pid: process.pid, parent_run_id: args.parentRunId ?? null },
+    origin: { prompt: args.userPrompt, workflow_source: requestedWorkflow, cwd: primaryCwd, host: hostname(), user: userInfo().username },
+    workspace: { isolation, primary_cwd: primaryCwd, cwd: workspace.cwd, branch: workspace.branch, worktree_path: workspace.worktreePath, reserved: true },
+    inputs: structuredClone(normalizedInputs),
+    execution: { workflow: definition.name, status: "running", nodes: Object.fromEntries(definition.nodes.map((node) => [node.id, { id: node.id, status: "pending" as const, attempts: 0 }])) },
+    changesets: {},
   };
-  await store.createRun(initialState);
+  await store.create(created);
+  try { await writePointer(created); } catch (error) { warn(`[harny] could not write run pointer: ${(error as Error).message}`); }
 
-  const handleCleanupWorktree = async (
-    outcome: "done" | "failed" | "exhausted" | "waiting_human",
-  ): Promise<void> => {
-    if (!worktreePath) return;
-    if (outcome === "done") {
-      try {
-        await git.removeWorktree(primaryCwd, worktreePath, { force: true });
-        log(`[harny] worktree removed: ${worktreePath}`);
-      } catch (err) {
-        warn(`[harny] worktree cleanup failed: ${(err as Error).message}`);
-      }
-    } else {
-      log(`[harny] worktree preserved: ${worktreePath} (branch: ${branch})`);
-    }
-  };
+  return continueRun({ run: (await store.load())!, definition, providers, mode, logMode, variant, workspaceProvider, forge: args.forge, prGit: args.prGit });
+}
 
-  const phoenix = setupPhoenix({
-    workflowId: workflow.id,
-    runId,
-    taskSlug,
-    cwd: primaryCwd,
-  });
+export async function continueRun(args: { run: RunSnapshot; definition?: Awaited<ReturnType<typeof loadWorkflow>>["definition"]; providers?: ReadonlyMap<string, AgentProvider>; mode: RunMode; logMode: LogMode; variant?: string; workspaceProvider?: WorkspaceProvider; forge?: ForgeProvider; prGit?: PullRequestGitRunner }): Promise<HarnessResult> {
+  const run = args.run; const store = new RunStore(run.workspace.primary_cwd, run.run.task_slug); const log = (message: string) => { if (args.logMode !== "quiet") console.log(message); }; const warn = (message: string) => { if (args.logMode !== "quiet") console.warn(message); };
+  const providers = args.providers ?? await createProviders({}, { workflowId: run.run.workflow, runId: run.run.id, taskSlug: run.run.task_slug, primaryCwd: run.workspace.primary_cwd, mode: args.mode, logMode: args.logMode });
+  const definition = args.definition ?? (await loadWorkflow(run.origin.workflow_source || run.run.workflow, { cwd: run.workspace.primary_cwd, providers })).definition;
+  let result: Awaited<ReturnType<typeof runDeclarativeWorkflow>>;
+  try { result = await runDeclarativeWorkflow({ definition, persistence: new RunWorkflowPersistence(store), providers, cwd: run.workspace.cwd, primaryCwd: run.workspace.primary_cwd, userPrompt: run.origin.prompt, taskSlug: run.run.task_slug, branch: run.workspace.branch, variant: args.variant ?? "default", mode: args.mode, inputs: run.inputs, forge: args.forge, prGit: args.prGit }); }
+  catch (error) { result = { status: "failed", snapshot: (await store.load())!.execution, error: String(error) }; }
+  const endedAt = result.status === "waiting_human" ? null : new Date().toISOString();
+  await store.mutate((state) => { if (result.status !== "waiting_human") { state.execution.status = result.status; state.run.ended_at = endedAt; state.run.ended_reason = result.status === "done" ? "completed" : result.status === "cancelled" ? "workflow cancelled" : result.error ?? "failed"; state.workspace.reserved = false; } }, { type: result.status === "waiting_human" ? "run.paused" : result.status === "done" ? "run.completed" : result.status === "cancelled" ? "run.cancelled" : "run.failed" });
+  await patchPointer(run.run.id, { status: result.status === "waiting_human" ? "paused" : result.status, ended_at: endedAt });
+  const workspace = { primaryCwd: run.workspace.primary_cwd, cwd: run.workspace.cwd, isolation: run.workspace.isolation, branch: run.workspace.branch, worktreePath: run.workspace.worktree_path };
+  await releaseWorkspace(args.workspaceProvider ?? new LocalWorkspaceProvider(realGitOps), workspace, result.status, log, warn);
+  if (result.status === "failed") log(`[harny] workflow failed: ${result.error ?? "unknown error"}`); else log(`[harny] workflow ${result.status === "waiting_human" ? "paused" : result.status}`);
+  return { status: result.status, branch: run.workspace.branch, state: await store.load() };
+}
 
-  return await withRunSpan(
-    phoenix,
-    taskSlug,
-    {
-      "harny.workflow": workflow.id,
-      "harny.run_id": runId,
-      "harny.task_slug": taskSlug,
-      "harny.cwd": primaryCwd,
-    },
-    async (traceId) => {
-      if (traceId && phoenix.projectName) {
-        await store.setPhoenix({ project: phoenix.projectName, trace_id: traceId });
-      }
+async function createProviders(args: Pick<HarnessRequest, "agentProvider" | "agentProviders">, metadata: { workflowId: string; runId: string; taskSlug: string; primaryCwd: string; mode: RunMode; logMode: LogMode }): Promise<Map<string, AgentProvider>> {
+  const providers = await createConfiguredProviders(metadata);
+  for (const provider of args.agentProviders ?? []) providers.set(provider.id, provider);
+  if (args.agentProvider) providers.set(args.agentProvider.id, args.agentProvider);
+  return providers;
+}
 
-      const engineResult = await runEngineWorkflow(workflow, {
-        cwd: phaseCwd,
-        primaryCwd,
-        taskSlug,
-        runId,
-        userPrompt: args.userPrompt,
-        log,
-        mode,
-        logMode,
-        store,
-        variant,
-      });
+async function handleExisting(existing: RunSnapshot, store: RunStore, log: (message: string) => void): Promise<HarnessResult> {
+  if (["done", "failed", "cancelled"].includes(existing.execution.status)) { log(`[harny] run already complete (status=${existing.execution.status}). Use \`harny clean ${existing.run.task_slug}\` then rerun.`); return { status: existing.execution.status === "done" ? "done" : existing.execution.status === "cancelled" ? "cancelled" : "failed", branch: existing.workspace.branch, state: existing }; }
+  if (existing.execution.status === "running" && isPidAlive(existing.run.pid)) throw new Error(`Run ${existing.run.task_slug} appears to still be running (pid=${existing.run.pid}).`);
+  if (existing.execution.status === "running") {
+    const ended = new Date().toISOString();
+    const failed = await store.mutate((run) => { run.execution.status = "failed"; run.run.ended_at = ended; run.run.ended_reason = `process exited unexpectedly (pid=${run.run.pid})`; run.workspace.reserved = false; }, { type: "run.dead_pid" });
+    await patchPointer(existing.run.id, { status: "failed", ended_at: ended });
+    return { status: "failed", branch: failed.workspace.branch, state: failed };
+  }
+  throw new Error(`Run ${existing.run.task_slug} is paused waiting for human input. Use \`harny answer ${existing.run.id}\`.`);
+}
 
-      await handleCleanupWorktree(engineResult.status);
-
-      await store.updateLifecycle({
-        status: engineResult.status === "done" ? "done" : "failed",
-        ended_at: new Date().toISOString(),
-        ended_reason: engineResult.status,
-        current_phase: null,
-      });
-
-      if (engineResult.status === "failed") {
-        log(`[harny] engine workflow failed: ${engineResult.error ?? "(no error message)"}`);
-      } else {
-        log(`[harny] engine workflow done`);
-      }
-
-      return { status: engineResult.status, planPath, branch };
-    },
-  );
+async function releaseWorkspace(provider: WorkspaceProvider, workspace: Awaited<ReturnType<WorkspaceProvider["prepare"]>>, outcome: HarnessResult["status"], log: (message: string) => void, warn: (message: string) => void): Promise<void> {
+  try { await provider.release(workspace, outcome); if (workspace.worktreePath) log(outcome === "done" ? `[harny] worktree removed: ${workspace.worktreePath}` : `[harny] worktree preserved: ${workspace.worktreePath} (branch: ${workspace.branch})`); }
+  catch (error) { warn(`[harny] worktree cleanup failed: ${(error as Error).message}`); }
+}
+async function discoverBaseBranch(cwd: string): Promise<string> {
+  const proc = Bun.spawn(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], { cwd, stdout: "pipe", stderr: "ignore" }); const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  if (code === 0 && stdout.trim()) return stdout.trim().replace(/^origin\//, "");
+  throw new Error("could not determine the repository base branch; pass inputs.base explicitly");
 }

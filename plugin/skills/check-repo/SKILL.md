@@ -53,7 +53,7 @@ For each of the 10 dimensions, in order:
 2. **Gather evidence from the repo** using whatever tools fit the dimension. Examples:
    - Dim 2 (safe-reset): `git status`, look for floating files at root, check `.gitignore` coverage
    - Dim 3 (install): identify lock files, check CI workflow vs declared dependencies
-   - Dim 6 (docs): look for `CLAUDE.md`, `ARCHITECTURE.md`, module-level docs
+   - Dim 6 (docs): look for `AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, module-level docs
    - Dim 8 (branches): `git branch -a | wc -l`, `git branch -r`
    - Dim 9 (lint/type): identify configured tools, check whether CI blocks on them
 3. **Ask only what is needed** — the diagnostic question or specific judgment calls. Do not ask the user to answer the checklist items one by one; you should infer most of them.
@@ -122,6 +122,6 @@ Do not auto-invoke other skills.
 ## Edge cases
 
 - **Repo with no commits.** harny needs at least one commit. Tell the user `git commit --allow-empty -m "initial"` before retrying.
-- **Repo without CLAUDE.md.** Score dimension 6 honestly (likely 🔴 or 🟡), do not lecture.
+- **Repo without AGENTS.md or equivalent agent instructions.** Score dimension 6 honestly (likely 🔴 or 🟡), do not lecture.
 - **Mid-walk interruption.** If the user stops you with a question, answer it tersely and resume from the dimension you were on.
 - **User pushes back on a score.** Take the feedback. The user knows their repo better than you do. Re-score with their context.

@@ -22,7 +22,7 @@ export interface GitOps {
   assertBranchAbsent(cwd: string, branch: string): Promise<void>;
   assertWorktreePathAbsent(worktreePath: string): Promise<void>;
   createBranch(cwd: string, branch: string): Promise<void>;
-  addWorktree(primaryCwd: string, worktreePath: string, branch: string): Promise<void>;
+  addWorktree(primaryCwd: string, worktreePath: string, branch: string, startPoint?: string): Promise<void>;
   removeWorktree(
     primaryCwd: string,
     worktreePath: string,

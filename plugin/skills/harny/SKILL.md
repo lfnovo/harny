@@ -18,7 +18,7 @@ The skill teaches the **mental model** and **routes you** to the focused skill t
 
 ## What harny is
 
-[harny](https://github.com/lfnovo/harny) is a TypeScript task launcher built on the Claude Agent SDK. It runs a **planner → developer → validator** loop on your behalf, with the orchestrator (harny) committing only after the validator passes.
+[harny](https://github.com/lfnovo/harny) is a local-first declarative workflow runtime for Claude and Codex. Its default workflow runs a **planner → developer → validator** loop, with Harny committing only the exact validated ChangeSet.
 
 In practical terms: instead of telling Claude "do this thing in my repo and figure out when you're done", you tell harny "do this thing, and the validator command tells you when you're done." Harny handles iteration, retries, branch management, and commits.
 
@@ -30,18 +30,18 @@ In practical terms: instead of telling Claude "do this thing in my repo and figu
 
 When you invoke `harny --name <slug> "<your prompt>"`:
 
-1. **Planner** reads your prompt + the repo's `CLAUDE.md` and produces a plan (`plan.json`) with one or more tasks.
+1. **Planner** reads your prompt and repository guidance and produces a typed node output with one or more tasks.
 2. **Developer** executes one task at a time, making code changes.
 3. **Validator** runs your validator command (typecheck, tests, lint, etc.). Read-only — no Edit/Write.
 4. **If validator passes**, harny composes a commit message (developer's intent + validator's evidence) and commits.
-5. **If validator fails**, harny retries the developer with the validator's feedback, up to a configurable cap. Reset between attempts is `git reset --hard` to the pre-phase SHA.
+5. **If validator fails**, harny retries the developer with the validator's feedback, up to a configurable cap, and captures a fresh ChangeSet.
 6. The run produces a branch `harny/<slug>` with one or more commits. You merge it (or not) when ready.
 
 State of the run lives at `<cwd>/.harny/<slug>/`:
 
-- `state.json` — phases, status, history.
-- `plan.json` — task list with verdict history.
-- `transcripts/` — per-phase SDK transcript pointers.
+- `run.json` — authoritative v4 snapshot with immutable inputs, exact scheduler state and ChangeSets.
+- `events.jsonl` — append-only, non-authoritative audit events.
+- `transcripts/` — normalized, attempt-scoped provider events used by the viewer.
 - The whole `.harny/` directory is gitignored — per-clone, never committed.
 
 ---
@@ -71,7 +71,7 @@ The architect does **not**:
 |---|---|
 | Evaluate whether your repo is ready for harny | `/check-repo` |
 | Note something interesting mid-conversation, no analysis | `/learn <text>` |
-| Triage accumulated learnings into Issues / CLAUDE.md edits / discards | `/drain` |
+| Triage accumulated learnings into Issues / AGENTS.md edits / discards | `/drain` |
 | Post-mortem a single harny run that surprised you | `/review <slug>` |
 | Operate as release manager across multiple harny runs | `/release` |
 | Have an agent dispatch + monitor a harny run for you in natural language | `Task(subagent_type: "orchestrator", ...)` |
@@ -100,7 +100,7 @@ harny --version  # confirm
 
 Walk through the 10-dimension readiness checklist. The skill produces a scorecard plus a prep checklist. Do the prep before the first run — it's much cheaper to fix readiness gaps now than to debug them mid-run.
 
-### 3. (Optional) Add agent-instruction section to your CLAUDE.md
+### 3. (Optional) Add agent instructions to your AGENTS.md
 
 If your repo has accumulated lint/type debt on `main`, or if your validator command is non-obvious, document it explicitly for harny:
 
@@ -181,11 +181,11 @@ harny clean <slug> --force         # SIGTERM the running process group, then cle
 harny clean <slug> --force --kill  # SIGTERM, then SIGKILL after 5s, then clean
 ```
 
-With no flags, `clean` refuses if `state.json` shows `status=running` with a live PID. Stale PIDs (process already gone) are detected and cleanup proceeds with a warning. `--force` terminates the process group; add `--kill` only if the process ignores SIGTERM.
+With no flags, `clean` refuses if the run snapshot shows a live running PID. Stale PIDs are materialized as failures. `--force` terminates the process group; add `--kill` only if the process ignores SIGTERM.
 
 ### When to run
 
-- **Schema migration.** A stale `plan.json` or `state.json` from an older harny version may fail validation on a fresh dispatch. Cleaning the offending slug is the official migration path.
+- **Schema migration.** Only run schema v4 is supported; clean an older slug before reusing it.
 - **Slug reuse.** You want to re-dispatch with the same `--name <slug>` and the previous run left a worktree/branch behind.
 - **Aborted run with no recoverable signal.** A failed run whose transcripts and verdicts you've already triaged (or that has no insight worth keeping).
 - **Throwaway experimentation.** Sandbox repo where run history has no value.

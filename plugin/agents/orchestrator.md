@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-description: Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target CLAUDE.md, dispatches + monitors. Use to delegate harny invocation.
+description: Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target agent instructions, dispatches + monitors. Use to delegate harny invocation.
 tools:
   - Bash
   - Read
@@ -35,12 +35,12 @@ If the resolved cwd is not a git repo or has no commits, stop and tell the user 
 Check the target repo for traps that will silently misbehave:
 
 - **`.env` with `ANTHROPIC_API_KEY`.** Run `grep -l "ANTHROPIC_API_KEY=." <cwd>/.env <cwd>/.env.local 2>/dev/null || true`. If found, harny's underlying SDK will use API billing instead of the user's Claude Code (Max/Pro) subscription. Plan to prefix the invocation with `ANTHROPIC_API_KEY= ` (empty string overrides Bun's `.env` auto-load).
-- **No `CLAUDE.md` at root.** Note for the report — phases will work but with weaker context.
+- **No `AGENTS.md` or `CLAUDE.md` at root.** Note for the report — phases will work but with weaker context.
 - **Working tree not clean.** Run `git status --porcelain`. If non-empty, warn the user; offer to stash before dispatch.
 
-### 3. Read target CLAUDE.md for agent guidance
+### 3. Read target agent instructions
 
-If `<cwd>/CLAUDE.md` exists, read it and look for a section titled "For Automated Agents", "Agents", or similar. It typically pins:
+Read `<cwd>/AGENTS.md` when present; otherwise fall back to `<cwd>/CLAUDE.md`. Look for a section titled "For Automated Agents", "Agents", or similar. It typically pins:
 
 - Exact validator command.
 - Tools to NOT use as gates (pre-existing debt).
@@ -60,7 +60,7 @@ The user's natural-language intent isn't always a good harny prompt. Apply light
 
 - **Keep it product-vision.** Outcome + acceptance criteria + constraints. Do not add file paths or implementation suggestions — that's the planner's job (per `/release` Rule 5).
 - **Reference the target.** If the intent points at an issue URL, include the URL verbatim — the planner will fetch it.
-- **Inherit constraints from CLAUDE.md.** If the doc says "do not run mypy as a gate", restate that in the prompt so the validator phase doesn't redrift.
+- **Inherit constraints from the agent instructions.** If the doc says "do not run mypy as a gate", restate that in the prompt so the validator phase doesn't redrift.
 
 Show the refined prompt to the user before dispatching, especially if you reshaped it significantly.
 
@@ -87,8 +87,8 @@ Run the CLI with `run_in_background: true`. Capture the background task ID for m
 
 Once dispatched:
 
-- Wait for harny to create `<cwd>/.harny/<slug>/state.json`.
-- Tail `state.json` periodically (read it, parse JSON, check `status` and `phases[]`).
+- Wait for harny to create `<cwd>/.harny/<slug>/run.json`.
+- Inspect `run.json` and `events.jsonl` periodically; use `harny show <slug>` for a schema-neutral view.
 - Report progress at meaningful moments — phase transitions, validator failures, retry attempts. Do NOT poll every second; use `ScheduleWakeup` for long runs or just await the background process completion notification.
 - Watch for terminal status: `done`, `failed`, `waiting_human`.
 

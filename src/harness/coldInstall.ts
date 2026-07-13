@@ -1,9 +1,10 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
 export async function coldInstallWorktree({
   worktreePath,
+  primaryCwd,
 }: {
   worktreePath: string;
   primaryCwd: string;
@@ -18,10 +19,13 @@ export async function coldInstallWorktree({
   }
 
   console.log(`[harny:cold-install] running bun install in ${worktreePath}`);
+  const tempDir = join(primaryCwd, ".harny", "tmp");
+  mkdirSync(tempDir, { recursive: true });
 
   await new Promise<void>((resolve, reject) => {
-    const proc = spawn("bun", ["install"], {
+    const proc = spawn("bun", ["install", "--cache-dir", join(tempDir, "bun-cache")], {
       cwd: worktreePath,
+      env: { ...process.env, TMPDIR: tempDir },
       stdio: ["ignore", "pipe", "pipe"],
     });
 

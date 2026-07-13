@@ -1,7 +1,6 @@
 import type { IsolationMode, LogMode, RunMode } from "./harness/types.js";
 import type { RunnerContext } from "./runner/context.js";
 import { configureEnv } from "./runner/env.js";
-import { maybeRunMigration } from "./runner/migrate.js";
 import { handleScan } from "./runner/scan.js";
 import { handleLs } from "./runner/ls.js";
 import { handleShow } from "./runner/show.js";
@@ -9,6 +8,7 @@ import { handleAnswer } from "./runner/answer.js";
 import { handleUi } from "./runner/ui.js";
 import { handleClean } from "./runner/clean.js";
 import { handleRun } from "./runner/run.js";
+import { handlePrFix } from "./runner/prFix.js";
 import { startUpdateCheck, printUpdateNotice } from "./runner/updateCheck.js";
 import pkg from "../package.json" with { type: "json" };
 
@@ -36,7 +36,8 @@ export function printHelp(): void {
       "Subcommands:",
       "  ls [--status <s>] [--cwd <path>] [--workflow <id>]   List runs",
       "  show <runId> [--tail] [--since <duration>]            Show run detail",
-      "  answer <runId>                                        Answer a parked question",
+      "  answer <runId> [text] [--json <value>]                Answer and resume a parked run",
+      "  pr fix <number>                                        Fix feedback on an existing PR",
       "  ui [--port <n>] [--no-open]                          Launch the viewer UI",
       "  clean <slug> [--force] [--kill]                      Clean up a run",
       "  clean --prune                                         Prune unreachable pointers from ~/.harny/runs/",
@@ -54,10 +55,11 @@ type SubcommandSpec = { positional?: string[]; flags: string[] };
 export type RegistryCmd =
   | { kind: "ls"; status?: string; cwd?: string; workflow?: string }
   | { kind: "show"; runId: string; tail?: boolean; since?: string }
-  | { kind: "answer"; runId: string }
+  | { kind: "answer"; runId: string; text?: string; json?: string }
   | { kind: "ui"; port?: number; noOpen?: boolean }
   | { kind: "clean"; slug: string | null; force?: boolean; kill?: boolean; prune?: boolean }
-  | { kind: "scan"; cwd?: string };
+  | { kind: "scan"; cwd?: string }
+  | { kind: "pr-fix"; number: number };
 
 const FLAGS: Record<string, FlagSpec> = {
   "--verbose":  { kind: "bool",  target: "verbose", short: "-v" },
@@ -76,6 +78,7 @@ const SUBCOMMANDS: Record<string, SubcommandSpec> = {
   ui:     { flags: ["--no-open", "--port"] },
   clean:  { positional: ["slug"], flags: ["--force", "--kill", "--prune"] },
   scan:   { positional: ["cwd"], flags: [] },
+  pr:     { positional: ["action", "number"], flags: [] },
 };
 
 function parseIsolation(v: string): IsolationMode {
@@ -153,7 +156,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
         if (pos[0]) registryCmd = { kind: "show", runId: pos[0], ...(sf["--tail"] ? { tail: true } : {}), ...(sf["--since"] ? { since: sf["--since"] as string } : {}) };
         break;
       case "answer":
-        if (pos[0]) registryCmd = { kind: "answer", runId: pos[0] };
+        if (pos[0]) registryCmd = { kind: "answer", runId: pos[0], ...(pos[1] ? { text: pos.slice(1).join(" ") } : {}), ...(typeof sf["--json"] === "string" ? { json: sf["--json"] as string } : {}) };
         break;
       case "ui":
         registryCmd = { kind: "ui", ...(sf["--port"] ? { port: Number(sf["--port"]) } : {}), ...(sf["--no-open"] ? { noOpen: true } : {}) };
@@ -167,6 +170,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
         break;
       case "scan":
         registryCmd = { kind: "scan", ...(pos[0] ? { cwd: pos[0] } : {}) };
+        break;
+      case "pr":
+        if (pos[0] === "fix" && pos[1] && Number.isInteger(Number(pos[1])) && Number(pos[1]) > 0) registryCmd = { kind: "pr-fix", number: Number(pos[1]) };
         break;
     }
   }
@@ -204,15 +210,17 @@ export async function main() {
   // Fire-and-forget the update check now so its network round-trip overlaps
   // the actual work; the notice is printed once the command finishes.
   const updateCheck = startUpdateCheck(pkg.version, logMode);
-  // One-shot migration: if the pointer registry is empty but legacy runs
-  // exist in known cwds, backfill so `ls`/`show`/`ui` aren't suddenly empty
-  // for upgraded users.
-  await maybeRunMigration(logMode);
   try {
     if (registryCmd) {
-      const handlers = { ls: handleLs, show: handleShow, answer: handleAnswer, ui: handleUi, clean: handleClean, scan: handleScan };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (handlers[registryCmd.kind] as any)(registryCmd as any, ctx);
+      switch (registryCmd.kind) {
+        case "ls": await handleLs(registryCmd); break;
+        case "show": await handleShow(registryCmd); break;
+        case "answer": await handleAnswer(registryCmd); break;
+        case "ui": await handleUi(registryCmd); break;
+        case "clean": await handleClean(registryCmd, ctx); break;
+        case "scan": await handleScan(registryCmd); break;
+        case "pr-fix": await handlePrFix(registryCmd, ctx); break;
+      }
       return;
     }
     await handleRun(parsed, ctx);

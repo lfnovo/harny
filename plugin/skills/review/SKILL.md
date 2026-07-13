@@ -1,6 +1,6 @@
 ---
 name: review
-description: Post-mortem of a single harny run. Reads state.json + plan.json + per-phase transcripts. Emits a leaves-to-trunk review with evidence-backed proposals (triaged NOW-blocks/NOW-quick/BACKLOG). Use after failed, retried, slow, or novel runs.
+description: Post-mortem of a Harny run. Reads run.json v4, events and transcripts. Emits evidence-backed proposals. Use after failed, retried, slow, or novel runs.
 allowed-tools: Bash, Read, Write, Agent
 ---
 
@@ -34,30 +34,32 @@ Use sub-agents aggressively to keep the main context window clean. Transcripts c
 ### Step 1 — Map the run
 
 Read in main context:
-- `<cwd>/.harny/<slug>/state.json` — phases, history, status, ended_reason, problems.
-- `<cwd>/.harny/<slug>/plan.json` — task list with verdict history (feature-dev workflow).
+- `<cwd>/.harny/<slug>/run.json` — authoritative nodes, attempts, artifacts, ChangeSets and outcome.
+- `<cwd>/.harny/<slug>/events.jsonl` — append-only audit trail. Fall back to v2 state/plan only for historical runs.
+- `<cwd>/.harny/<slug>/transcripts/` — normalized event streams scoped to agent attempts.
 
 Record: workflow, total wall-clock, attempt counts per phase, terminal status, agent-emitted `problems[]`.
 
 ### Step 2 — Locate phase transcripts
 
-For each entry in `state.json:phases[]`, the SDK transcript lives at:
+For each agent node attempt in `run.json`, locate its local transcript:
 
 ```
-~/.claude/projects/<encoded-cwd>/<session_id>.jsonl
+.harny/<slug>/transcripts/<node>/attempt-<n>.jsonl
+.harny/<slug>/transcripts/<foreach>/<index>/<step>/attempt-<n>.jsonl
 ```
 
-`<encoded-cwd>` is the run's working directory (the worktree path if `isolation=worktree`, else cwd) with `/` replaced by `-` and a leading `-`. If the worktree was cleaned, the encoded dir uses the worktree path that no longer exists on disk — the JSONL still lives under that name.
+Each line is a normalized record with `seq`, `at`, `provider`, and a typed `event`. A cleaned run has no remaining local transcript; review before cleanup.
 
 ### Step 3 — Spawn one sub-agent per phase (in parallel)
 
 Launch one Explore-type sub-agent per transcript with this brief:
 
-> Read `<jsonl_path>`. The file is JSONL — one event per line, mix of agent messages, tool_use, tool_result, attachments, hooks. Report:
+> Read `<jsonl_path>`. The file is JSONL — one normalized event per line, including messages, reasoning, tools, file changes, plans, usage, lifecycle, status, and errors. Report:
 >
-> 1. **Tool call inventory:** count of Bash, Read, Edit, Write, Grep, Glob calls. Names of bash commands invoked (deduplicated, with frequency).
+> 1. **Tool call inventory:** count calls by normalized tool name/kind. List shell commands invoked (deduplicated, with frequency).
 > 2. **Confusion moments:** any sequence where the agent retried the same operation 2+ times, backtracked, or expressed uncertainty.
-> 3. **Errors:** every `tool_result` with `is_error: true` or non-zero exit_code in Bash output. Quote verbatim.
+> 3. **Errors:** every event with `type: error` and every tool event with `status: failed` or a non-empty `error`. Quote verbatim.
 > 4. **Requirements slippage:** the prompt's acceptance criteria are <list them>. Did the agent address each? Did it drift outside scope?
 > 5. **Wall-clock anomalies:** gaps >2min between consecutive events. What was happening?
 > 6. **Notable choices:** non-obvious technical decisions — what and why (quote the justifying message).
@@ -79,11 +81,11 @@ In main context, weave per-phase reports into a story:
 
 For every "this would have been smoother if X" observation:
 
-> Would a fresh dev tomorrow, reading only CLAUDE.md + the codebase, hit the same friction?
+> Would a fresh dev tomorrow, reading only AGENTS.md + the codebase, hit the same friction?
 
 - **Yes** → propose a durable fix. Specify the lowest-impact location:
-  - CLAUDE.md "Gotchas" (root, auto-loaded) for cross-cutting invariants.
-  - Subtree CLAUDE.md for module-local conventions.
+  - Root AGENTS.md "Gotchas" for cross-cutting invariants.
+  - Subtree AGENTS.md for module-local conventions.
   - Code comment near the trap.
   - Probe template.
   - New harness primitive.
@@ -155,6 +157,6 @@ After confirmation, invite the architect to append each "Inbox captures" line vi
 
 ## Edge cases
 
-- **Run dir gone** (`harny clean` was run) — state and plan are unrecoverable. The transcripts may still exist under `~/.claude/projects/<encoded-cwd>/`. Tell the architect what's missing; offer to do a partial review from the transcripts alone.
+- **Run dir gone** (`harny clean` was run) — state, audit events, and local transcripts were removed together. Tell the architect the run is no longer reviewable from Harny's evidence.
 - **Multiple matching slugs** for the prefix — list them, ask which one.
-- **Workflow is not feature-dev** — `plan.json` may not exist or have a different shape. Adapt: read whatever is there.
+- **Workflow is not feature-dev** — the plan artifact may be absent or have a different shape. Adapt to the typed artifacts that exist.

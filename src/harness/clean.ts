@@ -2,9 +2,8 @@ import { rm, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { removeWorktree } from "./git.js";
-import { worktreePathFor, planDir } from "./state/plan.js";
+import { worktreePathFor, runDir } from "./state/paths.js";
 import { deletePointer, listPointers, registryDir, type RunPointer } from "./state/registry.js";
-import { statePathFor } from "./state/filesystem.js";
 import { spawn } from "node:child_process";
 
 function runGit(
@@ -79,32 +78,30 @@ export async function cleanRun(
 ): Promise<void> {
   const { force = false, kill = false } = options;
   const worktreePath = worktreePathFor(primaryCwd, slug);
-  const stateDir = planDir(primaryCwd, slug);
+  const stateDir = runDir(primaryCwd, slug);
   const branch = `harny/${slug}`;
-  const statePath = join(stateDir, "state.json");
+  const runPath = join(stateDir, "run.json");
 
   let stateRaw: string | null = null;
   try {
-    stateRaw = await readFile(statePath, "utf8");
-  } catch {
-    // state.json missing or unreadable — skip pid check
-  }
+    stateRaw = await readFile(runPath, "utf8");
+  } catch { /* no readable run state */ }
 
   if (stateRaw !== null) {
-    let state: { lifecycle?: { status?: string; pid?: number } } = {};
+    let state: { run?: { pid?: number }; execution?: { status?: string }; workspace?: { branch?: string; worktree_path?: string | null } } = {};
     try {
       state = JSON.parse(stateRaw) as typeof state;
     } catch {
-      // malformed state.json — proceed with cleanup
+      // malformed run.json — proceed with cleanup
     }
 
-    const status = state.lifecycle?.status;
-    const pid = state.lifecycle?.pid;
+    const status = state.execution?.status;
+    const pid = state.run?.pid;
 
     if (status === "running" && typeof pid === "number" && pid > 0) {
       if (!isPidAlive(pid)) {
         console.warn(
-          `[clean] warning: stale pid ${pid} in state.json (process no longer alive); proceeding`,
+          `[clean] warning: stale pid ${pid} in run.json (process no longer alive); proceeding`,
         );
       } else if (!force) {
         throw new Error(
@@ -154,7 +151,7 @@ export async function cleanRun(
 }
 
 /**
- * Prune pointers in `~/.harny/runs/` whose underlying state.json is
+ * Prune pointers in `~/.harny/runs/` whose underlying run.json is
  * unreachable (project deleted, run dir removed manually). Returns the count
  * removed.
  */
@@ -163,8 +160,8 @@ export async function pruneRegistry(verbose: boolean): Promise<number> {
   const pointers = await listPointers();
   let removed = 0;
   for (const p of pointers) {
-    const statePath = statePathFor(p.cwd, p.task_slug);
-    if (!existsSync(statePath)) {
+    const sourcePath = join(p.cwd, ".harny", p.task_slug, "run.json");
+    if (!existsSync(sourcePath)) {
       await deletePointer(p.run_id);
       removed++;
       if (verbose) console.log(`[clean] pruned unreachable pointer: ${p.run_id} (${p.cwd})`);

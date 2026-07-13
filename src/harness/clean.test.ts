@@ -23,7 +23,7 @@ async function spawn(args: string[], cwd: string): Promise<void> {
 }
 
 describe("cleanRun: happy path", () => {
-  test("removes .harny/<slug>/ state dir and deletes the harny/<slug> branch", async () => {
+  test("removes run state, local transcripts, and the harny/<slug> branch", async () => {
     const repo = await tmpGitRepo({ seed: {} });
     cleanups.push(repo.cleanup);
     const slug = "my-slug";
@@ -31,12 +31,14 @@ describe("cleanRun: happy path", () => {
     const stateDir = join(repo.path, ".harny", slug);
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(
-      join(stateDir, "state.json"),
+      join(stateDir, "run.json"),
       JSON.stringify({
-        lifecycle: { status: "done", pid: 1 },
+        run: { pid: 1 }, execution: { status: "done" },
       }),
     );
-    writeFileSync(join(stateDir, "plan.json"), "{}");
+    const transcriptPath = join(stateDir, "transcripts", "agent", "attempt-1.jsonl");
+    mkdirSync(join(stateDir, "transcripts", "agent"), { recursive: true });
+    writeFileSync(transcriptPath, '{"event":{"type":"reasoning"}}\n');
 
     // Create the branch so cleanRun has something to delete. Check it out then
     // back to the seed branch so `branch -D` won't refuse to delete the
@@ -45,10 +47,12 @@ describe("cleanRun: happy path", () => {
     await spawn(["checkout", "-"], repo.path);
 
     expect(existsSync(stateDir)).toBe(true);
+    expect(existsSync(transcriptPath)).toBe(true);
 
     await cleanRun(repo.path, slug, false, {});
 
     expect(existsSync(stateDir)).toBe(false);
+    expect(existsSync(transcriptPath)).toBe(false);
 
     // Verify branch is gone: `git show-ref --verify` returns non-zero for
     // absent refs.
@@ -70,9 +74,9 @@ describe("cleanRun: active-run protection", () => {
     const stateDir = join(repo.path, ".harny", slug);
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(
-      join(stateDir, "state.json"),
+      join(stateDir, "run.json"),
       JSON.stringify({
-        lifecycle: { status: "running", pid: process.pid },
+        run: { pid: process.pid }, execution: { status: "running" },
       }),
     );
 

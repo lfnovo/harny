@@ -109,8 +109,11 @@ export async function addWorktree(
   primaryCwd: string,
   worktreePath: string,
   branch: string,
+  startPoint?: string,
 ): Promise<void> {
-  await git(primaryCwd, ["worktree", "add", "-b", branch, worktreePath]);
+  const args = ["worktree", "add", "-b", branch, worktreePath];
+  if (startPoint) args.push(startPoint);
+  await git(primaryCwd, args);
 }
 
 export async function removeWorktree(
@@ -134,4 +137,3 @@ export async function removeWorktree(
     throw err;
   }
 }
-

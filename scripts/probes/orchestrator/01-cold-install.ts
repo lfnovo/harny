@@ -29,7 +29,10 @@ async function makeRepo(): Promise<{ primaryCwd: string; worktreePath: string }>
   const tmpBase = mkdtempSync(join(tmpdir(), "harny-ci-"));
   const primaryCwd = join(tmpBase, "primary");
   const worktreePath = join(tmpBase, "worktree");
+  const localDependency = join(tmpBase, "local-dependency");
   mkdirSync(primaryCwd, { recursive: true });
+  mkdirSync(localDependency, { recursive: true });
+  writeFileSync(join(localDependency, "package.json"), JSON.stringify({ name: "local-dependency", version: "1.0.0" }));
 
   const g = (...args: string[]) => git(args, primaryCwd);
   await g("init");
@@ -38,7 +41,7 @@ async function makeRepo(): Promise<{ primaryCwd: string; worktreePath: string }>
 
   writeFileSync(
     join(primaryCwd, "package.json"),
-    JSON.stringify({ name: "test", dependencies: { ms: "2.1.3" } }, null, 2) + "\n",
+    JSON.stringify({ name: "test", dependencies: { "local-dependency": "file:../local-dependency" } }, null, 2) + "\n",
   );
 
   await g("add", ".");

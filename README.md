@@ -1,305 +1,212 @@
-# harny
+# Harny
 
-[![npm](https://img.shields.io/npm/v/@lfnovo/harny?label=npm%3A%20%40lfnovo%2Fharny)](https://www.npmjs.com/package/@lfnovo/harny)
-[![license](https://img.shields.io/npm/l/@lfnovo/harny)](./CHANGELOG.md)
+Harny is a local-first workflow runtime for auditable AI-assisted software development. Workflows are declarative YAML DAGs, can mix Claude and Codex, persist resumable state locally, and keep privileged effects such as commits and pull-request publication outside the agents.
 
-**The agentic-workflow execution platform — auto-evolving, explainable (auditable), with structured observation and automated improvement-proposal — built for teams that want to extract more value from their AI investments, especially with Claude Code.**
+## Install
 
-The thesis: as AI does more of the implementation work, the human role splits into two — **make decisions** or **evolve the workflow the AI uses**. Iterating the dev pipeline itself becomes the dominant work of practically every dev. Harny is built to be the place where that work happens.
+Requires Bun 1.3+ and Git.
 
-The mechanism: a planner → developer → validator discipline that catches bad output, structured observation of every run (state.json, transcripts, history, ML features), and a meta-loop that uses those observations to propose harder prompts, missing tooling, missing docs.
-
-## Quickstart
-
-```sh
-# Run feature-dev workflow against the current directory.
-bunx @lfnovo/harny "build me a calculator CLI in calc.py"
-
-# All your runs across every project — pulled from ~/.harny/runs/ pointer registry.
-bunx @lfnovo/harny ls
-
-# Visual viewer with run timeline, plan, sibling-branch warnings, Phoenix deep-links.
-bunx @lfnovo/harny ui
-```
-
-`harny` requires [Bun](https://bun.sh) >= 1.3. The first `bunx` invocation installs the package; subsequent ones run instantly. For frequent use:
-
-```sh
+```bash
 bun add -g @lfnovo/harny
-harny "<prompt>"
+# or
+bunx @lfnovo/harny "implement the requested feature"
 ```
 
-## How it works
+Claude workflows use the Claude Agent SDK authentication. Codex nodes use the pinned official Codex SDK and the user's existing Codex authentication/config; a separately installed Codex executable is not required. GitHub PR delivery uses the installed `gh` CLI. Tokens never belong in workflow YAML or Harny's provider config.
 
-A run goes through three phases by default (`feature-dev` workflow):
+## Quick start
 
-1. **Planner** reads the prompt, explores the codebase, emits a structured plan (`plan.json`).
-2. **Developer** picks up the next pending task, makes code changes in a git worktree.
-3. **Validator** runs read-only against the uncommitted tree, returns pass/fail with evidence.
+```bash
+# Planner → sequential tasks → developer/validator retry → validated commits
+harny "add JSON export to the CLI"
 
-On `pass`, harny composes the commit message and commits. On `fail`, the developer's session resumes with the validator's feedback. After N failed retries, the tree is reset and a fresh developer session starts. Every step is captured in `<cwd>/.harny/<slug>/state.json` — single source of truth, atomic writes, inspectable any time.
+# Also push and create/update a draft GitHub PR
+harny --workflow feature-pr "add JSON export to the CLI"
 
-Other built-in workflows:
+# Load an explicit workflow file
+harny --workflow ./.harny/workflows/custom.yaml "run the custom workflow"
 
-```sh
-bunx @lfnovo/harny --workflow docs --input intent.json "document the CLI"
-bunx @lfnovo/harny --workflow issue-triage --input issue.json "triage this issue"
-bunx @lfnovo/harny --workflow feature-dev-engine "build me X"   # XState-based engine workflow (v0.2.0 preview)
+# Address review feedback on the current repository's existing PR
+harny pr fix 123
 ```
 
-## Architecture
+Each normal run creates an isolated `harny/<slug>` branch and Git worktree. `--isolation inline` is available when isolation is not wanted.
 
-A quick map of the moving parts. Solid arrows are control flow; dotted arrows are data / observation.
+New to agent harnesses? Start with the [Harny documentation](docs/README.md). It provides a progressive user path and a separate development path for contributors.
 
-```mermaid
-flowchart TB
-    User(("User / Claude Code"))
+## Runtime model
 
-    subgraph CLI["harny CLI"]
-        Runner["runner.ts<br/>parse args + subcommands<br/>(ls · show · answer · ui · clean)"]
-    end
+Workflow loading is:
 
-    subgraph Core["Core harness"]
-        Orch["orchestrator.ts<br/>git worktree · branch · state init<br/>lifecycle: dispatch · recover · exit"]
-        Engine["engine runtime<br/>runEngineWorkflow<br/>XState createActor + subscribe"]
-        Machine[["Workflow Machine (XState)<br/>feature-dev · auto · echoCommit · custom"]]
-        Dispatchers[["Dispatchers<br/>agentActor · commandActor<br/>humanReviewActor · commitActor"]]
-    end
-
-    subgraph Ext["External effects"]
-        SDK["Claude Agent SDK<br/>runPhase → structured output"]
-        Git[("git worktree / branch / commit")]
-    end
-
-    subgraph Persist[".harny/&lt;slug&gt;/"]
-        StateFile[("state.json<br/>single source of truth")]
-        PlanFile[("plan.json<br/>feature-dev only")]
-    end
-
-    subgraph Obs["Observation"]
-        Viewer["Viewer UI<br/>harny ui"]
-        Phoenix["Phoenix traces<br/>opt-in (HARNY_PHOENIX_URL)"]
-    end
-
-    User --> Runner
-    Runner --> Orch
-    Runner --> Viewer
-    Orch --> Engine
-    Engine --> Machine
-    Machine --> Dispatchers
-    Dispatchers -- "agentActor" --> SDK
-    Dispatchers -- "commitActor · commandActor" --> Git
-    Orch --> Git
-    Orch -. init .-> StateFile
-    Machine -. "phases[] · history[]" .-> StateFile
-    Machine -. write .-> PlanFile
-    Viewer -. read .-> StateFile
-    Viewer -. read .-> PlanFile
-    Orch -. withRunSpan .-> Phoenix
-    Dispatchers -. "phase spans" .-> Phoenix
+```text
+YAML → schema validation → static validation → normalized DAG → scheduler
 ```
 
-**Reading the diagram:**
+Named workflow precedence is:
 
-- The **runner** (CLI) is the entrypoint for both run invocations (`harny "..."`) and inspection subcommands (`ls`, `show`, `answer`, `ui`, `clean`).
-- The **orchestrator** owns the run lifecycle: sets up the git worktree/branch, initializes `state.json`, and hands off to the engine runtime. It's also the sole committer after a passing validator.
-- The **engine runtime** is a thin XState executor — it calls `createActor(machine)`, subscribes to `{ next, error }`, and resolves when the machine reaches a final state.
-- A **workflow** is an XState machine plus a `buildActors` factory. Built-in machines: `feature-dev` (planner → loop[developer → validator → committing] → done|failed), `auto` (boundary wrapper), `echoCommit` (minimal example). Custom workflows plug into the registry.
-- **Dispatchers** are the effect primitives: `agentActor` wraps a Claude SDK phase call, `commandActor` wraps `Bun.spawn`, `humanReviewActor` parks for approval, `commitActor` wraps git commit.
-- **`state.json`** is the single source of truth per run — atomic writes, schema-validated, readable any time. `plan.json` is the planner's output for `feature-dev`.
-- The **viewer** is strictly read-only over the state files. **Phoenix** (opt-in) receives one trace per run via OpenInference instrumentation.
-
-## CLI
-
-```
-harny [--workflow <id>] [--name <slug>] [--assistant <name>]
-      [--isolation worktree|inline] [--mode interactive|silent|async]
-      [--input <path>] [-v|--verbose|--quiet]
-      "<prompt>"
-
-harny ls [--status X] [--cwd X] [--workflow X]
-harny show <runId> [--tail] [--since=<duration>]   # tail = stream live phase activity
-harny answer <runId> [<text> | --json '{...}']
-harny clean <slug>
-harny ui [--port=N] [--no-open]
+```text
+<repo>/.harny/workflows > ~/.harny/workflows > bundled workflows
 ```
 
-- `--workflow` defaults to `feature-dev`.
-- `--assistant` is optional; without it the run targets the current working directory.
-- `--name <slug>` controls the branch name (`harny/<slug>`) and the per-run state directory. When omitted, a timestamped slug is generated.
-- `--mode silent` is auto-selected when stdin is not a TTY (CI, background runs).
-- `harny show <id> --tail` streams the active phase's tool activity in real time. `--since=30s|5m|1h` backfills the recent past before subscribing to new events.
+Markdown commands use the equivalent `commands/` precedence. Validation occurs before worktree creation or provider cost and checks duplicate IDs, missing dependencies, cycles, output references, retry bounds, human timeouts, provider capabilities, and reachable outcomes.
 
-## Credentials
+The v1 scheduler is sequential and deterministic: one ready node runs at a time in declaration order. Supported node types are:
 
-By default, harny isolates its Anthropic credentials from the project's `.env`. When a project `.env` (or `.env.local` / `.env.development` / `.env.production`) defines `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, or `ANTHROPIC_MODEL`, those values are **scrubbed from `process.env` at boot** so the project's app credentials don't silently drive the harness. Harny then overlays its own files:
+- `agent` — structured provider invocation with optional provider/model override and guards.
+- `command` — argv-based subprocess; inline shell scripts and plugins are not workflow escape hatches.
+- `foreach` — bounded, sequential steps per item, with persisted step checkpoints.
+- `human` — interactive input or persistent async parking with mandatory timeout.
+- `commit` — privileged commit of exactly the validated ChangeSet.
+- `pull_request` — privileged, idempotent GitHub draft-PR delivery.
+- `cancel` — finite terminal cancellation.
 
-- `~/.harny/.env` — user-global defaults
-- `./harny.env` — per-project override (gitignore it)
+Bundled workflows:
 
-Precedence: existing shell env (when not scrubbed) > `./harny.env` > `~/.harny/.env`.
+- `feature-dev` — plan, implement, independently validate, commit each task, then validate the accumulated branch.
+- `feature-pr` — `feature-dev` plus push and draft PR create/update.
+- `review-fix` — internal definition used by `harny pr fix <number>` to address feedback on the current remote head.
 
-```sh
-# ~/.harny/.env
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_BASE_URL=https://api.anthropic.com
+## Providers and safety
+
+`AgentProvider` normalizes structured output, cwd, sessions, transcripts, usage, cancellation, transient errors, and capabilities. Claude is the default. A node can select Codex:
+
+```yaml
+- id: planner
+  type: agent
+  command: planner
+  provider: codex
+  requires: [structured_output]
 ```
 
-To restore the legacy pass-through behavior (no scrubbing, no overlay), set `HARNY_INHERIT_ENV=1`.
+Unsupported capabilities fail before execution. In particular, the Codex SDK adapter advertises structured output, session resume, cwd, cancellation, and a read-only sandbox, but does not claim Harny's path-aware per-tool guards.
 
-## Observability (opt-in)
+Logical provider connections can be declared globally in `~/.harny/providers.json`. Project-local provider files are intentionally not loaded, so an untrusted repository cannot redirect agent traffic or choose credential variables:
 
-Set `HARNY_PHOENIX_URL` to mirror SDK transcripts and tool calls into a local [Phoenix](https://github.com/Arize-ai/phoenix) instance via Arize OpenInference. Each harny run becomes one Phoenix trace named after the task slug, with phase-named child spans and tool sub-spans.
-
-```sh
-docker run -d -p 6006:6006 arizephoenix/phoenix:latest
-export HARNY_PHOENIX_URL=http://127.0.0.1:6006
-bunx @lfnovo/harny "build me a calculator"
-```
-
-The viewer surfaces a deep-link to the run's Phoenix trace when this is enabled.
-
-## Cross-project run registry
-
-Every run auto-registers itself in `~/.harny/runs/<run_id>.json` — a small pointer file containing the cwd, task slug, workflow, and lifecycle status. `harny ls`, `harny show`, `harny answer`, and `harny ui` all read from this registry, so they work from any directory regardless of where the run was launched.
-
-No configuration required. The pointer is written on `createRun` and updated on lifecycle transitions; the full `state.json` continues to live at `<cwd>/.harny/<slug>/state.json` (the registry is an index, not a duplicate).
-
-```sh
-# From anywhere on the machine:
-harny ls
-harny show <runId>
-harny ui
-```
-
-### Maintenance
-
-```sh
-# Reindex runs from a project (e.g. after upgrading from a pre-registry version).
-harny scan [<cwd>]
-
-# Prune pointers whose underlying state.json is gone (deleted project, manual rm).
-harny clean --prune
-```
-
-On first invocation after upgrading from a pre-registry harny, the CLI auto-backfills pointers from the current cwd and any cwds listed in the legacy `~/.harny/assistants.json` — no manual `scan` needed in the common case.
-
-### Named-cwd shortcut (optional)
-
-`~/.harny/assistants.json` remains supported as a purely optional shortcut for `--assistant <name>`:
-
-```jsonc
+```json
 {
-  "assistants": [
-    { "name": "my-app", "cwd": "/Users/me/projects/my-app" }
+  "version": 1,
+  "providers": [
+    {
+      "id": "claude_proxy",
+      "type": "claude",
+      "base_url": "https://claude-compatible.example/v1",
+      "api_key_env": "CLAUDE_PROXY_API_KEY",
+      "model": "claude-compatible-model"
+    },
+    {
+      "id": "codex_proxy",
+      "type": "codex",
+      "base_url": "https://openai-compatible.example/v1",
+      "api_key_env": "CODEX_PROXY_API_KEY",
+      "model": "gpt-compatible-model"
+    }
   ]
 }
 ```
 
-`harny --assistant my-app "..."` then runs against `/Users/me/projects/my-app` regardless of `process.cwd()`. Cross-project visibility no longer depends on this file.
+Set the named environment variables outside the file, then use the logical ID as a workflow's `provider`. `base_url`, key-variable name, provider type, and default model are fingerprinted into persisted sessions; changing the connection prevents an unsafe resume. Secret values are neither persisted nor fingerprinted. The built-in `claude` and `codex` IDs remain available and can also be overridden in this global file.
 
-## Per-project config
+Developer output is captured as a content-addressed ChangeSet. Validation checks that exact ChangeSet before and after the validator. The commit executor recalculates it, stages only registered paths, and fails if contents changed or an unexpected file appeared:
 
-A repo can ship `harny.json` to override per-phase prompts, tools, model, max turns, MCP servers, isolation mode, default run mode, iteration caps, and platform toggles:
-
-```jsonc
-{
-  "phases": {
-    "planner":   { "model": "sonnet", "maxTurns": 50 },
-    "developer": { "model": "sonnet", "maxTurns": 200 },
-    "validator": { "model": "sonnet" }
-  },
-  "isolation": "worktree",
-  "defaultMode": "silent",
-  "maxIterationsPerTask": 3,
-  "maxRetriesBeforeReset": 1,
-  "maxIterationsGlobal": 30,
-  "coldWorktreeInstall": true,    // auto bun install in fresh worktrees (default true)
-  "siblingBranchGuard": true      // post-developer check for unmerged sibling branches touching the same files (default true)
-}
+```text
+implemented diff = validated diff = committed diff
 ```
 
-See `harny.example.json`.
+Before provider validation, a deterministic ChangeSet policy rejects generated dependency trees, credential-like files, and unexpectedly large diffs. `workspace.allow_paths` provides an explicit, audited prefix exception for repositories that intentionally version a protected path. Validators receive the authoritative path manifest, use an attempt-scoped scratch directory, re-run established project gates, and a final validator checks the accumulated committed branch before success or PR delivery.
 
-## Custom workflows (preview — v0.2.0 engine layer)
+Agents cannot publish PRs. The GitHub executor:
 
-Beyond the built-in `feature-dev`, `docs`, `issue-triage`, and `feature-dev-engine` workflows, you can ship your own as a TypeScript file under `<cwd>/.harny/workflows/<id>.ts` (loader landing in v0.2.0 Phase 2). Engine workflows are XState v5 machines with three primitives:
+- accepts only trusted `github.com` remotes;
+- uses ordinary push, never force-push;
+- verifies the remote head equals the expected commit;
+- creates draft PRs by default;
+- updates an existing PR idempotently;
+- persists repository, number, URL, base, head, and head SHA;
+- removes the worktree only after complete confirmation.
 
-- `agentActor` — wraps a Claude SDK phase call.
-- `commandActor` — wraps `Bun.spawn`.
-- `humanReviewActor` — pauses for human approval / refinement.
+`harny pr fix` leases the repository/PR pair, starts from the observed remote head, and refuses to overwrite the PR if its head changes during the run.
 
-See [`src/harness/engine/workflows/echoCommit.ts`](./src/harness/engine/workflows/echoCommit.ts) for a 60-line working example; [`src/harness/engine/CLAUDE.md`](./src/harness/engine/CLAUDE.md) for engine conventions.
+## State, recovery, and human review
 
-## What you get out of the box
+New runs use:
 
-- **Discipline** — planner / developer / validator separation catches bad output before it merges.
-- **Auditability** — every phase emits structured output (Zod-validated); every run produces `state.json` + transcripts + history.
-- **Sibling-branch guard** — automatic detection when your dev touches files another harness branch already owns (prevents silent merge regressions).
-- **Cold-install** — fresh worktrees auto-`bun install` so phases never hit missing-module errors.
-- **Live tail** — `harny show <id> --tail` for streaming view of running phases.
-- **Cross-project view** — one `harny ui` shows runs across all your registered projects.
-- **Phoenix integration** — opt-in OpenInference traces, one per run.
+```text
+<cwd>/.harny/<slug>/run.json      # atomic authoritative v4 snapshot
+<cwd>/.harny/<slug>/events.jsonl  # append-only audit events
+<cwd>/.harny/<slug>/transcripts/  # normalized JSONL, one file per agent attempt
+```
 
-## Plugin (Claude Code)
+The v4 snapshot contains immutable run inputs, run/workspace metadata, the scheduler's exact node instances and attempts, ChangeSets, parent-run linkage, and pending human input. Node outputs live only on the node that produced them; the planner output is the plan, so there is no mirrored artifact or second lifecycle model.
 
-The `plugin/` directory ships `harny` plugin — a Claude Code plugin with skills and an orchestrator agent that make it natural to use harny from a Claude Code conversation. Versioned independently of the CLI.
+Only v4 runs and workflow schema v2 are supported. Older pointers and runs are ignored; use `harny clean <slug>` before reusing an old slug. Global pointers under `~/.harny/runs/` are a rebuildable index, never a source of truth.
+
+Async human nodes persist their question, session, workspace reservation, and expiry:
 
 ```bash
-# Permanent install via marketplace
-claude plugin marketplace add /path/to/harny    # or: lfnovo/harny once published
-claude plugin install harny
-
-# Session-only (no global install, no marketplace)
-claude --plugin-dir /path/to/harny/plugin
+harny --mode async --workflow ./approval-flow.yaml "prepare the change"
+harny show <run-id>
+harny answer <run-id> "approve"
+harny answer <run-id> --json '{"approved":true}'
 ```
 
-Once installed, you get:
+There is no daemon. `show`, `answer`, discovery, and conflicting operations materialize logical expiry. A configured fallback resumes; otherwise the run fails and releases its reservation.
 
-- `/harny:harny` — onboarding + router; start here if new to harny.
-- `/harny:check-repo` — pre-flight readiness assessment.
-- `/harny:learn` — fast capture of a learning into the local inbox.
-- `/harny:drain` — analytical triage of accumulated learnings.
-- `/harny:review` — per-run post-mortem with leaves-to-trunk analysis.
-- `/harny:release` — operate as release manager across multiple runs.
-- `orchestrator` agent — dispatches and monitors harny runs from natural-language intent.
+## Inspection and cleanup
 
-See [`plugin/README.md`](plugin/README.md) for the full surface.
+```bash
+harny ls [--status paused] [--cwd /repo] [--workflow feature-dev]
+harny show <run-id-or-slug>
+harny show <run-id> --tail
+harny ui [--port 4123] [--no-open]
+harny scan [<cwd>]
+harny clean <slug>
+harny clean <slug> --force [--kill]
+harny clean --prune
+```
+
+`harny show` and the viewer report provider-supplied usage per attempt, node, provider, and run. The viewer also streams each agent attempt's normalized messages, reasoning, tool calls, file changes, plans, errors, and usage from local JSONL sidecars. Tool input/output and reasoning are collapsed by default but retained in full. Claude includes token/cache counts, reported USD cost, and per-model detail. Codex includes token/cache/reasoning counts; Harny does not estimate a cost the provider did not report. Mixed runs label cost coverage as partial. `harny ls` stays compact and does not include usage.
+
+Dead PIDs are materialized as terminal failures instead of leaving permanently running records. Paused worktrees remain reserved; successful completion removes them, while failures preserve them for diagnosis. `harny clean <slug>` removes the entire run directory, including its transcripts; cleanup is never automatic for terminal run evidence.
+
+## Workflow example
+
+```yaml
+version: 2
+name: verify
+defaults:
+  provider: claude
+  timeout: 600000
+workspace:
+  isolation: inline
+outcome:
+  type: none
+nodes:
+  - id: tests
+    type: command
+    command: [bun, test]
+    retry:
+      max_attempts: 2
+  - id: approval
+    type: human
+    question: Ship this result?
+    timeout: 86400000
+    depends_on: [tests]
+```
+
+Custom subprocesses must be argv arrays. Workflow v2 supports immutable `${{ inputs.* }}` references and intentionally excludes inline scripts, parallel scheduling, deploy/merge effects, GitLab/Gitea, webhooks, polling, and cloud workers.
 
 ## Development
 
-This repo is the source of `harny` itself. To work on it:
-
-```sh
-git clone https://github.com/lfnovo/harny
-cd harny
+```bash
 bun install
 bun run typecheck
-bun run harny -- "test prompt"        # local invocation
-bun bin/harny.ts ui                   # viewer against local runs
+bun test
+bun run probes
 ```
 
-Internals live under `src/harness/` (workflows, orchestrator, state, observability), `src/harness/engine/` (XState v0.2.0 layer), and `src/viewer/`. See [`CLAUDE.md`](./CLAUDE.md) for an exhaustive map and the invariants the codebase upholds.
+The declarative scheduler and `run.json` v4 are the only execution runtime and writable state.
 
-## Releasing
-
-Publishes are tag-driven via `.github/workflows/publish.yml`:
-
-```sh
-# 1. bump version in package.json (e.g. 0.1.0 -> 0.1.1)
-# 2. update CHANGELOG.md (move [Unreleased] entries under a new [0.1.1] section)
-git commit -am "chore(release): v0.1.1"
-git tag v0.1.1
-git push origin main v0.1.1
-```
-
-The action validates that `package.json:version` matches the tag, runs `bun run typecheck`, and publishes via `npm publish --access public` using the `NPM_TOKEN` repo secret.
-
-## Self-hosting
-
-harny is built BY harny — the harness that exists today is used to develop the harness of tomorrow. TS production code only lands through harness runs; the policy rules, per-run loop, and cheap-validator patterns live in the [`harny-release`](./.claude/skills/harny-release/) skill. Per-run post-mortem via [`harny-review`](./.claude/skills/harny-review/). Architect learnings captured and drained via [`harny-learnings`](./.claude/skills/harny-learnings/).
-
-See [`CLAUDE.md`](./CLAUDE.md) for codebase invariants, key paths, and gotchas. Open decisions and proposals live in [GitHub Issues](https://github.com/lfnovo/harny/issues) and [Discussions](https://github.com/lfnovo/harny/discussions).
+Core code lives under `src/harness/workflow/`, `src/harness/providers/`, `src/harness/forge/`, and `src/harness/state/`. The viewer is under `src/viewer/`.
 
 ## License
 

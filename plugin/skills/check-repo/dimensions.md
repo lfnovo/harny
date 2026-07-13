@@ -125,11 +125,11 @@ The output of this step is the user's final validator command. Pin it.
 
 ## 6. Agent context (documentation quality)
 
-**Why.** Harny phases run with `settingSources: ["project", "user"]`, automatically loading `.claude/` and `CLAUDE.md` files into agent context. Repos with written orientation produce phases that understand conventions.
+**Why.** Repositories with written, tool-neutral agent orientation produce phases that understand conventions. Claude phases load `.claude/` and `CLAUDE.md`; a compatibility redirect can import canonical instructions from `AGENTS.md`.
 
 **Checks.**
-- `CLAUDE.md` (or equivalent — `AGENTS.md`, `.cursor/rules`) at the repo root.
-- Module-level CLAUDE.md or README in major directories.
+- `AGENTS.md` (or equivalent — `CLAUDE.md`, `.cursor/rules`) at the repo root.
+- Module-level AGENTS.md, compatibility redirect, or README in major directories.
 - An `ARCHITECTURE.md` (or section in README) explaining **why**, not just what.
 - A `CONTRIBUTING.md` listing patterns to follow when adding code.
 - Naming conventions consistent enough to read from existing files.
@@ -138,8 +138,8 @@ The output of this step is the user's final validator command. Pin it.
 **Diagnostic.** "If I dropped a smart engineer into this repo with only the docs, how long until they could write idiomatic code in it?"
 
 **Calibration.**
-- 🟢 Root CLAUDE.md + module-level docs + architecture rationale. All current.
-- 🟡 Root CLAUDE.md exists, but stale or shallow. Module docs missing.
+- 🟢 Root AGENTS.md or equivalent + module-level docs + architecture rationale. All current.
+- 🟡 Root agent instructions exist, but are stale or shallow. Module docs missing.
 - 🔴 No agent-readable orientation. The only "docs" are the code itself.
 
 ---

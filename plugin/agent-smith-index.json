@@ -20,7 +20,7 @@
       {
         "name": "drain",
         "path": "skills/drain/SKILL.md",
-        "description": "Triage accumulated learnings from the local harny inbox into GitHub Issues, CLAUDE.md edits, or discards. Walks one entry at a time, verifies claims against current code, opens issues with provenance. Sister of /learn.",
+        "description": "Triage accumulated learnings from the local harny inbox into GitHub Issues, AGENTS.md edits, or discards. Walks one entry at a time, verifies claims against current code, opens issues with provenance. Sister of /learn.",
         "supportingFiles": [
           "skills/drain/patterns.md"
         ],
@@ -66,7 +66,7 @@
       {
         "name": "review",
         "path": "skills/review/SKILL.md",
-        "description": "Post-mortem of a single harny run. Reads state.json + plan.json + per-phase transcripts. Emits a leaves-to-trunk review with evidence-backed proposals (triaged NOW-blocks/NOW-quick/BACKLOG). Use after failed, retried, slow, or novel runs.",
+        "description": "Post-mortem of a Harny run. Reads run.json v4, events and transcripts. Emits evidence-backed improvement proposals.",
         "allowedTools": [
           "Bash",
           "Read",
@@ -79,7 +79,7 @@
       {
         "name": "orchestrator",
         "path": "agents/orchestrator.md",
-        "description": "Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target CLAUDE.md, dispatches + monitors. Use to delegate harny invocation."
+        "description": "Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target agent instructions, dispatches + monitors. Use to delegate harny invocation."
       }
     ],
     "hooks": [],

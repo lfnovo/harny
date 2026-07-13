@@ -1,128 +1,39 @@
-/**
- * Cross-project run registry.
- *
- * Each harny run writes a tiny pointer file to `~/.harny/runs/<run_id>.json`
- * when it starts and updates the pointer on lifecycle transitions. The pointer
- * is an index entry, not a source of truth — full state still lives in
- * `<cwd>/.harny/<slug>/state.json`. The registry lets `harny ls`, `harny show`,
- * `harny answer`, and `harny ui` discover runs across projects without any
- * user-maintained `assistants.json`.
- *
- * Schema is intentionally small and stable: only fields needed to locate the
- * state.json on disk and decide whether to even bother loading it (status,
- * started_at for sorting).
- */
-
 import { existsSync } from "node:fs";
 import { readdir, readFile, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { writeJsonAtomic } from "./atomic.js";
-import type { State } from "./schema.js";
+import type { RunSnapshot } from "./runSchema.js";
 
 export const RunPointerSchema = z.object({
-  schema_version: z.literal(1),
-  run_id: z.string(),
-  cwd: z.string(),
-  task_slug: z.string(),
-  workflow: z.string(),
-  started_at: z.string(),
-  status: z.enum(["running", "waiting_human", "done", "failed"]),
-  ended_at: z.string().nullable(),
+  schema_version: z.literal(2),
+  run_id: z.string(), cwd: z.string(), task_slug: z.string(), workflow: z.string(), started_at: z.string(),
+  status: z.enum(["running", "paused", "done", "failed", "cancelled"]), ended_at: z.string().nullable(),
 });
-
 export type RunPointer = z.infer<typeof RunPointerSchema>;
 
-function defaultRegistryDir(): string {
-  return join(homedir(), ".harny", "runs");
-}
-
 let registryDirOverride: string | null = null;
-
-/** Test seam: redirect the registry to a tmp dir. Pass `null` to reset. */
-export function setRegistryDirForTesting(dir: string | null): void {
-  registryDirOverride = dir;
-}
-
-export function registryDir(): string {
-  return registryDirOverride ?? defaultRegistryDir();
-}
+export function setRegistryDirForTesting(dir: string | null): void { registryDirOverride = dir; }
+export function registryDir(): string { return registryDirOverride ?? join(homedir(), ".harny", "runs"); }
 
 const SAFE_RUN_ID = /^[A-Za-z0-9_-]+$/;
+export function pointerPath(runId: string): string { if (!SAFE_RUN_ID.test(runId)) throw new Error(`Invalid run_id ${JSON.stringify(runId)}: must match ${SAFE_RUN_ID}`); return join(registryDir(), `${runId}.json`); }
+export function pointerFromRun(run: RunSnapshot): RunPointer { return { schema_version: 2, run_id: run.run.id, cwd: run.workspace.primary_cwd, task_slug: run.run.task_slug, workflow: run.run.workflow, started_at: run.run.started_at, status: run.execution.status, ended_at: run.run.ended_at }; }
+export async function writePointer(run: RunSnapshot): Promise<void> { await writeJsonAtomic(pointerPath(run.run.id), pointerFromRun(run)); }
 
-function assertSafeRunId(runId: string): void {
-  if (!SAFE_RUN_ID.test(runId)) {
-    throw new Error(
-      `Invalid run_id ${JSON.stringify(runId)}: must match ${SAFE_RUN_ID}`,
-    );
-  }
+export async function patchPointer(runId: string, patch: Partial<Pick<RunPointer, "status" | "ended_at">>): Promise<void> {
+  const path = pointerPath(runId); if (!existsSync(path)) return;
+  try { const parsed = RunPointerSchema.safeParse(JSON.parse(await readFile(path, "utf8"))); if (parsed.success) await writeJsonAtomic(path, { ...parsed.data, ...patch }); } catch { /* registry is rebuildable */ }
 }
-
-export function pointerPath(runId: string): string {
-  assertSafeRunId(runId);
-  return join(registryDir(), `${runId}.json`);
+export async function patchPointerIfStatus(runId: string, expected: RunPointer["status"], patch: Partial<Pick<RunPointer, "status" | "ended_at">>): Promise<void> {
+  const path = pointerPath(runId); if (!existsSync(path)) return;
+  try { const parsed = RunPointerSchema.safeParse(JSON.parse(await readFile(path, "utf8"))); if (parsed.success && parsed.data.status === expected) await writeJsonAtomic(path, { ...parsed.data, ...patch }); } catch { /* registry is rebuildable */ }
 }
-
-export function pointerFromState(state: State): RunPointer {
-  return {
-    schema_version: 1,
-    run_id: state.run_id,
-    cwd: state.environment.cwd,
-    task_slug: state.origin.task_slug,
-    workflow: state.origin.workflow,
-    started_at: state.origin.started_at,
-    status: state.lifecycle.status,
-    ended_at: state.lifecycle.ended_at,
-  };
-}
-
-export async function writePointer(state: State): Promise<void> {
-  await writeJsonAtomic(pointerPath(state.run_id), pointerFromState(state));
-}
-
-/**
- * Best-effort lifecycle update. Missing or malformed pointers are silently
- * ignored — the registry is an index, never the source of truth, so a corrupt
- * pointer must not crash a live run.
- */
-export async function patchPointer(
-  runId: string,
-  patch: Partial<Pick<RunPointer, "status" | "ended_at">>,
-): Promise<void> {
-  const path = pointerPath(runId);
-  if (!existsSync(path)) return;
-  try {
-    const raw = await readFile(path, "utf8");
-    const parsed = RunPointerSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) return;
-    const next: RunPointer = { ...parsed.data, ...patch };
-    await writeJsonAtomic(path, next);
-  } catch {
-    // swallow — pointer drift is recoverable via `harny scan`
-  }
-}
-
 export async function listPointers(): Promise<RunPointer[]> {
-  const dir = registryDir();
-  if (!existsSync(dir)) return [];
-  const entries = await readdir(dir);
-  const out: RunPointer[] = [];
-  for (const name of entries) {
-    if (!name.endsWith(".json")) continue;
-    try {
-      const raw = await readFile(join(dir, name), "utf8");
-      const parsed = RunPointerSchema.safeParse(JSON.parse(raw));
-      if (parsed.success) out.push(parsed.data);
-      // Malformed pointers are skipped silently; `harny scan` can rebuild.
-    } catch {
-      // unreadable; skip
-    }
-  }
-  return out;
+  const dir = registryDir(); if (!existsSync(dir)) return [];
+  const pointers: RunPointer[] = [];
+  for (const name of await readdir(dir)) { if (!name.endsWith(".json")) continue; try { const parsed = RunPointerSchema.safeParse(JSON.parse(await readFile(join(dir, name), "utf8"))); if (parsed.success) pointers.push(parsed.data); } catch { /* skip stale entries */ } }
+  return pointers;
 }
-
-export async function deletePointer(runId: string): Promise<void> {
-  const path = pointerPath(runId);
-  if (existsSync(path)) await unlink(path);
-}
+export async function deletePointer(runId: string): Promise<void> { const path = pointerPath(runId); if (existsSync(path)) await unlink(path); }

@@ -1,0 +1,48 @@
+version: 2
+name: review-fix
+defaults:
+  provider: claude
+  timeout: 1800000
+workspace:
+  isolation: worktree
+outcome:
+  type: pull_request
+nodes:
+  - id: fixes
+    type: foreach
+    items: "${{ inputs.tasks }}"
+    as: task
+    max_items: 1
+    steps:
+      - id: developer
+        type: agent
+        command: review_fixer
+        requires: [structured_output, tool_guards]
+        guards: [no_git_history, no_forge_effects]
+      - id: validator
+        type: agent
+        command: validator
+        depends_on: [developer]
+        requires: [structured_output, tool_guards]
+        guards: [read_only]
+        retry: { max_attempts: 3, return_to: developer }
+      - id: commit
+        type: commit
+        message: "fix: address review feedback"
+        changeset: developer
+        depends_on: [validator]
+  - id: final_validator
+    type: agent
+    command: final_validator
+    depends_on: [fixes]
+    requires: [structured_output, tool_guards]
+    guards: [read_only]
+  - id: pull_request
+    type: pull_request
+    title: "${{ inputs.pull_request.title }}"
+    body: "${{ inputs.pull_request.body }}"
+    base: "${{ inputs.pull_request.base }}"
+    head: "${{ inputs.pull_request.head }}"
+    draft: true
+    existing: require
+    depends_on: [final_validator]

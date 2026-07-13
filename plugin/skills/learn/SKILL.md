@@ -63,7 +63,7 @@ No questions. No analysis. No "would you like me to also...".
 ## What this skill does NOT do
 
 - Does not apply the counterfactual test ("would a fresh dev hit this?").
-- Does not propose file targets (CLAUDE.md edits, GitHub issues, etc.).
+- Does not propose file targets (AGENTS.md edits, GitHub issues, etc.).
 - Does not open issues or discussions.
 - Does not edit any file other than `.harny/LEARNINGS.local.md` and (on first creation) `.harny/.gitignore`.
 - Does not prompt for more detail.
