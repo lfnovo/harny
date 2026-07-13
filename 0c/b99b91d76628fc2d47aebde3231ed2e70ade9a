@@ -1,0 +1,47 @@
+src/harness/providers/claude.ts
+  s_361086fd550cc0::t_45ec5b6f470433 82
+src/harness/providers/claude.test.ts
+  s_361086fd550cc0::t_45ec5b6f470433 10,15
+src/harness/workflow/prompts/default/developer.md
+  s_361086fd550cc0::t_45ec5b6f470433 11-12
+src/harness/workflow/prompts/default/planner.md
+  s_361086fd550cc0::t_45ec5b6f470433 11-13
+CHANGELOG.md
+  s_361086fd550cc0::t_45ec5b6f470433 15
+src/harness/workflow/featureDev.ts
+  s_361086fd550cc0::t_45ec5b6f470433 33,63,149-156
+src/harness/workflow/featureDevShared.ts
+  s_361086fd550cc0::t_ad125bad7add2d 70-71,73
+src/harness/workflow/featureDev.test.ts
+  s_361086fd550cc0::t_45ec5b6f470433 29,33,97-98,100,103
+src/harness/workflow/bundled/feature-pr.yaml
+  s_361086fd550cc0::t_45ec5b6f470433 30
+src/harness/guardHooks.ts
+  s_361086fd550cc0::t_5e3ee127377c96 66,150
+  s_361086fd550cc0::t_45ec5b6f470433 55-56,65,67,144-149,203-206,209
+  s_361086fd550cc0::t_ef8393d1c67b4d 151-153
+  s_361086fd550cc0::t_f3fad3fe1752de 154
+src/harness/workflow/bundled/review-fix.yaml
+  s_361086fd550cc0::t_ad125bad7add2d 19
+src/harness/workflow/bundled/feature-dev.yaml
+  s_361086fd550cc0::t_45ec5b6f470433 30
+src/harness/guardHooks.test.ts
+  s_361086fd550cc0::t_45ec5b6f470433 213-217,219,221-233
+  s_361086fd550cc0::t_5e3ee127377c96 218,220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0cb99b91d76628fc2d47aebde3231ed2e70ade9a",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
