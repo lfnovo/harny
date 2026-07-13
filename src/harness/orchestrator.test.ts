@@ -24,7 +24,7 @@ async function commit(cwd: string, path: string, message = "workflow") { for (co
 
 test("feature-dev uses one authoritative v4 scheduler snapshot", async () => {
   const r = await repo(); const result = await runHarness({ cwd: r.path, userPrompt: "build", taskSlug: "default", isolation: "inline", mode: "silent", logMode: "quiet", agentProvider: new Provider() });
-  expect(result.status).toBe("done"); expect(result.state?.schema_version).toBe(4); expect(result.state?.execution.nodes.planner?.output).toBeDefined(); expect(result.state?.execution.nodes.planner?.attemptHistory?.[0]?.usage).toMatchObject({ provider: "claude", inputTokens: 10, costUsd: 0.01 }); expect(result.state?.execution.nodes.tasks?.steps?.["0.commit"]?.status).toBe("completed"); expect(statSync(join(r.path, ".harny/default/run.json")).isFile()).toBe(true); expect(existsSync(join(r.path, ".harny/default/state.json"))).toBe(false); expect(existsSync(join(r.path, ".harny/default/plan.json"))).toBe(false);
+  expect(result.status).toBe("done"); expect(result.state?.schema_version).toBe(4); expect(result.state?.inputs.base).toBeUndefined(); expect(result.state?.execution.nodes.planner?.output).toBeDefined(); expect(result.state?.execution.nodes.planner?.attemptHistory?.[0]?.usage).toMatchObject({ provider: "claude", inputTokens: 10, costUsd: 0.01 }); expect(result.state?.execution.nodes.tasks?.steps?.["0.commit"]?.status).toBe("completed"); expect(statSync(join(r.path, ".harny/default/run.json")).isFile()).toBe(true); expect(existsSync(join(r.path, ".harny/default/state.json"))).toBe(false); expect(existsSync(join(r.path, ".harny/default/plan.json"))).toBe(false);
   const plannerTranscript = readFileSync(join(r.path, ".harny/default/transcripts/planner/attempt-1.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
   const developerTranscript = readFileSync(join(r.path, ".harny/default/transcripts/tasks/0/developer/attempt-1.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
   expect(plannerTranscript.map((record) => record.event.type)).toEqual(["request", "message"]);
@@ -66,6 +66,12 @@ test("rejects malformed explicit base inputs before persisting a run", async () 
   const r = await repo();
   await expect(runHarness({ cwd: r.path, userPrompt: "x", taskSlug: "bad-base", inputs: { base: null } as never, isolation: "inline", mode: "silent", logMode: "quiet", agentProvider: new Provider() })).rejects.toThrow("inputs.base must be a non-empty branch name");
   expect(existsSync(join(r.path, ".harny/bad-base/run.json"))).toBe(false);
+});
+
+test("trims an explicit base input before persisting it", async () => {
+  const r = await repo();
+  const result = await runHarness({ cwd: r.path, userPrompt: "x", workflowId: await commandWorkflow(r.path), taskSlug: "trim-base", inputs: { base: " main " }, isolation: "inline", mode: "silent", logMode: "quiet", agentProvider: new Provider() });
+  expect(result.state?.inputs.base).toBe("main");
 });
 
 test("dead v4 pid materializes a terminal failure", async () => {

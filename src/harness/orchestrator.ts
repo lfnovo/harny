@@ -64,7 +64,9 @@ export async function runHarness(args: HarnessRequest): Promise<HarnessResult> {
   await git.assertHasInitialCommit(primaryCwd);
   if (args.inputs?.base !== undefined && (typeof args.inputs.base !== "string" || args.inputs.base.trim() === "")) throw new Error("inputs.base must be a non-empty branch name");
   const needsPullRequest = definition.nodes.some((node) => node.type === "pull_request");
-  const baseBranch = typeof args.inputs?.base === "string" ? args.inputs.base : needsPullRequest ? await discoverBaseBranch(primaryCwd) : "main";
+  const normalizedInputs: Record<string, unknown> = { ...(args.inputs ?? {}) };
+  if (typeof args.inputs?.base === "string") normalizedInputs.base = args.inputs.base.trim();
+  else if (needsPullRequest) normalizedInputs.base = await discoverBaseBranch(primaryCwd);
 
   const store = new RunStore(primaryCwd, taskSlug);
   const existing = await store.load();
@@ -79,7 +81,7 @@ export async function runHarness(args: HarnessRequest): Promise<HarnessResult> {
     run: { id: runId, task_slug: taskSlug, workflow: definition.name, started_at: startedAt, ended_at: null, ended_reason: null, pid: process.pid, parent_run_id: args.parentRunId ?? null },
     origin: { prompt: args.userPrompt, workflow_source: requestedWorkflow, cwd: primaryCwd, host: hostname(), user: userInfo().username },
     workspace: { isolation, primary_cwd: primaryCwd, cwd: workspace.cwd, branch: workspace.branch, worktree_path: workspace.worktreePath, reserved: true },
-    inputs: structuredClone({ ...(args.inputs ?? {}), base: baseBranch }),
+    inputs: structuredClone(normalizedInputs),
     execution: { workflow: definition.name, status: "running", nodes: Object.fromEntries(definition.nodes.map((node) => [node.id, { id: node.id, status: "pending" as const, attempts: 0 }])) },
     changesets: {},
   };
