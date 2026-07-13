@@ -3,6 +3,7 @@ import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TranscriptStore } from "./store.js";
+import { toJsonValue } from "./types.js";
 
 let root = "";
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
@@ -44,6 +45,15 @@ test("recovers appends after a torn final record", async () => {
 });
 
 test("rejects payloads that cannot round-trip as JSON", async () => { const value = await store(); await expect(value.append({ instanceId: "agent", attempt: 1 }, "codex", { type: "tool", id: "x", name: "tool", kind: "tool", status: "completed", output: 1n } as never)).rejects.toThrow(); });
+
+test("normalizes diagnostic and non-plain provider payloads without throwing", () => {
+  expect(toJsonValue(new Date("invalid"))).toBeNull();
+  expect(toJsonValue(new Error("boom"))).toMatchObject({ name: "Error", message: "boom" });
+  expect(toJsonValue(new Map([["key", 1]]))).toEqual([["key", 1]]);
+  expect(toJsonValue(new Set(["a", "b"]))).toEqual(["a", "b"]);
+  expect(toJsonValue(new URL("https://example.com/path"))).toBe("https://example.com/path");
+  expect(toJsonValue({ toJSON: () => ({ safe: true }) })).toEqual({ safe: true });
+});
 
 test("keeps complete large tool payloads", async () => {
   const value = await store(); const ref = { instanceId: "agent", attempt: 1 }; const output = "x".repeat(300_000);

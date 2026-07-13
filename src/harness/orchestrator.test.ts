@@ -62,6 +62,12 @@ test("provider capability validation happens before Git effects", async () => {
   const r = await repo(); const path = join(r.path, "unsafe.yaml"); writeFileSync(path, `version: 2\nname: unsafe\ndefaults: { provider: codex }\nworkspace: { isolation: worktree }\noutcome: { type: none }\nnodes:\n  - { id: agent, type: agent, command: work, requires: [structured_output, tool_guards] }\n`); const git = new MockGitOps(); await expect(runHarness({ cwd: r.path, userPrompt: "x", workflowId: path, taskSlug: "unsafe", gitOps: git })).rejects.toThrow("unsupported capability tool_guards"); expect(git.calls).toHaveLength(0);
 });
 
+test("rejects malformed explicit base inputs before persisting a run", async () => {
+  const r = await repo();
+  await expect(runHarness({ cwd: r.path, userPrompt: "x", taskSlug: "bad-base", inputs: { base: null } as never, isolation: "inline", mode: "silent", logMode: "quiet", agentProvider: new Provider() })).rejects.toThrow("inputs.base must be a non-empty branch name");
+  expect(existsSync(join(r.path, ".harny/bad-base/run.json"))).toBe(false);
+});
+
 test("dead v4 pid materializes a terminal failure", async () => {
   const r = await repo(); const first = await runHarness({ cwd: r.path, userPrompt: "run", workflowId: await commandWorkflow(r.path), taskSlug: "dead", isolation: "inline", mode: "silent", logMode: "quiet" }); const store = new RunStore(r.path, "dead"); await store.mutate((run) => { run.execution.status = "running"; run.run.pid = 99999999; run.run.ended_at = null; }); const result = await runHarness({ cwd: r.path, userPrompt: "again", taskSlug: "dead", mode: "silent", logMode: "quiet" }); expect(first.status).toBe("done"); expect(result.status).toBe("failed"); expect(result.state?.run.ended_reason).toContain("process exited unexpectedly");
 });

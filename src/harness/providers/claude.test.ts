@@ -51,6 +51,13 @@ test("ClaudeProvider observes cancellation", async () => {
 
 test("ClaudeProvider normalizes thrown SDK errors and terminal lifecycle", async () => { const events: AgentEvent[] = []; const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo", runPhase: (async () => { throw new Error("transport down"); }) as any }); await expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}), onEvent: (event) => { events.push(event); } })).rejects.toMatchObject({ name: "Error", message: "transport down" }); expect(events.at(-1)).toMatchObject({ type: "lifecycle", status: "failed" }); });
 
+test("ClaudeProvider preserves a newly initialized session when the turn throws", async () => {
+  const events: AgentEvent[] = [];
+  const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo", runPhase: (async (args: any) => { await args.onMessage({ type: "system", subtype: "init", session_id: "new-session" }); throw new Error("transport down"); }) as any });
+  await expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}), onEvent: (event) => { events.push(event); } })).rejects.toMatchObject({ metadata: { session: { id: "new-session", provider: "claude" } } });
+  expect(events.at(-1)).toMatchObject({ type: "lifecycle", status: "failed", sessionId: "new-session" });
+});
+
 test("ClaudeProvider streams normalized messages, reasoning and tool payloads", async () => {
   const events: AgentEvent[] = [];
   const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo",

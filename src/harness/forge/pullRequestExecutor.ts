@@ -8,8 +8,9 @@ export function createPullRequestExecutor(args: { cwd: string; forge: ForgeProvi
     if (node.type !== "pull_request") throw new Error("pull_request executor received another node type");
     const runGit = args.git ?? ((command) => git(args.cwd, command));
     const expectedHeadSha = await args.expectedSha(); const remoteUrl = await runGit(["remote", "get-url", "origin"]); const repository = parseTrustedGitHubRemote(remoteUrl.trim());
-    const pushUrl = await runGit(["remote", "get-url", "--push", "origin"]); const pushRepository = parseTrustedGitHubRemote(pushUrl.trim());
-    if (pushRepository !== repository) throw new Error(`origin push URL targets ${pushRepository}, expected ${repository}`);
+    const pushUrls = (await runGit(["remote", "get-url", "--push", "--all", "origin"])).trim().split(/\r?\n/).filter(Boolean);
+    if (!pushUrls.length) throw new Error("origin has no push URL");
+    for (const pushUrl of pushUrls) { const pushRepository = parseTrustedGitHubRemote(pushUrl); if (pushRepository !== repository) throw new Error(`origin push URL targets ${pushRepository}, expected ${repository}`); }
     const beforeLine = (await runGit(["ls-remote", "origin", `refs/heads/${node.head}`])).trim();
     const beforeSha = beforeLine.split(/\s+/)[0] || "";
     if (args.expectedRemoteSha !== undefined && beforeSha !== args.expectedRemoteSha) throw new Error(`remote head changed during run: expected ${args.expectedRemoteSha}, got ${beforeSha || "missing"}`);

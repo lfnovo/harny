@@ -26,6 +26,10 @@ export async function patchPointer(runId: string, patch: Partial<Pick<RunPointer
   const path = pointerPath(runId); if (!existsSync(path)) return;
   try { const parsed = RunPointerSchema.safeParse(JSON.parse(await readFile(path, "utf8"))); if (parsed.success) await writeJsonAtomic(path, { ...parsed.data, ...patch }); } catch { /* registry is rebuildable */ }
 }
+export async function patchPointerIfStatus(runId: string, expected: RunPointer["status"], patch: Partial<Pick<RunPointer, "status" | "ended_at">>): Promise<void> {
+  const path = pointerPath(runId); if (!existsSync(path)) return;
+  try { const parsed = RunPointerSchema.safeParse(JSON.parse(await readFile(path, "utf8"))); if (parsed.success && parsed.data.status === expected) await writeJsonAtomic(path, { ...parsed.data, ...patch }); } catch { /* registry is rebuildable */ }
+}
 export async function listPointers(): Promise<RunPointer[]> {
   const dir = registryDir(); if (!existsSync(dir)) return [];
   const pointers: RunPointer[] = [];

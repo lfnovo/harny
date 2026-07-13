@@ -56,6 +56,7 @@ export class ClaudeProvider implements AgentProvider {
 
   private async execute<T>(request: AgentRequest<T>, resumeSessionId?: string): Promise<AgentResult<T>> {
     const phase = request.phase ?? "agent";
+    let liveSessionId = resumeSessionId;
     if (request.signal?.aborted) {
       await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "cancelled", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message: abortMessage(request.signal.reason) });
       throw request.signal.reason ?? new Error("agent request aborted");
@@ -85,22 +86,24 @@ export class ClaudeProvider implements AgentProvider {
         runId: this.options.runId,
         env: request.env ? { ...process.env, ...this.options.env, ...request.env } : this.options.env,
         signal: request.signal,
-        onMessage: (message) => emitClaudeMessage(message, request.onEvent),
+        onMessage: (message) => { liveSessionId = sessionIdFromMessage(message) ?? liveSessionId; return emitClaudeMessage(message, request.onEvent); },
       }), request.signal);
       return await normalizeResult(result, this.id, this.connectionFingerprint, request.model ?? this.options.defaultModel ?? null, request.onEvent);
     } catch (error) {
       if (request.signal?.aborted) {
-        await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "cancelled", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message: abortMessage(request.signal.reason) });
+        await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "cancelled", ...(liveSessionId ? { sessionId: liveSessionId } : {}), message: abortMessage(request.signal.reason) });
         throw request.signal.reason ?? error;
       }
       if (error instanceof AgentProviderError || error instanceof AgentPausedError) throw error;
       const message = error instanceof Error ? error.message : String(error);
       await request.onEvent?.({ type: "error", message });
-      await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "failed", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message });
-      throw new AgentProviderError(message, resumeSessionId ? { session: { id: resumeSessionId, provider: this.id, connectionFingerprint: this.connectionFingerprint } } : {}, { cause: error });
+      await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "failed", ...(liveSessionId ? { sessionId: liveSessionId } : {}), message });
+      throw new AgentProviderError(message, liveSessionId ? { session: { id: liveSessionId, provider: this.id, connectionFingerprint: this.connectionFingerprint } } : {}, { cause: error });
     }
   }
 }
+
+function sessionIdFromMessage(message: SDKMessage): string | undefined { const value = message as unknown as Record<string, unknown>; return value.type === "system" && value.subtype === "init" && typeof value.session_id === "string" ? value.session_id : undefined; }
 
 function abortMessage(reason: unknown): string { return reason instanceof Error ? reason.message : reason === undefined ? "agent request aborted" : String(reason); }
 

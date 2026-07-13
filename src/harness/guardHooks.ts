@@ -133,10 +133,12 @@ function developerForgePublisher(): HookCallback {
 
 function isForbiddenForgeCommand(command: string): boolean {
   if (FORBIDDEN_PR_COMMAND.test(command)) return true;
-  if (!/\bgh\s+api\b/i.test(command)) return false;
-  const method = command.match(/(?:--method(?:\s+|=)|-X\s*)(GET|POST|PUT|PATCH|DELETE)\b/i)?.[1]?.toUpperCase();
-  if (method) return method !== "GET";
-  return /(?:^|\s)(?:-f|-F|--field|--raw-field|--input)(?:\s|=)/.test(command);
+  return command.split(/[;&|]+/).some((segment) => {
+    if (!/\bgh\s+api\b/i.test(segment)) return false;
+    const method = segment.match(/(?:--method(?:\s+|=)|-X\s*)(GET|POST|PUT|PATCH|DELETE)\b/i)?.[1]?.toUpperCase();
+    if (method) return method !== "GET";
+    return /(?:^|\s)(?:-f|-F|--field|--raw-field|--input)(?:\s|=)/.test(segment);
+  });
 }
 
 function operatesOutsidePrimary(command: string, primaryResolved: string): boolean {

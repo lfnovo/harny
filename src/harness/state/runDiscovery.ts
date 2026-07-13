@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { listPointers, patchPointer, type RunPointer } from "./registry.js";
+import { listPointers, patchPointer, patchPointerIfStatus, type RunPointer } from "./registry.js";
 import { RunStore } from "./runStore.js";
 import type { RunSnapshot } from "./runSchema.js";
 import { RunWorkflowPersistence } from "../workflow/persistence.js";
@@ -11,7 +11,7 @@ async function load(pointer: RunPointer): Promise<RunSnapshot | null> {
   if (run?.execution.status === "paused") {
     const execution = await materializeHumanExpiry(new RunWorkflowPersistence(store));
     if (execution?.status === "failed") { const ended = new Date().toISOString(); run = await store.mutate((value) => { value.run.ended_at = ended; value.run.ended_reason = "human input expired"; value.workspace.reserved = false; }, { type: "run.human_expired" }); await patchPointer(run.run.id, { status: "failed", ended_at: ended }); }
-    else if (execution?.status === "running" && !execution.pendingHuman) { run = await store.load(); if (run) await patchPointer(run.run.id, { status: "running", ended_at: null }); }
+    else if (execution?.status === "running" && !execution.pendingHuman) { run = await store.load(); if (run) await patchPointerIfStatus(run.run.id, "paused", { status: "running", ended_at: null }); }
   }
   return run;
 }
