@@ -6,16 +6,22 @@ All notable changes to this project are documented here. The format loosely foll
 
 ### Added
 - Declarative YAML DAG runtime with statically validated `agent`, `command`, `foreach`, `human`, `commit`, `pull_request`, and `cancel` nodes.
-- Provider-neutral `AgentProvider` boundary with Claude and Codex CLI implementations and capability validation.
-- Authoritative atomic `run.json` v3 snapshots plus append-only `events.jsonl`, typed artifacts, node attempts, ChangeSets, deliverables, parent runs, and pending human input.
+- Provider-neutral `AgentProvider` boundary with Claude and official Codex SDK implementations and capability validation.
+- Global-only `~/.harny/providers.json` connections for logical Claude/Codex provider IDs, compatible base URLs, environment-backed API keys, default models, and resume-safe connection fingerprints.
+- Provider-reported usage persisted on every runtime attempt and derived by node/provider/run in `harny show` and the viewer, including explicit reported-cost coverage.
+- Authoritative atomic `run.json` v4 snapshots plus append-only audit-only `events.jsonl`, exact scheduler state, immutable inputs, ChangeSets, parent runs, and pending human input.
 - Async human parking and `harny answer`, draft GitHub PR delivery through `feature-pr`, and manual `harny pr fix <number>` with PR leases and remote-head protection.
 - Project/global/bundled workflow and Markdown-command precedence, plus explicit `--workflow ./path.yaml` loading.
+- Local, attempt-scoped normalized transcripts for Claude and Codex, with messages, SDK-exposed reasoning, full tool payloads, file changes, plans, errors, lifecycle, and usage rendered incrementally in the run viewer.
 
 ### Changed
 - The deterministic declarative scheduler is now the only runtime; the XState engine and its private runtime switch were removed.
-- New runs use v3 exclusively; v2 `state.json`/`plan.json` runs remain readable but cannot be resumed.
+- Runs use v4 exclusively; historical v2/v3 readers, mutable `plan.json`, mirrored runtime artifacts, and migration code were removed.
 - Commits stage only a content-addressed ChangeSet that was verified unchanged before and after validation.
-- Dead run PIDs are materialized as terminal failures. CLI discovery, viewer, scan, summary, and cleanup understand both v2 and v3.
+- Dead run PIDs are materialized as terminal failures. CLI discovery, viewer, scan, summary, and cleanup share the v4 projection.
+- Workflow schema v2 adds immutable input references. Feature development, custom workflows, human resume, and review-fix all use the same runner.
+- Codex execution now uses the pinned `@openai/codex-sdk` instead of Harny's direct CLI subprocess/JSONL adapter.
+- Phoenix/OpenTelemetry observability was removed; run-local transcript JSONL is now the inspection source and is deleted together with the run by `harny clean`.
 
 ## [0.4.0] — 2026-07-12
 

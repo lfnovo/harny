@@ -23,3 +23,7 @@ Report your outcome as structured data:
 - problems (OPTIONAL): if you encountered friction that would benefit FUTURE harness runs to fix at the project level — a missing dev dep, an ambiguous acceptance criterion, an undocumented gotcha, a gap in your tooling — report it. Categories: environment (missing deps/tools/config), design (ambiguous task/plan/acceptance), understanding (insufficient context/docs), tooling (harness or agent tooling gap). Severity: low/medium/high. Be concrete about what would need to change. Omit if nothing noteworthy — do not pad.
 - If you were resumed on this task after a validator failure, the previous transcript is already in your context. Focus on the new validator feedback.
 - You cannot write to the harness plan file or run history-changing git commands; the harness enforces these invariants via hooks.
+
+Before installing dependencies, running generators, builds, coverage, or other commands that create files, inspect `.gitignore`. Add the ecosystem's generated paths without replacing existing rules. Confirm `git status --short` contains only intentional deliverables. The runtime rejects dependency directories and credential-like files by default.
+
+Task identity belongs to the scheduler and is not part of your structured output. Report only the implementation verdict and metadata requested by the output schema.

@@ -38,7 +38,6 @@ import type {
   HookCallbackMatcher,
   HookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
-import { planFilePath } from "./state/plan.js";
 
 /**
  * Composable guard policy. A workflow declares which invariants apply per
@@ -48,8 +47,6 @@ import { planFilePath } from "./state/plan.js";
 export type PhaseGuards = {
   /** Deny Write/Edit/MultiEdit/NotebookEdit on paths INSIDE the phase cwd. */
   readOnly?: boolean;
-  /** Deny writes to .harny/<slug>/plan.json (sole-writer invariant). */
-  noPlanWrites?: boolean;
   /** Deny Bash commands that mutate git history inside the phase cwd. */
   noGitHistory?: boolean;
   /** Deny forge publication commands; only privileged executors may publish. */
@@ -104,24 +101,6 @@ function validatorReadOnly(phaseCwd: string): HookCallback {
     }
     return denyPreToolUse(
       `Validator is read-only on the phase working dir (${phase}). Tool "${input.tool_name}" at ${filePath ?? "<unknown path>"} is not permitted inside the phase dir. Writes to paths outside (e.g., /tmp/harny-e2e-*) are allowed for empirical test setup. Report "fail" in your verdict instead of trying to fix code.`,
-    );
-  };
-}
-
-function developerPlanWriter(
-  primaryCwd: string,
-  phaseCwd: string,
-  taskSlug: string,
-): HookCallback {
-  const forbidden = resolve(planFilePath(primaryCwd, taskSlug));
-  return async (input) => {
-    if (input.hook_event_name !== "PreToolUse") return allowPreToolUse();
-    const filePath = readStringField(input.tool_input, "file_path");
-    if (filePath == null) return allowPreToolUse();
-    const abs = resolve(phaseCwd, filePath);
-    if (abs !== forbidden) return allowPreToolUse();
-    return denyPreToolUse(
-      `The harness is the sole writer of plan.json. Do not edit ${forbidden}.`,
     );
   };
 }
@@ -184,17 +163,10 @@ function readStringField(toolInput: unknown, key: string): string | null {
 
 export function buildGuardHooks(args: {
   guards: PhaseGuards;
-  primaryCwd: string;
   phaseCwd: string;
-  taskSlug: string;
 }): Partial<Record<"PreToolUse", HookCallbackMatcher[]>> {
   const writeMatchers: HookCallback[] = [];
   if (args.guards.readOnly) writeMatchers.push(validatorReadOnly(args.phaseCwd));
-  if (args.guards.noPlanWrites) {
-    writeMatchers.push(
-      developerPlanWriter(args.primaryCwd, args.phaseCwd, args.taskSlug),
-    );
-  }
 
   const preToolUse: HookCallbackMatcher[] = [];
   if (writeMatchers.length > 0) {

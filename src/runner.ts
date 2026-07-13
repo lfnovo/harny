@@ -1,7 +1,6 @@
 import type { IsolationMode, LogMode, RunMode } from "./harness/types.js";
 import type { RunnerContext } from "./runner/context.js";
 import { configureEnv } from "./runner/env.js";
-import { maybeRunMigration } from "./runner/migrate.js";
 import { handleScan } from "./runner/scan.js";
 import { handleLs } from "./runner/ls.js";
 import { handleShow } from "./runner/show.js";
@@ -211,15 +210,17 @@ export async function main() {
   // Fire-and-forget the update check now so its network round-trip overlaps
   // the actual work; the notice is printed once the command finishes.
   const updateCheck = startUpdateCheck(pkg.version, logMode);
-  // One-shot migration: if the pointer registry is empty but legacy runs
-  // exist in known cwds, backfill so `ls`/`show`/`ui` aren't suddenly empty
-  // for upgraded users.
-  await maybeRunMigration(logMode);
   try {
     if (registryCmd) {
-      const handlers = { ls: handleLs, show: handleShow, answer: handleAnswer, ui: handleUi, clean: handleClean, scan: handleScan, "pr-fix": handlePrFix };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (handlers[registryCmd.kind] as any)(registryCmd as any, ctx);
+      switch (registryCmd.kind) {
+        case "ls": await handleLs(registryCmd); break;
+        case "show": await handleShow(registryCmd); break;
+        case "answer": await handleAnswer(registryCmd); break;
+        case "ui": await handleUi(registryCmd); break;
+        case "clean": await handleClean(registryCmd, ctx); break;
+        case "scan": await handleScan(registryCmd); break;
+        case "pr-fix": await handlePrFix(registryCmd, ctx); break;
+      }
       return;
     }
     await handleRun(parsed, ctx);

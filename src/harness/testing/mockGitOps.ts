@@ -12,6 +12,7 @@ export type GitCall =
       primaryCwd: string;
       worktreePath: string;
       branch: string;
+      startPoint?: string;
     }
   | {
       op: "removeWorktree";
@@ -63,8 +64,9 @@ export class MockGitOps implements GitOps {
     primaryCwd: string,
     worktreePath: string,
     branch: string,
+    startPoint?: string,
   ): Promise<void> {
-    this.record({ op: "addWorktree", primaryCwd, worktreePath, branch });
+    this.record({ op: "addWorktree", primaryCwd, worktreePath, branch, startPoint });
   }
 
   async removeWorktree(

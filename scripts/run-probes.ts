@@ -6,8 +6,7 @@
  *
  * Probe discovery: files matching scripts/probes/** /<N>[a-z]?-*.ts.
  *
- * By default, env-dependent probe subdirs are skipped (they require external
- * binaries/services like a running Phoenix collector). Pass --env-deps to
+ * By default, env-dependent probe subdirs are skipped. Pass --env-deps to
  * include them.
  */
 
@@ -19,7 +18,7 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const PROBES_DIR = join(ROOT, 'scripts/probes');
 
 const PROBE_NAME = /^\d+[a-z]?-.+\.ts$/;
-const ENV_DEP_DIRS = new Set(['phoenix']);
+const ENV_DEP_DIRS = new Set<string>();
 
 type CliOptions = {
   includeEnvDeps: boolean;

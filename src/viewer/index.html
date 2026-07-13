@@ -258,6 +258,21 @@
     .phase .pdur { font-size:13px; color:var(--text); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
     .phase.run .pdur { color:var(--run); }
     .phase .psid { font-size:11px; color:var(--text-dim); }
+    .phase-wrap { border-radius:10px; }
+    .transcripts { margin:0 14px 10px 48px; }
+    details.transcript { border:1px solid var(--border); border-radius:9px; background:var(--bg-2); margin-top:7px; overflow:hidden; }
+    details.transcript > summary { grid-template-columns:1fr auto; padding:9px 12px; font-size:12px; color:var(--text-mut); }
+    .transcript-body { padding:4px 12px 12px; display:grid; gap:8px; }
+    .tr-event { border-left:2px solid var(--border-2); padding:6px 9px; min-width:0; }
+    .tr-event.message { border-color:var(--accent); background:var(--accent-bg); border-radius:0 7px 7px 0; }
+    .tr-event.error { border-color:var(--fail); color:var(--fail); }
+    .tr-label { color:var(--text-dim); font-size:10px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px; }
+    .tr-text { font-size:12.5px; overflow-wrap:anywhere; }
+    .tr-text p:first-child { margin-top:0; } .tr-text p:last-child { margin-bottom:0; }
+    .tr-payload { white-space:pre-wrap; overflow-wrap:anywhere; max-height:420px; overflow:auto; margin:6px 0 0; padding:8px; border-radius:7px; background:var(--surface-2); color:var(--text-mut); font-size:11px; }
+    .tr-sub { border:0; background:transparent; }
+    .tr-sub > summary { display:flex; grid-template-columns:none; gap:8px; padding:3px 0; color:var(--text-mut); font-size:12px; }
+    .tr-status { margin-left:auto; color:var(--text-dim); }
 
     .tnode { justify-self:center; width:12px; height:12px; border-radius:50%; box-sizing:border-box;
              background:var(--surface); border:2px solid var(--done); }
@@ -752,11 +767,13 @@
     function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } }
 
     const openDetails = new Set();
+    const transcriptCache = new Map();
+    let activeTranscriptRun = null;
     function bindDetailsTracking(root) {
       root.querySelectorAll('details[data-detail-id]').forEach((el) => {
         const id = el.getAttribute('data-detail-id');
         if (openDetails.has(id)) el.open = true;
-        el.addEventListener('toggle', () => { if (el.open) openDetails.add(id); else openDetails.delete(id); });
+        el.addEventListener('toggle', () => { if (el.open) { openDetails.add(id); if (el.classList.contains('transcript') && activeTranscriptRun) void refreshTranscripts(activeTranscriptRun.cwdHash, activeTranscriptRun.slug); } else openDetails.delete(id); });
       });
     }
 
@@ -826,19 +843,85 @@
     }
 
     // --- run detail ----------------------------------------------------------
+    function usageNumber(value) { return Number(value || 0).toLocaleString('en-US'); }
+    function usageCost(value, coverage) { return value == null ? '—' : `$${Number(value).toFixed(4)}${coverage === 'partial' ? ' partial' : ''}`; }
+    function usageLine(value) {
+      if (!value) return '';
+      const parts = [`in ${usageNumber(value.input_tokens ?? value.inputTokens)}`, `out ${usageNumber(value.output_tokens ?? value.outputTokens)}`];
+      const read = value.cache_read_input_tokens ?? value.cacheReadInputTokens ?? 0;
+      const write = value.cache_creation_input_tokens ?? value.cacheCreationInputTokens ?? 0;
+      const reasoning = value.reasoning_output_tokens ?? value.reasoningOutputTokens ?? 0;
+      const cost = value.cost_usd ?? value.costUsd;
+      if (read) parts.push(`cache-read ${usageNumber(read)}`);
+      if (write) parts.push(`cache-write ${usageNumber(write)}`);
+      if (reasoning) parts.push(`reasoning ${usageNumber(reasoning)}`);
+      if (cost != null) parts.push(`$${Number(cost).toFixed(4)} reported`);
+      return parts.join(' · ');
+    }
+    function usageModels(value) {
+      return Object.entries((value && value.models) || {}).map(([model, metrics]) => `<div class="mut" style="font-size:11px;margin-top:5px"><span class="mono">${escapeHtml(model)}</span> · ${escapeHtml(usageLine(metrics))}</div>`).join('');
+    }
+    function transcriptPanels(p) {
+      const attempts = (p.attempts_detail || []).filter(a => a.transcript_available);
+      if (!attempts.length) return '';
+      return `<div class="transcripts">${attempts.map(a => {
+        const key = `${p.instance_id}:${a.number}`;
+        return `<details class="transcript" data-detail-id="transcript-${escapeHtml(key)}" data-instance="${escapeHtml(p.instance_id)}" data-attempt="${a.number}"><summary><span>Transcript · attempt ${a.number}</span><span class="tr-status">${escapeHtml(a.status)}</span></summary><div class="transcript-body" data-transcript-key="${escapeHtml(key)}"><span class="mut">Open to load events.</span></div></details>`;
+      }).join('')}</div>`;
+    }
+    function jsonPayload(value) {
+      if (value === undefined) return '';
+      try { return `<pre class="tr-payload mono">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`; }
+      catch { return `<pre class="tr-payload mono">${escapeHtml(String(value))}</pre>`; }
+    }
+    function renderTranscript(records) {
+      const items = []; const replaceable = new Map();
+      records.forEach(record => {
+        const event = record.event || {};
+        const key = ['tool', 'file_change', 'plan'].includes(event.type) && event.id ? `${event.type}:${event.id}` : null;
+        if (key && replaceable.has(key)) items[replaceable.get(key)] = record;
+        else { if (key) replaceable.set(key, items.length); items.push(record); }
+      });
+      return items.map(record => {
+        const e = record.event; const when = fmtTime(record.at).split(' ').pop();
+        if (e.type === 'request') return `<div class="tr-event"><div class="tr-label">request · ${escapeHtml(when)}</div><details class="tr-sub"><summary>Prompt</summary>${jsonPayload({ prompt:e.prompt, system_prompt:e.systemPrompt, model:e.model, tools:e.tools, guards:e.guards })}</details></div>`;
+        if (e.type === 'message') return `<div class="tr-event message"><div class="tr-label">${escapeHtml(e.role)} · ${escapeHtml(when)}</div><div class="tr-text">${renderMarkdown(e.text)}</div></div>`;
+        if (e.type === 'reasoning') return `<div class="tr-event"><details class="tr-sub"><summary>Reasoning <span class="tr-status">${escapeHtml(when)}</span></summary><div class="tr-text">${renderMarkdown(e.text)}</div></details></div>`;
+        if (e.type === 'tool') return `<div class="tr-event"><details class="tr-sub"><summary>${escapeHtml(e.name)} <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload({ kind:e.kind, input:e.input, output:e.output, error:e.error })}</details></div>`;
+        if (e.type === 'file_change') return `<div class="tr-event"><details class="tr-sub"><summary>File changes <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.changes)}</details></div>`;
+        if (e.type === 'plan') return `<div class="tr-event"><details class="tr-sub"><summary>Agent plan <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.items)}</details></div>`;
+        if (e.type === 'usage') return `<div class="tr-event"><div class="tr-label">usage</div><div class="tr-text mono">${escapeHtml(usageLine(e.usage))}</div></div>`;
+        if (e.type === 'error') return `<div class="tr-event error"><div class="tr-label">error</div><div class="tr-text">${escapeHtml(e.message)}</div></div>`;
+        if (e.type === 'lifecycle') return `<div class="tr-event"><div class="tr-label">${escapeHtml(e.scope)} · ${escapeHtml(e.status)}</div>${e.message ? `<div class="tr-text">${escapeHtml(e.message)}</div>` : ''}</div>`;
+        return `<div class="tr-event"><div class="tr-label">${escapeHtml(e.name || e.type)}</div>${jsonPayload(e.data)}</div>`;
+      }).join('') || '<span class="mut">No transcript events yet.</span>';
+    }
+    async function refreshTranscripts(cwdHash, slug) {
+      activeTranscriptRun = { cwdHash, slug };
+      const panels = [...app.querySelectorAll('details.transcript[open]')];
+      await Promise.all(panels.map(async panel => {
+        const instance = panel.dataset.instance; const attempt = Number(panel.dataset.attempt); const key = `${cwdHash}:${slug}:${instance}:${attempt}`;
+        const cached = transcriptCache.get(key) || { after:0, records:[] };
+        try {
+          const page = await fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/transcripts?instance=${encodeURIComponent(instance)}&attempt=${attempt}&after=${cached.after}&limit=200`);
+          if (page.events.length) { cached.records.push(...page.events); cached.after = page.next_after; transcriptCache.set(key, cached); }
+          const body = panel.querySelector('.transcript-body'); if (body) body.innerHTML = renderTranscript(cached.records);
+        } catch (error) { const body = panel.querySelector('.transcript-body'); if (body) body.innerHTML = `<span style="color:var(--fail)">${escapeHtml(error.message)}</span>`; }
+      }));
+    }
     function phaseRow(p) {
       const dur = liveDur(p.started_at, p.ended_at);
       const sid = p.session_id ? p.session_id.slice(0, 8) : '—';
       const name = p.attempt > 1 ? `${p.name} #${p.attempt}` : p.name;
       if (p.status === 'running') {
-        return `<div class="phase run">
+        return `<div class="phase-wrap"><div class="phase run">
           <div class="runhead">
             <span class="tnode run"></span>
             <span class="pname">${escapeHtml(name)} <span class="pill s-running spin" style="margin-left:8px"><span class="d"></span>running</span></span>
             <span class="runmeta"><span class="pdur">${dur}</span><span class="psid mono" title="session id">${escapeHtml(sid)}</span></span>
           </div>
           <div class="workframe">${sceneFor(p.name)}</div>
-        </div>`;
+        </div>${transcriptPanels(p)}</div>`;
       }
       const ok = p.status === 'completed';
       const phaseCls = ok ? 'phase ok' : p.status === 'failed' ? 'phase' : 'phase';
@@ -848,11 +931,11 @@
         else if (p.status === 'parked') nodeCls += ' parked';
         else if (p.name.startsWith('planner')) nodeCls += ' planner';
       }
-      return `<div class="${phaseCls}">
+      return `<div class="phase-wrap"><div class="${phaseCls}">
         <span class="${nodeCls}"></span>
-        <div class="pmain"><span class="pname">${escapeHtml(name)}</span></div>
+        <div class="pmain"><span class="pname">${escapeHtml(name)}</span>${p.usage ? `<div class="mut" style="font-size:11px;margin-top:3px">${escapeHtml(usageLine(p.usage))}</div>` : ''}</div>
         <div class="pright"><span class="pdur">${dur}</span><span class="psid mono" title="session id">${escapeHtml(sid)}</span></div>
-      </div>`;
+      </div>${transcriptPanels(p)}</div>`;
     }
     function iterTitle(group) {
       const dev = group.find(p => p.name.startsWith('developer') && p.verdict);
@@ -871,7 +954,7 @@
           ]);
 
           const sig = JSON.stringify({ state, plan, commits, gitErr, siblingBranches });
-          if (sig === lastDetailSig && app.querySelector('.head')) return;
+          if (sig === lastDetailSig && app.querySelector('.head')) { await refreshTranscripts(cwdHash, slug); return; }
           const animate = detailAnimate;
           detailAnimate = false;
           lastDetailSig = sig;
@@ -894,10 +977,21 @@
           const tasksKpi = (plan && Array.isArray(plan.tasks) && plan.tasks.length) ? `${plan.tasks.filter(t => t.status === 'done').length}/${plan.tasks.length}` : '—';
           const retriesKpi = visiblePhases.reduce((n, p) => n + Math.max(0, (p.attempt || 1) - 1), 0);
 
-          let phoenixLink;
-          if (state.phoenix && state.phoenix.url) phoenixLink = `<a class="cta-out" href="${escapeHtml(state.phoenix.url)}" target="_blank" rel="noopener">Open trace in Phoenix ↗</a>`;
-          else if (state.phoenix) phoenixLink = `<span class="mut" style="font-size:12px" title="Project not yet visible in Phoenix — try again in a few seconds">trace pending</span>`;
-          else phoenixLink = `<span class="mut" style="font-size:12px">no Phoenix trace</span>`;
+          let usageHtml = '';
+          const usage = state.usage && state.usage.total;
+          if (usage && (usage.input_tokens || usage.output_tokens || usage.cache_read_input_tokens || usage.cache_creation_input_tokens || usage.reasoning_output_tokens || usage.cost_usd != null)) {
+            const cache = (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+            const providers = Object.entries(state.usage.by_provider || {}).map(([provider, value]) => `<div class="phase ok"><span class="tnode"></span><div class="pmain"><span class="pname">${escapeHtml(provider)}</span><div class="mut" style="font-size:11px;margin-top:3px">${escapeHtml(usageLine(value))}</div></div></div>`).join('');
+            const attempts = visiblePhases.flatMap(phase => (phase.attempts_detail || []).filter(attempt => attempt.usage).map(attempt => `<details class="task"><summary><span class="tid mono">${escapeHtml(phase.name)}</span><span class="ttitle">attempt ${attempt.number} · ${escapeHtml(attempt.status)} · ${escapeHtml(attempt.usage.provider)}${attempt.usage.model ? `/${escapeHtml(attempt.usage.model)}` : ''}</span><span class="mono dim">${escapeHtml(usageLine(attempt.usage))}</span></summary>${usageModels(attempt.usage) ? `<div class="task-body">${usageModels(attempt.usage)}</div>` : ''}</details>`)).join('');
+            usageHtml = `<div class="section-h reveal" style="--i:3"><h2>Usage</h2><span class="meta">provider-reported metrics</span></div>
+              <div class="summary reveal" style="--i:3; margin:0 0 18px">
+                <div class="stat" style="--c:var(--accent)"><div class="n num">${usageNumber(usage.input_tokens)}</div><div class="l"><span class="k"></span>Input</div></div>
+                <div class="stat" style="--c:var(--run)"><div class="n num">${usageNumber(usage.output_tokens)}</div><div class="l"><span class="k"></span>Output</div></div>
+                <div class="stat" style="--c:var(--done)"><div class="n num">${usageNumber(cache)}</div><div class="l"><span class="k"></span>Cache</div></div>
+                <div class="stat" style="--c:var(--wait)"><div class="n num">${escapeHtml(usageCost(usage.cost_usd, usage.cost_coverage))}</div><div class="l"><span class="k"></span>Reported cost</div></div>
+              </div>
+              <div class="grid2 reveal" style="--i:3; margin-bottom:24px"><div class="panel"><h3>By provider</h3>${providers}</div><div class="panel"><h3>By attempt</h3>${attempts || '<p class="mut" style="font-size:12px">No attempt metrics.</p>'}</div></div>`;
+          }
 
           let planHtml = '';
           if (plan && Array.isArray(plan.tasks) && plan.tasks.length > 0) {
@@ -952,7 +1046,6 @@
                 <h1>${escapeHtml(state.origin.task_slug)}</h1>
                 <div class="metaline"><span>${escapeHtml(state.origin.workflow)}</span><span class="dim">·</span>${statusPill(state.lifecycle.status)}<span class="dim">·</span><span class="mono dim">${escapeHtml(state.run_id)}</span><span class="chip"><span class="cd"></span>elapsed ${elapsedHtml}</span></div>
               </div>
-              ${phoenixLink}
             </div>
             ${pendingHtml}
             <div class="section-h reveal" style="--i:1; margin-top:8px"><h2>Live pipeline</h2><span class="meta">${escapeHtml(state.lifecycle.status)}${state.lifecycle.ended_reason ? ` · ${escapeHtml(state.lifecycle.ended_reason)}` : ''}</span></div>
@@ -963,6 +1056,7 @@
               <div class="stat" style="--c:var(--done)"><div class="n num">${tasksKpi}</div><div class="l"><span class="k"></span>Tasks done</div></div>
               <div class="stat" style="--c:var(--wait)"><div class="n num">${retriesKpi}</div><div class="l"><span class="k"></span>Retries</div></div>
             </div>
+            ${usageHtml}
             <div class="grid2 reveal" style="--i:3">
               <div class="panel"><h3>Origin</h3><dl>
                 <dt>prompt</dt><dd>${escapeHtml(state.origin.prompt)}</dd>
@@ -987,6 +1081,7 @@
             </div>
           </div>`;
           bindDetailsTracking(app);
+          await refreshTranscripts(cwdHash, slug);
         } catch (e) {
           app.innerHTML = `<a class="back" href="#/">← all runs</a><p style="margin-top:16px; color:var(--fail)">Error: ${escapeHtml(e.message)}</p>`;
         }

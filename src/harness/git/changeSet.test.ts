@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { assertChangeSetUnchanged, captureChangeSet, commitChangeSet } from "./changeSet.js";
+import { assertChangeSetAllowed, assertChangeSetUnchanged, captureChangeSet, commitChangeSet } from "./changeSet.js";
 
 async function repo() {
   const cwd = await mkdtemp(join(tmpdir(), "harny-changeset-"));
@@ -28,4 +28,13 @@ test("ChangeSet rejects a new file appearing after validation", async () => {
   const cwd = await repo(); await writeFile(join(cwd, "base.txt"), "first\n");
   const changeSet = await captureChangeSet(cwd); await writeFile(join(cwd, "surprise.txt"), "surprise\n");
   expect(commitChangeSet(cwd, "unsafe", changeSet)).rejects.toThrow("changed after validation");
+});
+
+test("ChangeSet rejects generated dependencies and credential-like files unless explicitly allowed", async () => {
+  const cwd = await repo(); await mkdir(join(cwd, "node_modules/pkg"), { recursive: true }); await writeFile(join(cwd, "node_modules/pkg/index.js"), "generated\n");
+  const generated = await captureChangeSet(cwd);
+  expect(assertChangeSetAllowed(cwd, generated)).rejects.toThrow("protected paths");
+  await expect(assertChangeSetAllowed(cwd, generated, { allowPaths: ["node_modules/"] })).resolves.toBeUndefined();
+  await writeFile(join(cwd, ".env"), "SECRET=value\n");
+  expect(assertChangeSetAllowed(cwd, await captureChangeSet(cwd))).rejects.toThrow(".env");
 });

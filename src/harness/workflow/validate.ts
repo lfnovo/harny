@@ -1,5 +1,6 @@
 import type { AgentProvider } from "../providers/types.js";
 import type { NormalizedWorkflowDefinition, WorkflowNode, WorkflowPredicate } from "./schema.js";
+import { schemaFromDefinition } from "./outputSchema.js";
 
 export class WorkflowValidationError extends Error {
   constructor(public readonly issues: string[]) {
@@ -20,9 +21,12 @@ export function validateWorkflow(
   for (const node of workflow.nodes) {
     for (const dep of node.depends_on) if (!byId.has(dep)) issues.push(`${node.id} depends on unknown node ${dep}`);
     if (node.type === "human" && !node.timeout && !workflow.defaults.timeout) issues.push(`human node ${node.id} requires a timeout`);
+    if (node.retry?.return_to) issues.push(`${node.id} retry.return_to is only valid inside foreach`);
     if (node.type === "command" && isInlineScript(node.command)) issues.push(`${node.id} uses an inline shell script; command nodes require direct argv`);
-    if (node.type === "agent") validateProvider(node, workflow.defaults.provider, providers, issues);
+    if (node.type === "commit" && !/^\$\{\{\s*nodes\./.test(node.changeset)) issues.push(`${node.id} must reference a dependency ChangeSet output`);
+    if (node.type === "agent") { validateProvider(node, workflow.defaults.provider, providers, issues); validateOutputSchema(node, issues); }
     if (node.type === "foreach") validateForeach(node, workflow.defaults.timeout, workflow.defaults.provider, providers, issues);
+    validateReferenceSyntax(node, node.type === "foreach" ? new Set([node.as]) : new Set(), node.id, issues);
     visitReferences(node, (id) => {
       if (!byId.has(id)) issues.push(`${node.id} references output of unknown node ${id}`);
       else if (id !== node.id && !dependsOn(node, id, byId)) issues.push(`${node.id} references ${id} without depending on it`);
@@ -46,12 +50,21 @@ function validateForeach(node: Extract<WorkflowNode, { type: "foreach" }>, defau
     if (step.retry?.return_to && !seen.has(step.retry.return_to)) issues.push(`${node.id}.${step.id} retry returns to a step that is missing or not earlier: ${step.retry.return_to}`);
     if (step.type === "human" && !step.timeout && !defaultTimeout) issues.push(`human step ${node.id}.${step.id} requires a timeout`);
     if (step.type === "command" && isInlineScript(step.command)) issues.push(`${node.id}.${step.id} uses an inline shell script; command steps require direct argv`);
-    if (step.type === "agent") validateProvider(step, defaultProvider, providers, issues);
+    if (step.type === "agent") { validateProvider(step, defaultProvider, providers, issues); validateOutputSchema(step, issues); }
+    if (step.type === "commit" && !seen.has(step.changeset)) issues.push(`${node.id}.${step.id} commits a ChangeSet from a step that is missing or not earlier: ${step.changeset}`);
     seen.add(step.id);
   }
 }
 
+function validateOutputSchema(node: Extract<WorkflowNode, { type: "agent" }>, issues: string[]) {
+  if (!node.output_schema) return;
+  try { schemaFromDefinition(node.output_schema); }
+  catch (error) { issues.push(`${node.id} has invalid output_schema: ${error instanceof Error ? error.message : String(error)}`); }
+}
+
 function validateProvider(node: Extract<WorkflowNode, { type: "agent" }>, fallback: string, providers: ReadonlyMap<string, AgentProvider>, issues: string[]) {
+  const knownGuards = new Set(["read_only", "no_git_history", "no_forge_effects"]);
+  for (const guard of node.guards) if (!knownGuards.has(guard)) issues.push(`${node.id} uses unknown guard ${guard}`);
   if (!providers.size) return;
   const id = node.provider ?? fallback;
   const provider = providers.get(id);
@@ -77,6 +90,12 @@ function visitReferences(value: unknown, found: (nodeId: string) => void): void 
     for (const match of value.matchAll(/\$\{\{\s*nodes\.([a-z][a-z0-9_-]*)\.outputs(?:\.[^}\s]+)?\s*}}/g)) found(match[1]!);
   } else if (Array.isArray(value)) value.forEach((item) => visitReferences(item, found));
   else if (value && typeof value === "object") Object.values(value).forEach((item) => visitReferences(item, found));
+}
+
+function validateReferenceSyntax(value: unknown, aliases: ReadonlySet<string>, owner: string, issues: string[]): void {
+  if (typeof value === "string") { for (const match of value.matchAll(/\$\{\{\s*([^}]+?)\s*}}/g)) { const expression = match[1]!.trim(); if (aliases.has(expression) || /^inputs(?:\.[a-zA-Z0-9_.-]+)?$/.test(expression) || /^nodes\.[a-z][a-z0-9_-]*\.outputs(?:\.[a-zA-Z0-9_.-]+)?$/.test(expression)) continue; issues.push(`${owner} uses unsupported reference \${{ ${expression} }}`); } }
+  else if (Array.isArray(value)) value.forEach((item) => validateReferenceSyntax(item, aliases, owner, issues));
+  else if (value && typeof value === "object") Object.values(value).forEach((item) => validateReferenceSyntax(item, aliases, owner, issues));
 }
 
 export function evaluatePredicate(predicate: WorkflowPredicate): boolean {

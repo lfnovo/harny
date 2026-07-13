@@ -1,4 +1,4 @@
-version: 1
+version: 2
 name: review-fix
 defaults:
   provider: claude
@@ -8,32 +8,41 @@ workspace:
 outcome:
   type: pull_request
 nodes:
-  - id: collect_feedback
-    type: command
-    command: [gh, pr, view]
-  - id: developer
+  - id: fixes
+    type: foreach
+    items: "${{ inputs.tasks }}"
+    as: task
+    max_items: 1
+    steps:
+      - id: developer
+        type: agent
+        command: review_fixer
+        requires: [structured_output, tool_guards]
+        guards: [no_git_history, no_forge_effects]
+      - id: validator
+        type: agent
+        command: validator
+        depends_on: [developer]
+        requires: [structured_output, tool_guards]
+        guards: [read_only]
+        retry: { max_attempts: 3, return_to: developer }
+      - id: commit
+        type: commit
+        message: "fix: address review feedback"
+        changeset: developer
+        depends_on: [validator]
+  - id: final_validator
     type: agent
-    command: review_fixer
-    depends_on: [collect_feedback]
-    requires: [structured_output, tool_guards]
-    guards: [no_git_history, no_forge_effects]
-  - id: validator
-    type: agent
-    command: validator
-    depends_on: [developer]
+    command: final_validator
+    depends_on: [fixes]
     requires: [structured_output, tool_guards]
     guards: [read_only]
-  - id: commit
-    type: commit
-    message: "fix: address review feedback"
-    changeset: developer
-    depends_on: [validator]
   - id: pull_request
     type: pull_request
-    title: "Update existing PR"
-    body: "Address review feedback"
-    base: main
-    head: "${{ run.branch }}"
+    title: "${{ inputs.pull_request.title }}"
+    body: "${{ inputs.pull_request.body }}"
+    base: "${{ inputs.pull_request.base }}"
+    head: "${{ inputs.pull_request.head }}"
     draft: true
     existing: require
-    depends_on: [commit]
+    depends_on: [final_validator]

@@ -10,11 +10,9 @@
  *   bun scripts/probes/single-query.ts "list skills"
  *   bun scripts/probes/single-query.ts --assistant my-app -v "explore X"
  *
- * Phoenix instrumentation kicks in automatically when HARNY_PHOENIX_URL is set.
  */
 
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { setupPhoenix, withRunSpan } from "../../src/harness/observability/phoenix.js";
+import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { mkdir, writeFile, rename, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname, isAbsolute } from "node:path";
@@ -137,19 +135,8 @@ async function main() {
     }
   }
 
-  const phoenix = setupPhoenix({
-    workflowId: "single-query",
-    cwd: assistant?.cwd,
-  });
-  const query = phoenix.query;
-
   try {
-    await withRunSpan(
-      phoenix,
-      "single-query",
-      { "harness.workflow": "single-query" },
-      async () => {
-        for await (const message of query({
+    for await (const message of query({
           prompt,
           options: {
             allowedTools: [
@@ -172,7 +159,7 @@ async function main() {
               ? { additionalDirectories: assistant.additionalDirectories }
               : {}),
           },
-        })) {
+    })) {
           record.events.push(message);
 
           if (
@@ -193,9 +180,7 @@ async function main() {
             console.log(`[probe] event: ${message.type}`);
             console.dir(message, { depth: null, colors: true });
           }
-        }
-      },
-    );
+    }
 
     record.status = "completed";
   } catch (err) {

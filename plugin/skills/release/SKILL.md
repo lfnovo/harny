@@ -201,10 +201,10 @@ Deterministic, fast, same correctness signal.
 
 If returning to this work after a context compaction:
 
-1. Read your project's `CLAUDE.md` — invariants, gotchas, key paths.
+1. Read your project's `AGENTS.md` (or its `CLAUDE.md` compatibility file) — invariants, gotchas, key paths.
 2. Re-read this skill — policy + operational HOW.
 3. Check `git log --oneline -20` — what was last committed.
-4. Check `.harny/` for the most recent run; read `run.json` + `events.jsonl` + `review.md` (if `/review` was invoked). Use historical v2 state only when `run.json` is absent.
+4. Check `.harny/` for the most recent run; read `run.json` + `events.jsonl` + `review.md` (if `/review` was invoked).
 5. Scan open GitHub Issues + Discussions for pending architectural decisions.
 6. Ask the user: "what's the next decision we're making?" Don't assume.
 
@@ -213,6 +213,6 @@ If returning to this work after a context compaction:
 ## Companion skills
 
 - **`/review <slug>`** — post-mortem of one finished run; emits findings pre-triaged (NOW-blocks / NOW-quick / BACKLOG) so this skill can route them without re-classifying.
-- **`/learn` + `/drain`** — capture (`/learn <text>`) + drain the inbox into Issues / CLAUDE.md edits / discards.
+- **`/learn` + `/drain`** — capture (`/learn <text>`) + drain the inbox into Issues / AGENTS.md edits / discards.
 - **`/check-repo`** — pre-flight readiness assessment, run before adopting harny in a fresh repo.
 - **`/harny`** — onboarding + router if you've never used harny before.

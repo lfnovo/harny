@@ -8,7 +8,7 @@ import { runWorkflow, type WorkflowSnapshot } from '../../../src/harness/workflo
 
 let snapshot: WorkflowSnapshot | null = null;
 const workflow = WorkflowDefinitionSchema.parse({
-  version: 1,
+  version: 2,
   name: 'validator-smoke',
   defaults: { provider: 'claude', timeout: 1_000 },
   workspace: { isolation: 'inline' },

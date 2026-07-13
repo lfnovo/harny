@@ -1,14 +1,22 @@
 import type { NormalizedWorkflowDefinition, WorkflowNode, WorkflowStep } from "./schema.js";
 import { evaluatePredicate, validateWorkflow } from "./validate.js";
 import type { Observer, WorkflowEvent } from "./observer.js";
+import { z } from "zod";
+import { AgentUsageSchema, type AgentSession, type AgentUsage } from "../providers/types.js";
+import type { TranscriptAttemptRef } from "../transcripts/types.js";
 
 export type NodeStatus = "pending" | "running" | "completed" | "skipped" | "failed" | "paused" | "cancelled";
-export interface RuntimeAttempt { number: number; status: "running" | "completed" | "failed" | "paused" | "cancelled"; startedAt: string; endedAt?: string; error?: string; }
+export interface RuntimeAttempt { number: number; status: "running" | "completed" | "failed" | "paused" | "cancelled"; startedAt: string; endedAt?: string; error?: string; session?: AgentSession; usage?: AgentUsage; }
 export interface NodeInstance { id: string; status: NodeStatus; attempts: number; attemptHistory?: RuntimeAttempt[]; output?: unknown; error?: string; steps?: Record<string, NodeInstance>; }
-export interface PendingHumanInput { nodeId: string; question: string; options?: unknown[]; askedAt: string; expiresAt: string; fallback?: string; resumeNode?: boolean; session?: { provider: string; id: string }; }
+export interface PendingHumanInput { nodeId: string; question: string; options?: unknown[]; askedAt: string; expiresAt: string; fallback?: string; resumeNode?: boolean; session?: AgentSession; }
 export interface WorkflowSnapshot { workflow: string; status: "running" | "paused" | "done" | "failed" | "cancelled"; nodes: Record<string, NodeInstance>; pendingHuman?: PendingHumanInput; }
+const AgentSessionSchema: z.ZodType<AgentSession> = z.object({ provider: z.string(), id: z.string(), connectionFingerprint: z.string() });
+const RuntimeAttemptSchema: z.ZodType<RuntimeAttempt> = z.object({ number: z.number().int().positive(), status: z.enum(["running", "completed", "failed", "paused", "cancelled"]), startedAt: z.string(), endedAt: z.string().optional(), error: z.string().optional(), session: AgentSessionSchema.optional(), usage: AgentUsageSchema.optional() });
+const NodeInstanceSchema: z.ZodType<NodeInstance> = z.lazy(() => z.object({ id: z.string(), status: z.enum(["pending", "running", "completed", "skipped", "failed", "paused", "cancelled"]), attempts: z.number().int().nonnegative(), attemptHistory: z.array(RuntimeAttemptSchema).optional(), output: z.unknown().optional(), error: z.string().optional(), steps: z.record(z.string(), NodeInstanceSchema).optional() }));
+const PendingHumanInputSchema: z.ZodType<PendingHumanInput> = z.object({ nodeId: z.string(), question: z.string(), options: z.array(z.unknown()).optional(), askedAt: z.string(), expiresAt: z.string(), fallback: z.string().optional(), resumeNode: z.boolean().optional(), session: AgentSessionSchema.optional() });
+export const WorkflowSnapshotSchema: z.ZodType<WorkflowSnapshot> = z.object({ workflow: z.string(), status: z.enum(["running", "paused", "done", "failed", "cancelled"]), nodes: z.record(z.string(), NodeInstanceSchema), pendingHuman: PendingHumanInputSchema.optional() });
 export interface WorkflowStateStore { load(): Promise<WorkflowSnapshot | null>; save(snapshot: WorkflowSnapshot): Promise<void>; }
-export interface NodeExecutionContext { snapshot: WorkflowSnapshot; signal: AbortSignal; checkpoint?: NodeInstance; foreach?: { item: unknown; index: number; outputs: Record<string, unknown> }; }
+export interface NodeExecutionContext { snapshot: WorkflowSnapshot; inputs?: Readonly<Record<string, unknown>>; signal: AbortSignal; attempt: TranscriptAttemptRef; checkpoint?: NodeInstance; foreach?: { item: unknown; index: number; outputs: Record<string, unknown> }; reportAttempt(metadata: { session?: AgentSession; usage?: AgentUsage }): Promise<void>; }
 export type NodeExecutor = (node: WorkflowNode, context: NodeExecutionContext) => Promise<unknown>;
 
 export class RetryWorkflowStepError extends Error {
@@ -25,13 +33,14 @@ export async function runWorkflow(args: {
   executors: Partial<Record<WorkflowNode["type"], NodeExecutor>>;
   signal?: AbortSignal;
   observer?: Observer;
+  inputs?: Readonly<Record<string, unknown>>;
 }): Promise<WorkflowSnapshot> {
   validateWorkflow(args.workflow);
   let snapshot = await args.store.load() ?? initialSnapshot(args.workflow);
   if (snapshot.workflow !== args.workflow.name) throw new Error(`snapshot belongs to workflow ${snapshot.workflow}`);
-  // A process can disappear after persisting "running" but before the next
-  // boundary. Re-queue that node; completed foreach steps remain checkpointed.
-  for (const instance of Object.values(snapshot.nodes)) if (instance.status === "running") instance.status = "pending";
+  // Close interrupted attempts before re-queueing their nodes. Usage already
+  // reported by a provider remains an immutable record of the billed call.
+  for (const instance of Object.values(snapshot.nodes)) recoverInterrupted(instance);
   while (snapshot.status === "running") {
     const node = nextReady(args.workflow.nodes, snapshot);
     if (!node) {
@@ -40,7 +49,7 @@ export async function runWorkflow(args: {
       await args.store.save(snapshot); await observe(args.observer, { type: "run.finished", workflow: snapshot.workflow, at: new Date().toISOString(), data: { status: snapshot.status } }); break;
     }
     const instance = snapshot.nodes[node.id]!;
-    if (node.when && !evaluatePredicate(resolveReferences(node.when, snapshot) as typeof node.when)) {
+    if (node.when && !evaluatePredicate(resolveReferences(node.when, snapshot, args.inputs ?? {}) as typeof node.when)) {
       instance.status = "skipped"; await args.store.save(snapshot); snapshot = (await args.store.load())!; continue;
     }
     const executor = node.type === "foreach" || node.type === "cancel" ? undefined : args.executors[node.type];
@@ -54,8 +63,8 @@ export async function runWorkflow(args: {
     const timer = timeout ? setTimeout(() => controller.abort(new Error(`node ${node.id} timed out`)), timeout) : undefined;
     try {
       instance.output = await abortable(node.type === "foreach"
-        ? executeForeach(node, snapshot, args.store, args.executors, controller.signal)
-        : node.type === "cancel" ? { reason: node.reason } : executor!(resolveReferences(node, snapshot) as WorkflowNode, { snapshot, signal: controller.signal }), controller.signal);
+        ? executeForeach(node, snapshot, args.store, args.executors, controller.signal, args.inputs ?? {})
+        : node.type === "cancel" ? { reason: node.reason } : executor!(resolveReferences(node, snapshot, args.inputs ?? {}) as WorkflowNode, { snapshot, inputs: args.inputs ?? {}, signal: controller.signal, attempt: { instanceId: node.id, attempt: instance.attempts }, reportAttempt: (metadata) => persistAttemptMetadata(args.store, snapshot, instance, metadata) }), controller.signal);
       if (node.type === "cancel") { instance.status = "cancelled"; snapshot.status = "cancelled"; }
       else {
       instance.status = "completed"; delete instance.error;
@@ -64,7 +73,7 @@ export async function runWorkflow(args: {
     } catch (error) {
       if (error instanceof PauseWorkflowError) {
         instance.status = "paused"; snapshot.status = "paused"; snapshot.pendingHuman = error.pending;
-        const pausedAttempt = instance.attemptHistory?.at(-1); if (pausedAttempt) { pausedAttempt.status = "paused"; pausedAttempt.endedAt = new Date().toISOString(); }
+        const pausedAttempt = instance.attemptHistory?.at(-1); if (pausedAttempt) { pausedAttempt.status = "paused"; pausedAttempt.endedAt = new Date().toISOString(); pausedAttempt.session = error.pending.session; }
         await args.store.save(snapshot); await observe(args.observer, { type: "node.paused", workflow: snapshot.workflow, nodeId: node.id, at: new Date().toISOString() }); break;
       }
       instance.error = String(error);
@@ -104,9 +113,9 @@ export async function materializeHumanExpiry(store: WorkflowStateStore, now = ne
 async function executeForeach(
   node: Extract<WorkflowNode, { type: "foreach" }>, snapshot: WorkflowSnapshot,
   store: WorkflowStateStore,
-  executors: Partial<Record<WorkflowNode["type"], NodeExecutor>>, signal: AbortSignal,
+  executors: Partial<Record<WorkflowNode["type"], NodeExecutor>>, signal: AbortSignal, inputs: Readonly<Record<string, unknown>>,
 ): Promise<unknown[]> {
-  const items = Array.isArray(node.items) ? node.items : resolveItems(node.items, snapshot);
+  const items = Array.isArray(node.items) ? node.items : resolveItems(node.items, snapshot, inputs);
   if (items.length > node.max_items) throw new Error(`foreach ${node.id} received ${items.length} items, limit is ${node.max_items}`);
   const outputs: unknown[] = [];
   const parent = snapshot.nodes[node.id]!;
@@ -125,12 +134,13 @@ async function executeForeach(
       if (!executor) throw new Error(`no executor registered for foreach step ${step.type}`);
       checkpoint.status = "running"; checkpoint.attempts += 1; checkpoint.attemptHistory ??= []; checkpoint.attemptHistory.push({ number: checkpoint.attempts, status: "running", startedAt: new Date().toISOString() }); await store.save(snapshot);
       try {
-        checkpoint.output = await executor(interpolateStep(step, node.as, items[index]) as WorkflowNode, { snapshot, signal, checkpoint, foreach: { item: items[index], index, outputs: itemOutputs } });
+        const interpolated = interpolateStep(step, node.as, items[index]);
+        checkpoint.output = await executor(resolveReferences(interpolated, snapshot, inputs) as WorkflowNode, { snapshot, inputs, signal, attempt: { instanceId: `${node.id}:${index}:${step.id}`, attempt: checkpoint.attempts }, checkpoint, foreach: { item: items[index], index, outputs: itemOutputs }, reportAttempt: (metadata) => persistAttemptMetadata(store, snapshot, checkpoint, metadata) });
         checkpoint.status = "completed"; delete checkpoint.error; const completed = checkpoint.attemptHistory.at(-1); if (completed) { completed.status = "completed"; completed.endedAt = new Date().toISOString(); } itemOutputs[step.id] = checkpoint.output;
         await store.save(snapshot); stepIndex += 1;
       } catch (error) {
         if (error instanceof PauseWorkflowError) {
-          checkpoint.status = "paused"; checkpoint.error = error.message; const paused = checkpoint.attemptHistory?.at(-1); if (paused) { paused.status = "paused"; paused.endedAt = new Date().toISOString(); } const pending = { ...error.pending, nodeId: `${node.id}:${index}:${step.id}` }; await store.save(snapshot); throw new PauseWorkflowError(pending);
+          checkpoint.status = "paused"; checkpoint.error = error.message; const paused = checkpoint.attemptHistory?.at(-1); if (paused) { paused.status = "paused"; paused.endedAt = new Date().toISOString(); paused.session = error.pending.session; } const pending = { ...error.pending, nodeId: `${node.id}:${index}:${step.id}` }; await store.save(snapshot); throw new PauseWorkflowError(pending);
         }
         if (error instanceof RetryWorkflowStepError && step.retry?.return_to === error.returnTo && checkpoint.attempts < step.retry.max_attempts) {
           const retryAttempt = checkpoint.attemptHistory?.at(-1); if (retryAttempt) { retryAttempt.status = "failed"; retryAttempt.endedAt = new Date().toISOString(); retryAttempt.error = error.message; }
@@ -151,27 +161,32 @@ async function executeForeach(
   return outputs;
 }
 
-function resolveItems(reference: string, snapshot: WorkflowSnapshot): unknown[] {
-  const match = reference.match(/^\$\{\{\s*nodes\.([a-z][a-z0-9_-]*)\.outputs(?:\.([a-zA-Z0-9_.-]+))?\s*}}$/);
-  if (!match) throw new Error(`invalid foreach items reference: ${reference}`);
-  let value: unknown = snapshot.nodes[match[1]!]?.output;
-  for (const part of match[2]?.split(".") ?? []) value = value && typeof value === "object" ? (value as Record<string, unknown>)[part] : undefined;
+function resolveItems(reference: string, snapshot: WorkflowSnapshot, inputs: Readonly<Record<string, unknown>>): unknown[] {
+  const value = resolveReference(reference, snapshot, inputs);
   if (!Array.isArray(value)) throw new Error(`foreach items reference ${reference} did not resolve to an array`);
   return value;
 }
 
-function resolveReferences(value: unknown, snapshot: WorkflowSnapshot): unknown {
+function resolveReferences(value: unknown, snapshot: WorkflowSnapshot, inputs: Readonly<Record<string, unknown>>): unknown {
   if (typeof value === "string") {
-    const exact = value.match(/^\$\{\{\s*nodes\.([a-z][a-z0-9_-]*)\.outputs(?:\.([a-zA-Z0-9_.-]+))?\s*}}$/);
-    if (exact) return outputPath(snapshot, exact[1]!, exact[2]);
-    return value.replace(/\$\{\{\s*nodes\.([a-z][a-z0-9_-]*)\.outputs(?:\.([a-zA-Z0-9_.-]+))?\s*}}/g, (_all, id, path) => { const resolved = outputPath(snapshot, id, path); return typeof resolved === "string" ? resolved : JSON.stringify(resolved); });
+    if (/^\$\{\{.*}}$/.test(value)) return resolveReference(value, snapshot, inputs);
+    return value.replace(/\$\{\{\s*(nodes\.[a-z][a-z0-9_-]*\.outputs|inputs)(?:\.([a-zA-Z0-9_.-]+))?\s*}}/g, (_all, root, path) => { const resolved = referencePath(root, path, snapshot, inputs); return typeof resolved === "string" ? resolved : JSON.stringify(resolved); });
   }
-  if (Array.isArray(value)) return value.map((item) => resolveReferences(item, snapshot));
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolveReferences(child, snapshot)]));
+  if (Array.isArray(value)) return value.map((item) => resolveReferences(item, snapshot, inputs));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolveReferences(child, snapshot, inputs)]));
   return value;
 }
-function outputPath(snapshot: WorkflowSnapshot, id: string, path?: string): unknown { let value = snapshot.nodes[id]?.output; for (const part of path?.split(".") ?? []) value = value && typeof value === "object" ? (value as Record<string, unknown>)[part] : undefined; return value; }
-
+function resolveReference(value: string, snapshot: WorkflowSnapshot, inputs: Readonly<Record<string, unknown>>): unknown {
+  const match = value.match(/^\$\{\{\s*(nodes\.[a-z][a-z0-9_-]*\.outputs|inputs)(?:\.([a-zA-Z0-9_.-]+))?\s*}}$/);
+  if (!match) throw new Error(`invalid workflow reference: ${value}`);
+  return referencePath(match[1]!, match[2], snapshot, inputs);
+}
+function referencePath(root: string, path: string | undefined, snapshot: WorkflowSnapshot, inputs: Readonly<Record<string, unknown>>): unknown {
+  let value: unknown = root === "inputs" ? inputs : snapshot.nodes[root.split(".")[1]!]?.output;
+  for (const part of path?.split(".") ?? []) value = value && typeof value === "object" ? (value as Record<string, unknown>)[part] : undefined;
+  if (value === undefined) throw new Error(`workflow reference did not resolve: ${root}${path ? `.${path}` : ""}`);
+  return value;
+}
 function interpolateStep(step: WorkflowStep, alias: string, item: unknown): WorkflowStep {
   const token = `\${{ ${alias} }}`;
   const walk = (value: unknown): unknown => {
@@ -189,4 +204,20 @@ function initialSnapshot(workflow: NormalizedWorkflowDefinition): WorkflowSnapsh
 }
 function nextReady(nodes: WorkflowNode[], snapshot: WorkflowSnapshot): WorkflowNode | undefined {
   return nodes.find((node) => snapshot.nodes[node.id]?.status === "pending" && node.depends_on.every((id) => ["completed", "skipped"].includes(snapshot.nodes[id]?.status ?? "")));
+}
+async function persistAttemptMetadata(store: WorkflowStateStore, snapshot: WorkflowSnapshot, instance: NodeInstance, metadata: { session?: AgentSession; usage?: AgentUsage }): Promise<void> {
+  const attempt = instance.attemptHistory?.at(-1);
+  if (!attempt || attempt.status !== "running") throw new Error(`cannot report metadata without a running attempt for ${instance.id}`);
+  if (metadata.session) attempt.session = metadata.session;
+  if (metadata.usage) attempt.usage = metadata.usage;
+  await store.save(snapshot);
+}
+
+function recoverInterrupted(instance: NodeInstance): void {
+  if (instance.status === "running") {
+    instance.status = "pending";
+    const attempt = instance.attemptHistory?.at(-1);
+    if (attempt?.status === "running") { attempt.status = "failed"; attempt.endedAt = new Date().toISOString(); attempt.error = "execution interrupted before completion was persisted"; }
+  }
+  for (const step of Object.values(instance.steps ?? {})) recoverInterrupted(step);
 }

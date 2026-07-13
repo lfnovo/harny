@@ -1,7 +1,4 @@
-import type { State } from "../harness/state/schema.js";
-import { loadPlan } from "../harness/state/plan.js";
-import type { RunV3 } from "../harness/state/v3/schema.js";
-import type { Plan } from "../harness/types.js";
+import type { RunSnapshot } from "../harness/state/runSchema.js";
 
 export function parseGitHubCompareUrl(
   originUrl: string | null | undefined,
@@ -95,10 +92,10 @@ async function resolveOriginUrl(cwd: string): Promise<string | null> {
 const SEP = "─".repeat(60);
 
 export async function printRunSummary(
-  result: { status: string; branch: string; state: State | RunV3 | null; planPath?: string | null },
+  result: { status: string; branch: string; state: RunSnapshot | null },
   cwd: string,
 ): Promise<void> {
-  const { status, branch, state, planPath } = result;
+  const { status, branch, state } = result;
 
   if (!state) {
     console.log(SEP);
@@ -114,25 +111,17 @@ export async function printRunSummary(
     resolveLatestCommit(cwd, branch),
   ]);
 
-  let plan: Plan | null = state.schema_version === 3 ? (state.artifacts.plan?.value as Plan | undefined) ?? null : null;
-  if (!plan && planPath) {
-    try {
-      plan = await loadPlan(planPath);
-    } catch {
-      plan = null;
-    }
-  }
-
-  const doneTasks = plan?.tasks.filter(t => t.status === "done").length ?? 0;
-  const totalTasks = plan?.tasks.length ?? 0;
+  const plan = state.execution.nodes.planner?.output as { tasks?: unknown[] } | undefined;
+  const totalTasks = plan?.tasks?.length ?? 0;
+  const taskNode = Object.values(state.execution.nodes).find((node) => node.steps);
+  const doneTasks = Object.entries(taskNode?.steps ?? {}).filter(([key, step]) => key.endsWith(".commit") && step.status === "completed").length;
 
   const compareUrl = parseGitHubCompareUrl(originUrl, branch, defaultBranch);
-  const isV3 = state.schema_version === 3;
-  const startedAt = isV3 ? state.run.started_at : state.origin.started_at;
-  const endedAt = isV3 ? state.run.ended_at : state.lifecycle.ended_at;
-  const workflow = isV3 ? state.run.workflow : state.origin.workflow;
-  const slug = isV3 ? state.run.task_slug : state.origin.task_slug;
-  const endedReason = isV3 ? state.run.ended_reason : state.lifecycle.ended_reason;
+  const startedAt = state.run.started_at;
+  const endedAt = state.run.ended_at;
+  const workflow = state.run.workflow;
+  const slug = state.run.task_slug;
+  const endedReason = state.run.ended_reason;
   const duration = humanDuration(startedAt, endedAt);
 
   console.log(SEP);
@@ -146,7 +135,7 @@ export async function printRunSummary(
     console.log(`tasks:     ${doneTasks}/${totalTasks} done`);
   }
 
-  const phases = isV3 ? Object.values(state.nodes).map((node) => ({ name: node.id, attempt: node.attempts.at(-1)?.number ?? 1, status: node.status })) : state.phases;
+  const phases = Object.values(state.execution.nodes).map((node) => ({ name: node.id, attempt: node.attempts || 1, status: node.status }));
   if (phases.length > 0) {
     console.log("");
     console.log("phases:");

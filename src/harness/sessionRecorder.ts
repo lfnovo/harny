@@ -1,6 +1,5 @@
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type ModelUsage, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { setupPhoenix, withPhaseContext } from "./observability/phoenix.js";
 // The bundled `claude-code` binary silently ignores schemas with a top-level
 // `$schema` key (which Zod emits by default). Strip it before passing in.
 function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
@@ -15,6 +14,9 @@ import {
   type AskUserQuestionInput,
 } from "./askUser.js";
 import type { LogMode, PhaseName, ResolvedPhaseConfig, RunMode } from "./types.js";
+import type { UsageMetrics } from "./providers/types.js";
+
+export type PhaseUsage = UsageMetrics & { models?: Record<string, UsageMetrics> };
 
 export type PhaseRunResult<T> = {
   sessionId: string;
@@ -22,7 +24,7 @@ export type PhaseRunResult<T> = {
   error: string | null;
   structuredOutput: T | null;
   resultSubtype: string | null;
-  events: SDKMessage[];
+  usage?: PhaseUsage;
   /** Set when status === "paused_for_user_input". The SDK input is the
    *  AskUserQuestion batch (questions array); tool_use_id is the SDK's id. */
   parked?: {
@@ -31,13 +33,8 @@ export type PhaseRunResult<T> = {
   };
 };
 
-/**
- * In-memory record of one phase's session. We don't persist this anymore —
- * the SDK already writes the full transcript to ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
- * (and Phoenix mirrors it via OpenInference instrumentation, when enabled).
- * Kept in-memory only to extract structured_output and bookkeeping for the
- * orchestrator's StateStore writes.
- */
+/** In-memory bookkeeping for one phase. SDK events are streamed to `onMessage`
+ * instead of being retained here, so long agent sessions have bounded memory. */
 type SessionRecord = {
   phase: PhaseName;
   task_slug: string;
@@ -50,7 +47,6 @@ type SessionRecord = {
   ended_at: string | null;
   status: "running" | "completed" | "error";
   error: string | null;
-  events: SDKMessage[];
 };
 
 const MAX_TRANSIENT_RETRIES = 3;
@@ -93,6 +89,7 @@ function buildQueryOptions<T>(args: {
   resumeSessionId: string | null | undefined;
   phase: PhaseName;
   setParkState: (state: { askUserInput: AskUserQuestionInput; toolUseId: string | null }) => void;
+  env?: Record<string, string | undefined>;
 }) {
   const {
     phaseConfig,
@@ -104,6 +101,7 @@ function buildQueryOptions<T>(args: {
     resumeSessionId,
     phase: _phase,
     setParkState,
+    env,
   } = args;
 
   // In silent mode, the agent never sees AskUserQuestion at all — strip it
@@ -116,6 +114,7 @@ function buildQueryOptions<T>(args: {
 
   return {
     cwd: phaseCwd,
+    ...(env ? { env } : {}),
     ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
     allowedTools: effectiveAllowedTools,
     permissionMode: phaseConfig.permissionMode,
@@ -192,6 +191,7 @@ type SDKEventCtx = {
   setSessionId: (id: string) => void;
   setStructuredRaw: (v: unknown) => void;
   setResultSubtype: (v: string) => void;
+  setUsage?: (usage: PhaseUsage) => void;
 };
 
 export type SDKEventOutcome = "continue" | "park" | "done" | "error";
@@ -209,6 +209,7 @@ export function handleSDKEvent(
     }
   } else if (message.type === "result") {
     ctx.setResultSubtype(message.subtype);
+    ctx.setUsage?.(phaseUsage(message.usage, message.total_cost_usd, message.modelUsage));
     if (message.subtype === "error_during_execution") {
       outcome = "park";
     } else if (
@@ -269,9 +270,13 @@ export async function runPhase<T>(args: {
   mode?: RunMode;
   workflowId: string;
   runId: string;
+  env?: Record<string, string | undefined>;
+  onMessage?: (message: SDKMessage) => void | Promise<void>;
 }): Promise<PhaseRunResult<T>> {
+  const usages: PhaseUsage[] = [];
   for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
     const result = await runPhaseAttempt(args);
+    if (result.usage) usages.push(result.usage);
     // Only retry on transient SDK errors. paused_for_user_input is intentional
     // and must not be retried.
     if (
@@ -279,7 +284,7 @@ export async function runPhase<T>(args: {
       !isTransientApiError(result.error) ||
       attempt >= MAX_TRANSIENT_RETRIES
     ) {
-      return result;
+      return { ...result, usage: mergePhaseUsages(usages) };
     }
     const delay = Math.min(
       RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1),
@@ -315,6 +320,8 @@ async function runPhaseAttempt<T>(args: {
   mode?: RunMode;
   workflowId: string;
   runId: string;
+  env?: Record<string, string | undefined>;
+  onMessage?: (message: SDKMessage) => void | Promise<void>;
 }): Promise<PhaseRunResult<T>> {
   const {
     phase,
@@ -332,10 +339,10 @@ async function runPhaseAttempt<T>(args: {
     mode = "interactive",
     workflowId,
     runId,
+    env,
+    onMessage,
   } = args;
-
-  const phoenix = setupPhoenix({ workflowId, runId, taskSlug });
-  const query = phoenix.query;
+  void workflowId; void runId;
 
   const record: SessionRecord = {
     phase,
@@ -349,11 +356,11 @@ async function runPhaseAttempt<T>(args: {
     ended_at: null,
     status: "running",
     error: null,
-    events: [],
   };
 
   let structuredRaw: unknown = null;
   let resultSubtype: string | null = null;
+  let usage: PhaseUsage | undefined;
   let parkState: { askUserInput: AskUserQuestionInput; toolUseId: string | null } | null = null;
 
   const logBlock = (header: string, body: string) => {
@@ -373,9 +380,7 @@ async function runPhaseAttempt<T>(args: {
 
   const guardHooks = buildGuardHooks({
     guards,
-    primaryCwd,
     phaseCwd,
-    taskSlug,
   });
 
   const queryOptions = buildQueryOptions({
@@ -390,18 +395,13 @@ async function runPhaseAttempt<T>(args: {
     setParkState: (state) => {
       parkState = state;
     },
+    env,
   });
 
-  // Attach phase name to the OTel context so the rename processor relabels
-  // the SDK's "ClaudeAgent.query" span to "harny.<phase>". No extra wrapping
-  // span — keeps the trace tree flat: run → harny.<phase> → tool spans.
-  await withPhaseContext(
-    phoenix,
-    phase,
-    async () => {
+  await (async () => {
       try {
         for await (const message of query({ prompt, options: queryOptions })) {
-          record.events.push(message);
+          await onMessage?.(message);
           const outcome = handleSDKEvent(message, {
             phase,
             logMode,
@@ -414,6 +414,7 @@ async function runPhaseAttempt<T>(args: {
             setResultSubtype: (v) => {
               resultSubtype = v;
             },
+            setUsage: (value) => { usage = value; },
           });
           if (outcome === "park") break;
         }
@@ -433,8 +434,7 @@ async function runPhaseAttempt<T>(args: {
       } finally {
         record.ended_at = new Date().toISOString();
       }
-    },
-  );
+    })();
 
   if (parkState && record.session_id) {
     logBlock("output (paused)", "parked for async review");
@@ -444,7 +444,7 @@ async function runPhaseAttempt<T>(args: {
       error: null,
       structuredOutput: null,
       resultSubtype,
-      events: record.events,
+      usage,
       parked: parkState,
     };
   }
@@ -457,7 +457,7 @@ async function runPhaseAttempt<T>(args: {
       error: record.error,
       structuredOutput: null,
       resultSubtype,
-      events: record.events,
+      usage,
     };
   }
   if (!record.session_id) {
@@ -468,7 +468,7 @@ async function runPhaseAttempt<T>(args: {
       error: "no session_id received from SDK",
       structuredOutput: null,
       resultSubtype,
-      events: record.events,
+      usage,
     };
   }
   if (resultSubtype !== "success") {
@@ -480,7 +480,7 @@ async function runPhaseAttempt<T>(args: {
       error: msg,
       structuredOutput: null,
       resultSubtype,
-      events: record.events,
+      usage,
     };
   }
   if (structuredRaw == null) {
@@ -491,7 +491,7 @@ async function runPhaseAttempt<T>(args: {
       error: "result message had no structured_output",
       structuredOutput: null,
       resultSubtype,
-      events: record.events,
+      usage,
     };
   }
 
@@ -504,7 +504,7 @@ async function runPhaseAttempt<T>(args: {
       error: validated.error,
       structuredOutput: null,
       resultSubtype,
-      events: record.events,
+      usage,
     };
   }
 
@@ -516,6 +516,37 @@ async function runPhaseAttempt<T>(args: {
     error: null,
     structuredOutput: validated.data,
     resultSubtype,
-    events: record.events,
+    usage,
   };
+}
+
+function phaseUsage(usage: { input_tokens: number; output_tokens: number; cache_creation_input_tokens: number; cache_read_input_tokens: number }, costUsd: number, modelUsage: Record<string, ModelUsage>): PhaseUsage {
+  return {
+    inputTokens: usage.input_tokens,
+    outputTokens: usage.output_tokens,
+    cacheCreationInputTokens: usage.cache_creation_input_tokens,
+    cacheReadInputTokens: usage.cache_read_input_tokens,
+    costUsd,
+    models: Object.fromEntries(Object.entries(modelUsage).map(([model, value]) => [model, {
+      inputTokens: value.inputTokens,
+      outputTokens: value.outputTokens,
+      cacheReadInputTokens: value.cacheReadInputTokens,
+      cacheCreationInputTokens: value.cacheCreationInputTokens,
+      costUsd: value.costUSD,
+    }])),
+  };
+}
+
+function mergePhaseUsages(values: PhaseUsage[]): PhaseUsage | undefined {
+  if (!values.length) return undefined;
+  const merged: PhaseUsage = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUsd: 0, models: {} };
+  for (const value of values) {
+    merged.inputTokens += value.inputTokens; merged.outputTokens += value.outputTokens;
+    merged.cacheReadInputTokens! += value.cacheReadInputTokens ?? 0; merged.cacheCreationInputTokens! += value.cacheCreationInputTokens ?? 0; merged.costUsd! += value.costUsd ?? 0;
+    for (const [model, usage] of Object.entries(value.models ?? {})) {
+      const target = merged.models![model] ??= { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUsd: 0 };
+      target.inputTokens += usage.inputTokens; target.outputTokens += usage.outputTokens; target.cacheReadInputTokens! += usage.cacheReadInputTokens ?? 0; target.cacheCreationInputTokens! += usage.cacheCreationInputTokens ?? 0; target.costUsd! += usage.costUsd ?? 0;
+    }
+  }
+  return merged;
 }

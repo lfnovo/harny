@@ -47,7 +47,7 @@ const results = await Promise.all([
     const result = await run(['--only', 'orchestrator/03', '--list']);
     if (result.exitCode !== 0) throw new Error(result.stderr.trim());
     const lines = result.stdout.trim().split('\n').filter(Boolean);
-    if (lines.length !== 1 || lines[0] !== 'scripts/probes/orchestrator/03-declarative-phoenix-wrap.ts') {
+    if (lines.length !== 1 || lines[0] !== 'scripts/probes/orchestrator/03-declarative-transcripts.ts') {
       throw new Error(`unexpected output: ${result.stdout.trim()}`);
     }
   }),

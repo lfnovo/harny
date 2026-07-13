@@ -66,10 +66,13 @@ export const WorkflowNodeSchema = z.discriminatedUnion("type", [
 ]);
 
 export const WorkflowDefinitionSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   name: z.string().regex(/^[a-z][a-z0-9_-]*$/),
   defaults: z.object({ provider: z.string(), timeout: z.number().int().positive().optional() }),
-  workspace: z.object({ isolation: z.enum(["worktree", "inline"]) }),
+  workspace: z.object({
+    isolation: z.enum(["worktree", "inline"]),
+    allow_paths: z.array(z.string().min(1)).default([]),
+  }),
   outcome: z.object({ type: z.enum(["branch", "pull_request", "none"]) }),
   nodes: z.array(WorkflowNodeSchema).min(1),
 });

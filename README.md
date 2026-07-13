@@ -12,7 +12,7 @@ bun add -g @lfnovo/harny
 bunx @lfnovo/harny "implement the requested feature"
 ```
 
-Claude workflows use the installed Claude Agent SDK authentication. Codex nodes use the installed `codex` CLI and its existing authentication. GitHub PR delivery uses the installed `gh` CLI; tokens never belong in workflow YAML.
+Claude workflows use the Claude Agent SDK authentication. Codex nodes use the pinned official Codex SDK and the user's existing Codex authentication/config; a separately installed Codex executable is not required. GitHub PR delivery uses the installed `gh` CLI. Tokens never belong in workflow YAML or Harny's provider config.
 
 ## Quick start
 
@@ -31,6 +31,8 @@ harny pr fix 123
 ```
 
 Each normal run creates an isolated `harny/<slug>` branch and Git worktree. `--isolation inline` is available when isolation is not wanted.
+
+New to agent harnesses? Start with the [Harny documentation](docs/README.md). It provides a progressive user path and a separate development path for contributors.
 
 ## Runtime model
 
@@ -60,7 +62,7 @@ The v1 scheduler is sequential and deterministic: one ready node runs at a time 
 
 Bundled workflows:
 
-- `feature-dev` — plan, implement, independently validate, and commit each task.
+- `feature-dev` — plan, implement, independently validate, commit each task, then validate the accumulated branch.
 - `feature-pr` — `feature-dev` plus push and draft PR create/update.
 - `review-fix` — internal definition used by `harny pr fix <number>` to address feedback on the current remote head.
 
@@ -76,13 +78,41 @@ Bundled workflows:
   requires: [structured_output]
 ```
 
-Unsupported capabilities fail before execution. In particular, the current Codex CLI adapter advertises structured output, session resume, cwd, cancellation, and a read-only sandbox, but does not claim Harny's path-aware per-tool guards.
+Unsupported capabilities fail before execution. In particular, the Codex SDK adapter advertises structured output, session resume, cwd, cancellation, and a read-only sandbox, but does not claim Harny's path-aware per-tool guards.
+
+Logical provider connections can be declared globally in `~/.harny/providers.json`. Project-local provider files are intentionally not loaded, so an untrusted repository cannot redirect agent traffic or choose credential variables:
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "claude_proxy",
+      "type": "claude",
+      "base_url": "https://claude-compatible.example/v1",
+      "api_key_env": "CLAUDE_PROXY_API_KEY",
+      "model": "claude-compatible-model"
+    },
+    {
+      "id": "codex_proxy",
+      "type": "codex",
+      "base_url": "https://openai-compatible.example/v1",
+      "api_key_env": "CODEX_PROXY_API_KEY",
+      "model": "gpt-compatible-model"
+    }
+  ]
+}
+```
+
+Set the named environment variables outside the file, then use the logical ID as a workflow's `provider`. `base_url`, key-variable name, provider type, and default model are fingerprinted into persisted sessions; changing the connection prevents an unsafe resume. Secret values are neither persisted nor fingerprinted. The built-in `claude` and `codex` IDs remain available and can also be overridden in this global file.
 
 Developer output is captured as a content-addressed ChangeSet. Validation checks that exact ChangeSet before and after the validator. The commit executor recalculates it, stages only registered paths, and fails if contents changed or an unexpected file appeared:
 
 ```text
 implemented diff = validated diff = committed diff
 ```
+
+Before provider validation, a deterministic ChangeSet policy rejects generated dependency trees, credential-like files, and unexpectedly large diffs. `workspace.allow_paths` provides an explicit, audited prefix exception for repositories that intentionally version a protected path. Validators receive the authoritative path manifest, use an attempt-scoped scratch directory, re-run established project gates, and a final validator checks the accumulated committed branch before success or PR delivery.
 
 Agents cannot publish PRs. The GitHub executor:
 
@@ -101,13 +131,14 @@ Agents cannot publish PRs. The GitHub executor:
 New runs use:
 
 ```text
-<cwd>/.harny/<slug>/run.json      # atomic authoritative v3 snapshot
+<cwd>/.harny/<slug>/run.json      # atomic authoritative v4 snapshot
 <cwd>/.harny/<slug>/events.jsonl  # append-only audit events
+<cwd>/.harny/<slug>/transcripts/  # normalized JSONL, one file per agent attempt
 ```
 
-The v3 snapshot contains run/workspace metadata, node instances and attempts, typed artifacts, ChangeSets, deliverables, parent-run linkage, and pending human input. The plan is a typed artifact rather than a second source of truth.
+The v4 snapshot contains immutable run inputs, run/workspace metadata, the scheduler's exact node instances and attempts, ChangeSets, parent-run linkage, and pending human input. Node outputs live only on the node that produced them; the planner output is the plan, so there is no mirrored artifact or second lifecycle model.
 
-Historical `state.json`/`plan.json` v2 runs remain readable in `ls`, `show`, and the viewer, but are not resumed. Global pointers under `~/.harny/runs/` record the underlying schema version and are only an index.
+Only v4 runs and workflow schema v2 are supported. Older pointers and runs are ignored; use `harny clean <slug>` before reusing an old slug. Global pointers under `~/.harny/runs/` are a rebuildable index, never a source of truth.
 
 Async human nodes persist their question, session, workspace reservation, and expiry:
 
@@ -133,12 +164,14 @@ harny clean <slug> --force [--kill]
 harny clean --prune
 ```
 
-Dead PIDs are materialized as terminal failures instead of leaving permanently running records. Paused worktrees remain reserved; successful completion removes them, while failures preserve them for diagnosis.
+`harny show` and the viewer report provider-supplied usage per attempt, node, provider, and run. The viewer also streams each agent attempt's normalized messages, reasoning, tool calls, file changes, plans, errors, and usage from local JSONL sidecars. Tool input/output and reasoning are collapsed by default but retained in full. Claude includes token/cache counts, reported USD cost, and per-model detail. Codex includes token/cache/reasoning counts; Harny does not estimate a cost the provider did not report. Mixed runs label cost coverage as partial. `harny ls` stays compact and does not include usage.
+
+Dead PIDs are materialized as terminal failures instead of leaving permanently running records. Paused worktrees remain reserved; successful completion removes them, while failures preserve them for diagnosis. `harny clean <slug>` removes the entire run directory, including its transcripts; cleanup is never automatic for terminal run evidence.
 
 ## Workflow example
 
 ```yaml
-version: 1
+version: 2
 name: verify
 defaults:
   provider: claude
@@ -160,7 +193,7 @@ nodes:
     depends_on: [tests]
 ```
 
-Custom subprocesses must be argv arrays. Workflow v1 intentionally excludes inline scripts, parallel scheduling, deploy/merge effects, GitLab/Gitea, webhooks, polling, and cloud workers.
+Custom subprocesses must be argv arrays. Workflow v2 supports immutable `${{ inputs.* }}` references and intentionally excludes inline scripts, parallel scheduling, deploy/merge effects, GitLab/Gitea, webhooks, polling, and cloud workers.
 
 ## Development
 
@@ -171,9 +204,9 @@ bun test
 bun run probes
 ```
 
-The declarative scheduler is the only execution runtime. Historical v2 runs remain read-only.
+The declarative scheduler and `run.json` v4 are the only execution runtime and writable state.
 
-Core code lives under `src/harness/workflow/`, `src/harness/providers/`, `src/harness/forge/`, and `src/harness/state/v3/`. The viewer is under `src/viewer/`.
+Core code lives under `src/harness/workflow/`, `src/harness/providers/`, `src/harness/forge/`, and `src/harness/state/`. The viewer is under `src/viewer/`.
 
 ## License
 

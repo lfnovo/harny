@@ -1,18 +1,17 @@
 /**
- * Viewer server — read-only HTTP wrapper over v3 runs and historical v2 state.
+ * Viewer server — read-only HTTP wrapper over current runs.
  *
  * Spawned by `harny ui`. Lives only as long as the parent CLI process.
  * No writes, no auth, binds to 127.0.0.1 only.
  */
 
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { listRunsInCwd, statePathFor } from "../harness/state/filesystem.js";
-import { listHistoricalRuns, listV3RunsInCwd } from "../harness/state/v3/discovery.js";
-import type { HistoricalRun } from "../harness/state/v3/reader.js";
-import { normalizeV2Run, normalizeV3Run } from "../harness/state/v3/reader.js";
-import { planFilePath } from "../harness/state/plan.js";
+import { listRuns, listRunsInCwd } from "../harness/state/runDiscovery.js";
+import type { RunSnapshot } from "../harness/state/runSchema.js";
+import { RunStore } from "../harness/state/runStore.js";
+import { toRunView } from "../harness/state/runView.js";
+import { TranscriptStore } from "../harness/transcripts/store.js";
 
 function cwdHashOf(cwd: string): string {
   return Buffer.from(cwd).toString("base64url");
@@ -21,16 +20,10 @@ function cwdFromHash(hash: string): string {
   return Buffer.from(hash, "base64url").toString("utf8");
 }
 
-async function findOneRun(cwd: string, slug: string): Promise<HistoricalRun | null> {
-  const indexed = (await listHistoricalRuns()).find((run) => run.cwd === cwd && (run.schema_version === 2 ? run.raw.origin.task_slug : run.raw.run.task_slug) === slug); if (indexed) return indexed;
-  const v3 = (await listV3RunsInCwd(cwd)).find((run) => run.run.task_slug === slug); if (v3) return normalizeV3Run(v3);
-  const v2 = (await listRunsInCwd(cwd)).find((run) => run.origin.task_slug === slug); return v2 ? normalizeV2Run(v2) : null;
-}
-
-function viewerState(run: HistoricalRun): any {
-  if (run.schema_version === 2) return run.raw;
-  const value = run.raw; const plan = value.artifacts.plan?.value;
-  return { schema_version: 3, run_id: value.run.id, origin: { prompt: value.origin.prompt, workflow: value.run.workflow, task_slug: value.run.task_slug, started_at: value.run.started_at, host: value.origin.host, user: value.origin.user, features: null }, environment: { cwd: value.workspace.primary_cwd, branch: value.workspace.branch, isolation: value.workspace.isolation, worktree_path: value.workspace.worktree_path, mode: "async" }, lifecycle: { status: value.run.status === "paused" ? "waiting_human" : value.run.status, current_phase: Object.values(value.nodes).find((node) => node.status === "running")?.id ?? null, ended_at: value.run.ended_at, ended_reason: value.run.ended_reason, pid: value.run.pid }, phases: Object.values(value.nodes).map((node) => ({ name: node.id, attempt: node.attempts.at(-1)?.number ?? 1, started_at: node.attempts.at(-1)?.started_at ?? value.run.started_at, ended_at: node.attempts.at(-1)?.ended_at ?? null, status: node.status === "paused" ? "parked" : node.status === "skipped" ? "completed" : node.status, verdict: null, session_id: node.attempts.at(-1)?.session?.id ?? null })), history: [], pending_question: value.pending_human ? { id: value.pending_human.node_id, kind: "user_input", prompt: value.pending_human.question, options: value.pending_human.options, asked_at: value.pending_human.asked_at, phase_session_id: value.pending_human.session?.id ?? null, tool_use_id: null, phase_name: value.pending_human.node_id } : null, workflow_state: {}, workflow_chosen: { id: value.run.workflow, variant: "default" }, phoenix: value.artifacts.phoenix?.value, plan };
+async function findOneRun(cwd: string, slug: string): Promise<RunSnapshot | null> {
+  return (await listRuns()).find((run) => run.workspace.primary_cwd === cwd && run.run.task_slug === slug)
+    ?? (await listRunsInCwd(cwd)).find((run) => run.run.task_slug === slug)
+    ?? null;
 }
 
 const baseBranchCache = new Map<string, string>();
@@ -102,6 +95,18 @@ function runGit(args: string[], cwd: string): Promise<string | null> {
   });
 }
 
+export async function findSiblingBranches(cwd: string, branch: string): Promise<Array<{ branch: string; files: string[] }>> {
+  let filesOutput = await runGit(["diff", "--name-only", `${branch}~1`, branch], cwd);
+  if (filesOutput === null) filesOutput = await runGit(["diff-tree", "--no-commit-id", "-r", "--name-only", branch], cwd);
+  const modifiedFiles = (filesOutput ?? "").split("\n").map((file) => file.trim()).filter(Boolean);
+  if (!modifiedFiles.length) return [];
+  const branchesOutput = await runGit(["branch", "--no-merged", branch], cwd);
+  const siblingNames = (branchesOutput ?? "").split("\n").map((value) => value.replace(/^\*?\s+/, "").trim()).filter((value) => /^(harny|harness)\//.test(value));
+  const modifiedFilesSet = new Set(modifiedFiles); const siblings: Array<{ branch: string; files: string[] }> = [];
+  for (const sibling of siblingNames) { const output = await runGit(["log", sibling, "--not", branch, "--name-only", "--format=", "--", ...modifiedFiles], cwd); if (!output) continue; const files = [...new Set(output.split("\n").map((file) => file.trim()).filter((file) => file.length > 0 && modifiedFilesSet.has(file)))]; if (files.length) siblings.push({ branch: sibling, files }); }
+  return siblings;
+}
+
 async function loadHtml(): Promise<string> {
   // Bun resolves __dirname-equivalent at runtime; read sibling index.html.
   const here = new URL("./index.html", import.meta.url);
@@ -115,57 +120,13 @@ function jsonRes(body: unknown, status = 200): Response {
   });
 }
 
-/**
- * Look up Phoenix's name → GraphQL global ID map. Phoenix URLs require the
- * encoded ID (e.g. "UHJvamVjdDoy"), not the project name. Browser fetches
- * are blocked by Phoenix's missing CORS, so we resolve server-side and
- * cache for 30s to avoid hammering Phoenix per detail page load.
- */
-let phoenixProjectsCache: { at: number; map: Record<string, string> } | null = null;
-const PHOENIX_CACHE_TTL_MS = 30_000;
-
-async function phoenixProjectMap(baseUrl: string): Promise<Record<string, string>> {
-  const now = Date.now();
-  if (phoenixProjectsCache && now - phoenixProjectsCache.at < PHOENIX_CACHE_TTL_MS) {
-    return phoenixProjectsCache.map;
-  }
-  const url = `${baseUrl.replace(/\/+$/, "")}/v1/projects`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn("[harny viewer] phoenix projects fetch failed:", res.status, url);
-      if (phoenixProjectsCache) {
-        console.warn(`[harny viewer] serving stale phoenix project map (age=${now - phoenixProjectsCache.at}ms)`);
-      } else {
-        console.warn("[harny viewer] check HARNY_PHOENIX_URL and phoenix container");
-      }
-      return phoenixProjectsCache?.map ?? {};
-    }
-    const json = (await res.json()) as { data?: Array<{ id: string; name: string }> };
-    const map: Record<string, string> = {};
-    for (const p of json.data ?? []) map[p.name] = p.id;
-    phoenixProjectsCache = { at: now, map };
-    return map;
-  } catch (err) {
-    console.warn("[harny viewer] phoenix projects fetch error", err);
-    if (phoenixProjectsCache) {
-      console.warn(`[harny viewer] serving stale phoenix project map (age=${now - phoenixProjectsCache.at}ms)`);
-    } else {
-      console.warn("[harny viewer] check HARNY_PHOENIX_URL and phoenix container");
-    }
-    return phoenixProjectsCache?.map ?? {};
-  }
-}
-
-function buildPhoenixUrl(
-  baseUrl: string,
-  projectMap: Record<string, string>,
-  projectName: string,
-  traceId: string,
-): string | null {
-  const id = projectMap[projectName];
-  if (!id) return null;
-  return `${baseUrl.replace(/\/+$/, "")}/projects/${id}/traces/${traceId}`;
+function findTranscriptAttempt(snapshot: RunSnapshot, instanceId: string, attemptNumber: number) {
+  if (!Number.isInteger(attemptNumber) || attemptNumber < 1) return undefined;
+  const nested = instanceId.match(/^([a-z][a-z0-9_-]*):(\d+):([a-z][a-z0-9_-]*)$/);
+  const instance = nested
+    ? snapshot.execution.nodes[nested[1]!]?.steps?.[`${nested[2]}.${nested[3]}`]
+    : /^[a-z][a-z0-9_-]*$/.test(instanceId) ? snapshot.execution.nodes[instanceId] : undefined;
+  return instance?.attemptHistory?.find((attempt) => attempt.number === attemptNumber);
 }
 
 export type ViewerOptions = {
@@ -201,19 +162,19 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       }
 
       if (path === "/api/runs") {
-        const runs = await listHistoricalRuns();
+        const runs = await listRuns();
         const summarized = runs.map((r) => ({
-          run_id: r.id,
-          short_id: r.id.slice(0, 8),
-          cwd: r.cwd,
-          cwd_hash: cwdHashOf(r.cwd),
-          task_slug: r.schema_version === 2 ? r.raw.origin.task_slug : r.raw.run.task_slug,
-          workflow: r.workflow,
-          status: r.status === "paused" ? "waiting_human" : r.status,
+          run_id: r.run.id,
+          short_id: r.run.id.slice(0, 8),
+          cwd: r.workspace.primary_cwd,
+          cwd_hash: cwdHashOf(r.workspace.primary_cwd),
+          task_slug: r.run.task_slug,
+          workflow: r.run.workflow,
+          status: r.execution.status === "paused" ? "waiting_human" : r.execution.status,
           current_phase: null,
-          started_at: r.started_at,
-          ended_at: r.ended_at,
-          phases_total: r.schema_version === 2 ? r.raw.phases.length : Object.keys(r.raw.nodes).length,
+          started_at: r.run.started_at,
+          ended_at: r.run.ended_at,
+          phases_total: Object.keys(r.execution.nodes).length,
           retries: 0,
         }));
         return jsonRes({ runs: summarized });
@@ -223,41 +184,36 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       if (detailMatch) {
         const cwd = cwdFromHash(detailMatch[1]!);
         const slug = detailMatch[2]!;
-        const historical = await findOneRun(cwd, slug);
-        if (!historical) return jsonRes({ error: "not found" }, 404);
-        const run = viewerState(historical);
-        let plan: unknown = null;
-        const planPath = planFilePath(cwd, slug);
-        if (historical.schema_version === 3) plan = historical.raw.artifacts.plan?.value ?? null;
-        else if (existsSync(planPath)) {
-          try {
-            plan = JSON.parse(await readFile(planPath, "utf8"));
-          } catch {
-            plan = null;
-          }
-        }
+        const snapshot = await findOneRun(cwd, slug);
+        if (!snapshot) return jsonRes({ error: "not found" }, 404);
+        const store = new RunStore(cwd, slug);
+        const run = toRunView(snapshot, await store.events());
+        const transcripts = new TranscriptStore(cwd, slug);
+        await Promise.all(run.phases.flatMap((phase) => phase.attempts_detail.map(async (attempt) => {
+          attempt.transcript_available = await transcripts.exists({ instanceId: phase.instance_id, attempt: attempt.number });
+        })));
+        const plan = run.plan;
 
-        // Pre-bake the Phoenix deep-link server-side (Phoenix doesn't expose
-        // CORS so the browser can't do the name → ID lookup itself). One link
-        // per run — all phases inherit the run's trace_id and live as child
-        // spans inside it.
-        const phoenixBase = process.env.HARNY_PHOENIX_URL;
-        let phoenixUrl: string | undefined;
-        if (phoenixBase && run.phoenix) {
-          const projectMap = await phoenixProjectMap(phoenixBase);
-          const url = buildPhoenixUrl(
-            phoenixBase,
-            projectMap,
-            run.phoenix.project,
-            run.phoenix.trace_id,
-          );
-          if (url) phoenixUrl = url;
-        }
-        const enrichedRun = phoenixUrl
-          ? { ...run, phoenix: { ...run.phoenix!, url: phoenixUrl } }
-          : run;
+        return jsonRes({ state: run, plan, state_path: store.runPath });
+      }
 
-        return jsonRes({ state: enrichedRun, plan, state_path: statePathFor(cwd, slug) });
+      const transcriptMatch = path.match(/^\/api\/runs\/([^/]+)\/([^/]+)\/transcripts$/);
+      if (transcriptMatch) {
+        const cwd = cwdFromHash(transcriptMatch[1]!);
+        const slug = transcriptMatch[2]!;
+        const snapshot = await findOneRun(cwd, slug);
+        if (!snapshot) return jsonRes({ error: "not found" }, 404);
+        const instanceId = url.searchParams.get("instance") ?? "";
+        const attemptNumber = Number(url.searchParams.get("attempt"));
+        const attempt = findTranscriptAttempt(snapshot, instanceId, attemptNumber);
+        if (!attempt) return jsonRes({ error: "unknown transcript attempt" }, 404);
+        const after = Number(url.searchParams.get("after") ?? 0);
+        const limit = Number(url.searchParams.get("limit") ?? 200);
+        if (!Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1) return jsonRes({ error: "invalid transcript cursor" }, 400);
+        try {
+          const page = await new TranscriptStore(cwd, slug).read({ instanceId, attempt: attemptNumber }, { after, limit });
+          return jsonRes({ events: page.events, next_after: page.nextAfter, complete: attempt.status !== "running" });
+        } catch (error) { return jsonRes({ error: String(error) }, 500); }
       }
 
       const siblingMatch = path.match(/^\/api\/runs\/([^/]+)\/([^/]+)\/sibling-branches$/);
@@ -266,48 +222,10 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         const slug = siblingMatch[2]!;
         const historical = await findOneRun(cwd, slug);
         if (!historical) return jsonRes({ error: "not found" }, 404);
-        const branch = historical.branch;
+        const branch = historical.workspace.branch;
         if (!branch) return jsonRes({ siblingBranches: [] });
 
-        // Get files modified by the run's latest commit.
-        let filesOutput = await runGit(["diff", "--name-only", `${branch}~1`, branch], cwd);
-        if (filesOutput === null) {
-          // Fallback: branch may be the very first commit with no parent.
-          filesOutput = await runGit(["diff-tree", "--no-commit-id", "-r", "--name-only", branch], cwd);
-        }
-        const modifiedFiles = (filesOutput ?? "").split("\n").map((f) => f.trim()).filter(Boolean);
-        if (modifiedFiles.length === 0) return jsonRes({ siblingBranches: [] });
-
-        // Unmerged local branches filtered to harny/harness managed only.
-        const branchesOutput = await runGit(["branch", "--no-merged", branch], cwd);
-        const siblingNames = (branchesOutput ?? "")
-          .split("\n")
-          .map((b) => b.replace(/^\*?\s+/, "").trim())
-          .filter(Boolean)
-          .filter((b) => /^(harny|harness)\//.test(b));
-
-        // One git log per sibling returns all touched files at once (O(S) not O(S×F)).
-        const modifiedFilesSet = new Set(modifiedFiles);
-        const siblingBranches: Array<{ branch: string; files: string[] }> = [];
-        for (const sibling of siblingNames) {
-          const output = await runGit(
-            ["log", sibling, "--not", branch, "--name-only", "--format=", "--", ...modifiedFiles],
-            cwd,
-          );
-          if (output) {
-            const files = [
-              ...new Set(
-                output
-                  .split("\n")
-                  .map((f) => f.trim())
-                  .filter((f) => f.length > 0 && modifiedFilesSet.has(f)),
-              ),
-            ];
-            if (files.length > 0) siblingBranches.push({ branch: sibling, files });
-          }
-        }
-
-        return jsonRes({ siblingBranches });
+        return jsonRes({ siblingBranches: await findSiblingBranches(cwd, branch) });
       }
 
       const logMatch = path.match(/^\/api\/runs\/([^/]+)\/([^/]+)\/git-log$/);
@@ -316,7 +234,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
         const slug = logMatch[2]!;
         const run = await findOneRun(cwd, slug);
         if (!run) return jsonRes({ error: "not found" }, 404);
-        const branch = run.branch;
+        const branch = run.workspace.branch;
         if (!branch) return jsonRes({ commits: [] });
         const log = await gitLog(cwd, branch);
         return jsonRes(log);
@@ -327,11 +245,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       }
 
       if (path === "/api/config") {
-        // Surface env-derived config the SPA needs (Phoenix base URL for
-        // deep-links). null when not configured — the SPA hides the link.
-        return jsonRes({
-          phoenix_url: process.env.HARNY_PHOENIX_URL ?? null,
-        });
+        return jsonRes({});
       }
 
       return new Response("Not found", { status: 404 });
@@ -339,7 +253,7 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
   });
 
   return {
-    url: `http://${host}:${port}`,
+    url: `http://${host}:${server.port}`,
     stop: () => server.stop(),
   };
 }

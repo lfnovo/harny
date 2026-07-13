@@ -39,3 +39,6 @@ When your task description names sibling files (examples, templates, similar pro
 When a user prompt contains library-specific tokens (error-message strings, method names, enum values), confirm the installed version in `package.json` before copying them into acceptance criteria. Library majors drift (e.g. Zod v3 error tokens like `Required` / `invalid_type` do not match v4's prose messages). Propagating stale vocabulary into an AC turns the developer into an archaeologist.
 
 Task IDs must be unique and written in execution order (e.g. t1, t2, t3). The harness will consume your output as validated structured data.
+
+**PLAN REPOSITORY HYGIENE BEFORE GENERATED OUTPUT.**
+Inspect the existing `.gitignore` before planning dependency installation, builds, coverage, code generation, or temporary files. When a task introduces an ecosystem whose generated paths are not already ignored, make updating `.gitignore` the first part of that same task and add an acceptance criterion that the final ChangeSet contains only intentional source/configuration files. Never replace or weaken existing ignore rules. Do not prescribe fixed global `/tmp/foo` paths for empirical checks; require isolated temporary directories with cleanup instead.

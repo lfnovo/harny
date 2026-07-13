@@ -4,13 +4,13 @@ Six patterns from the 2026-04-23 drain sonda (walked 14 entries across 12 learni
 
 ---
 
-## 1. Absorbed into code + CLAUDE.md (DISCARD)
+## 1. Absorbed into code + AGENTS.md (DISCARD)
 
 The action was completely executed.
 
 **Signals:**
 - Function/file mentioned in the entry exists and matches the described behavior.
-- CLAUDE.md has a bullet documenting the invariant.
+- AGENTS.md has a bullet documenting the invariant.
 - Sibling-mirror or prompt-level guards exist.
 
 **Example.** Entry: "provider guards should be enforced." Verification: the workflow validator checks declared capabilities and the provider contract tests preserve the invariant.
@@ -52,7 +52,7 @@ Action pointed at a file that no longer exists, yet the intent was captured by a
 
 **Signals:**
 - Entry references a file/doc/section that has been moved or deleted.
-- The intent is now visible elsewhere (sibling-mirror rule, CLAUDE.md absorption, code-as-template).
+- The intent is now visible elsewhere (sibling-mirror rule, AGENTS.md absorption, code-as-template).
 
 **Example.** Observability parity should point at the current scheduler/provider boundary and its probes, not a retired design document.
 
@@ -81,7 +81,7 @@ Guidance about how the architect should write prompts, with no natural existing 
 **Signals:**
 - Entry is meta-guidance ("probes must exercise full argv → observable effect", "phase prompts should X").
 - Doesn't fit phase-prompt defaults (too specific).
-- Doesn't fit general CLAUDE.md gotchas (not "always when editing").
+- Doesn't fit general AGENTS.md gotchas (not "always when editing").
 
 **Examples.** L10 → Issue #25. L11 → Issue #26.
 

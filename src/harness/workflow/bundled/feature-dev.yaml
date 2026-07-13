@@ -1,4 +1,4 @@
-version: 1
+version: 2
 name: feature-dev
 defaults:
   provider: claude
@@ -12,22 +12,18 @@ nodes:
     type: agent
     command: planner
     requires: [structured_output]
-  - id: persist_plan
-    type: command
-    command: [persist_plan]
-    depends_on: [planner]
   - id: tasks
     type: foreach
     items: "${{ nodes.planner.outputs.tasks }}"
     as: task
     max_items: 100
-    depends_on: [persist_plan]
+    depends_on: [planner]
     steps:
       - id: developer
         type: agent
         command: developer
         requires: [structured_output, tool_guards]
-        guards: [no_plan_writes, no_git_history, no_forge_effects]
+        guards: [no_git_history, no_forge_effects]
       - id: validator
         type: agent
         command: validator
@@ -42,3 +38,9 @@ nodes:
         message: feature-dev
         changeset: developer
         depends_on: [validator]
+  - id: final_validator
+    type: agent
+    command: final_validator
+    depends_on: [tasks]
+    requires: [structured_output, tool_guards]
+    guards: [read_only]

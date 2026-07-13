@@ -66,11 +66,9 @@ export const DEFAULT_DEVELOPER: ResolvedPhaseConfig = {
   effort: 'high',
   model: 'sonnet',
   mcpServers: {},
-  // Enforces two CLAUDE.md invariants at the SDK layer: "harness is sole
-  // writer of plan.json", "harness is sole committer", and privileged PR
-  // delivery. Escape hatches
+  // Enforces sole-committer and privileged-PR invariants. Escape hatches
   // for throwaway paths (cd /tmp/..., git -C /tmp/...) live in guardHooks.ts.
-  guards: { noPlanWrites: true, noGitHistory: true, noForgeEffects: true },
+  guards: { noGitHistory: true, noForgeEffects: true },
 };
 
 export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
@@ -89,7 +87,7 @@ export const DEFAULT_VALIDATOR: ResolvedPhaseConfig = {
 };
 
 const PROBLEMS_FIELD_DESCRIPTION =
-  'OPTIONAL. Problems encountered during this attempt that would benefit FUTURE runs of the harness if fixed at the project level (not fixed within this task). Examples: missing CLAUDE.md coverage of a critical area, missing dev dependency, ambiguous acceptance criterion, agent tool you wished you had. Leave empty/omit if nothing noteworthy.';
+  'OPTIONAL. Problems encountered during this attempt that would benefit FUTURE runs of the harness if fixed at the project level (not fixed within this task). Examples: missing AGENTS.md coverage of a critical area, missing dev dependency, ambiguous acceptance criterion, agent tool you wished you had. Leave empty/omit if nothing noteworthy.';
 
 export const PlannerVerdictSchema = z
   .object({
@@ -111,7 +109,6 @@ export const PlannerVerdictSchema = z
 
 export const DeveloperVerdictSchema = z
   .object({
-    task_id: z.string(),
     status: z.enum(['done', 'blocked']),
     summary: z
       .string()

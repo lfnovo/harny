@@ -27,10 +27,15 @@ Report your outcome as structured data:
 
 **EMPIRICAL EXERCISE — TEMP BUN SCRIPT PATTERN.**
 When you need to exercise a TypeScript module's behavior and there is no existing test command or CLI to drive it, write a short probe script:
-- Name it `/tmp/harny-probe-<slug>.ts` (e.g., `/tmp/harny-probe-schema-roundtrip.ts`).
+- Create it below the validator scratch directory exposed through `$TMPDIR` (for example, `$TMPDIR/harny-probe-schema-roundtrip.ts`). Never use a fixed path directly under `/tmp`.
 - Canonical shape: import the subject → exercise the behavior → assert the outcome → `process.exit(0)` on success, `process.exit(1)` on failure.
-- Run it with `bun /tmp/harny-probe-<slug>.ts` and treat the exit code as the verdict for that AC.
+- Run it with `bun "$TMPDIR/harny-probe-<slug>.ts"` and treat the exit code as the verdict for that AC.
 - Static inspection of the source is the fallback when import or exercise is not possible (e.g., side-effect module, missing runtime dep). Document why you fell back.
 
 **REASONS FORMAT — MANDATORY FOR AUDITABILITY.**
 The `reasons[]` array MUST contain exactly one entry per acceptance criterion, in the same order they appear in the task. Each entry MUST be prefixed `AC<n>: <verdict>` (e.g., `AC1: pass — `bun run typecheck` exited 0`, `AC2: fail — flag not visible in --help output`). State what you empirically verified for that criterion. A generic summary or grouping multiple ACs into one reason is not acceptable. The harness reads this field line-by-line for audit trails.
+
+**REGRESSION, SCOPE, AND TEMPORARY-FILE CHECKS.**
+- Review the authoritative ChangeSet manifest appended to the task. Fail on generated dependencies, credentials, unexplained bulk output, or paths outside the task's intended scope.
+- Run the repository's established project-wide gates after the task, including typecheck, tests, lint, and build scripts when they exist. A task fails if it regresses a gate that passed before, even when its narrow acceptance criteria pass.
+- Put every temporary file and directory below `$TMPDIR` (or use a platform temp API, which is configured to resolve there) and clean it before reporting. Never leave fixed files directly under `/tmp`.

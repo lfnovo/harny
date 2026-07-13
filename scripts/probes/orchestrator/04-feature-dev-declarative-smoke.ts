@@ -52,7 +52,7 @@ async function main(): Promise<void> {
     ]);
     const count = Bun.spawnSync(['git', 'rev-list', '--count', 'HEAD'], { cwd, stdout: 'pipe' });
     if (result.status !== 'done' || new TextDecoder().decode(count.stdout).trim() !== '2' || !existsSync(join(cwd, 'CONTRIBUTING.md'))) throw new Error('declarative feature-dev assertions failed');
-    if (!existsSync(join(cwd, '.harny', 'smoke-e2e', 'run.json'))) throw new Error('run.json v3 missing');
+    if (!existsSync(join(cwd, '.harny', 'smoke-e2e', 'run.json'))) throw new Error('run.json v4 missing');
     console.log(`PASS ${NAME}`);
   } finally { rmSync(cwd, { recursive: true, force: true }); }
 }

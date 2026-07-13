@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "claude_proxy",
+      "type": "claude",
+      "base_url": "https://claude-compatible.example/v1",
+      "api_key_env": "CLAUDE_PROXY_API_KEY",
+      "model": "claude-compatible-model"
+    },
+    {
+      "id": "codex_proxy",
+      "type": "codex",
+      "base_url": "https://openai-compatible.example/v1",
+      "api_key_env": "CODEX_PROXY_API_KEY",
+      "model": "gpt-compatible-model"
+    }
+  ]
+}

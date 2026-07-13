@@ -28,17 +28,17 @@ class FakeForge implements ForgeProvider {
   async createPullRequest(spec: PullRequestSpec) { this.creates++; return this.existing = { repository: spec.repository, number: 1, url: "url", base: spec.base, head: spec.head, headSha: spec.expectedHeadSha, draft: spec.draft }; }
   async updatePullRequest(_pr: PullRequestArtifact, spec: PullRequestSpec) { this.updates++; return { ...this.existing!, headSha: spec.expectedHeadSha }; }
 }
-const prNode = () => WorkflowDefinitionSchema.parse({ version: 1, name: "pr", defaults: { provider: "claude" }, workspace: { isolation: "worktree" }, outcome: { type: "pull_request" }, nodes: [{ id: "pr", type: "pull_request", title: "Feature", body: "", base: "main", head: "feature", draft: true, existing: "allow" }] }).nodes[0]!;
+const prNode = () => WorkflowDefinitionSchema.parse({ version: 2, name: "pr", defaults: { provider: "claude" }, workspace: { isolation: "worktree" }, outcome: { type: "pull_request" }, nodes: [{ id: "pr", type: "pull_request", title: "Feature", body: "", base: "main", head: "feature", draft: true, existing: "allow" }] }).nodes[0]!;
 
 test("pull_request executor pushes without force, verifies remote SHA and is idempotent", async () => {
   const forge = new FakeForge(); const gitCalls: string[][] = []; const sha = "a".repeat(40);
   const executor = createPullRequestExecutor({ cwd: "/repo", forge, expectedSha: async () => sha, git: async (args) => { gitCalls.push(args); if (args[0] === "remote") return "git@github.com:o/r.git\n"; if (args[0] === "ls-remote") return `${sha}\trefs/heads/feature\n`; return ""; } });
-  const context = { snapshot: { workflow: "pr", status: "running" as const, nodes: {} }, signal: new AbortController().signal };
+  const context = { snapshot: { workflow: "pr", status: "running" as const, nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "pr", attempt: 1 }, reportAttempt: async () => {} };
   await executor(prNode(), context); await executor(prNode(), context);
   expect(forge.creates).toBe(1); expect(forge.updates).toBe(1); expect(gitCalls.filter((call) => call[0] === "push").every((call) => !call.includes("--force"))).toBe(true);
 });
 
 test("pull_request executor refuses a divergent remote head before publishing", async () => {
-  const forge = new FakeForge(); const executor = createPullRequestExecutor({ cwd: "/repo", forge, expectedSha: async () => "a".repeat(40), git: async (args) => args[0] === "remote" ? "https://github.com/o/r.git" : args[0] === "ls-remote" ? `${"b".repeat(40)}\trefs/heads/feature` : "" });
-  expect(executor(prNode(), { snapshot: { workflow: "pr", status: "running", nodes: {} }, signal: new AbortController().signal })).rejects.toThrow("remote head diverged"); expect(forge.creates).toBe(0);
+  const forge = new FakeForge(); const calls: string[][] = []; const executor = createPullRequestExecutor({ cwd: "/repo", forge, expectedSha: async () => "a".repeat(40), expectedRemoteSha: "c".repeat(40), git: async (args) => { calls.push(args); return args[0] === "remote" ? "https://github.com/o/r.git" : args[0] === "ls-remote" ? `${"b".repeat(40)}\trefs/heads/feature` : ""; } });
+  expect(executor(prNode(), { snapshot: { workflow: "pr", status: "running", nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "pr", attempt: 1 }, reportAttempt: async () => {} })).rejects.toThrow("remote head changed during run"); expect(calls.some((call) => call[0] === "push")).toBe(false); expect(forge.creates).toBe(0);
 });

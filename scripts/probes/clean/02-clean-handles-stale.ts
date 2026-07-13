@@ -1,5 +1,5 @@
 /**
- * Probe: cleanRun proceeds when state.json has status='running' but pid is
+ * Probe: cleanRun proceeds when run.json has status='running' but pid is
  * dead (stale-pid case). Should warn and complete cleanup without --force.
  *
  * RUN
@@ -42,19 +42,8 @@ try {
       const stateDir = join(primaryCwd, ".harny", slug);
       await mkdir(stateDir, { recursive: true });
 
-      const state = {
-        schema_version: 2,
-        run_id: "test-run",
-        origin: { prompt: "x", workflow: "feature-dev", task_slug: slug, started_at: new Date().toISOString(), host: "localhost", user: "test", features: null },
-        environment: { cwd: primaryCwd, branch: `harny/${slug}`, isolation: "inline", worktree_path: null, mode: "silent" },
-        lifecycle: { status: "running", current_phase: null, ended_at: null, ended_reason: null, pid: 999999 },
-        phases: [],
-        history: [],
-        pending_question: null,
-        workflow_state: {},
-        workflow_chosen: null,
-      };
-      await writeFile(join(stateDir, "state.json"), JSON.stringify(state), "utf8");
+      const state = { schema_version: 4, run: { pid: 999999 }, execution: { status: "running" } };
+      await writeFile(join(stateDir, "run.json"), JSON.stringify(state), "utf8");
 
       // Should NOT throw (stale pid → warn and proceed)
       await cleanRun(primaryCwd, slug, false, {});

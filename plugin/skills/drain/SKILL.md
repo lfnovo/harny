@@ -1,12 +1,12 @@
 ---
 name: drain
-description: Triage accumulated learnings from the local harny inbox into GitHub Issues, CLAUDE.md edits, or discards. Walks one entry at a time, verifies claims against current code, opens issues with provenance. Sister of /learn.
+description: Triage accumulated learnings from the local harny inbox into GitHub Issues, AGENTS.md edits, or discards. Walks one entry at a time, verifies claims against current code, opens issues with provenance. Sister of /learn.
 allowed-tools: Bash, Read, Edit, Write
 ---
 
 # drain — analytical triage of the harny learnings inbox
 
-The drainable companion to `/learn`. Walks the user through the inbox at `<cwd>/.harny/LEARNINGS.local.md` (and optionally `.harny/*/review.md` files), classifying each entry into a destination — GitHub Issue, CLAUDE.md edit, or DISCARD — with evidence cited.
+The drainable companion to `/learn`. Walks the user through the inbox at `<cwd>/.harny/LEARNINGS.local.md` (and optionally `.harny/*/review.md` files), classifying each entry into a destination — GitHub Issue, AGENTS.md edit, or DISCARD — with evidence cited.
 
 This skill is **analytical and slow**. Unlike `/learn` (which captures verbatim), drain verifies claims, decomposes multi-part actions, and writes back changes only with the user's approval per entry.
 
@@ -44,9 +44,9 @@ So you both look at the same words.
 Before classifying, check the code/repo:
 
 - **References to a file/commit/function** — does it exist? Does the referenced behavior match? Use `Read`, `git log -- <path>`, `git show <sha>`.
-- **Look for absorption markers.** "Permanent fix landed", "Already infra-shipped", "Convention enshrined in CLAUDE.md" — strong DISCARD signals. Verify each.
+- **Look for absorption markers.** "Permanent fix landed", "Already infra-shipped", "Convention enshrined in AGENTS.md" — strong DISCARD signals. Verify each.
 - **Correlate with run history.** An entry about "task trailer duplication" + a run named `dedup-task-trailer` → fix likely landed. Check `git log --all --oneline --grep <keyword>`.
-- **CLAUDE.md cross-check.** If the entry's principle is now documented, it's been absorbed.
+- **AGENTS.md cross-check.** If the entry's principle is now documented, it's been absorbed.
 
 ### 3. Decompose multi-part actions
 
@@ -54,9 +54,9 @@ If the entry has sub-actions `(a)`, `(b)`, `(c)`, triage each separately. Common
 
 ### 4. Apply the counterfactual test
 
-> Would a fresh dev, reading only CLAUDE.md + code, hit the same friction?
+> Would a fresh dev, reading only AGENTS.md + code, hit the same friction?
 
-If yes → there's still teaching to do (CLAUDE.md edit or Issue).
+If yes → there's still teaching to do (AGENTS.md edit or Issue).
 If no → the lesson has been absorbed elsewhere → DISCARD.
 
 ### 5. Propose a destination
@@ -74,7 +74,7 @@ Match the entry to one of the 6 patterns. Propose the destination with evidence.
 Show:
 - The classification verdict
 - The evidence supporting it
-- The proposed action (DISCARD, OPEN ISSUE, CLAUDE.md edit, DEFER)
+- The proposed action (DISCARD, OPEN ISSUE, AGENTS.md edit, DEFER)
 
 Do not execute until the user says go.
 
@@ -83,7 +83,7 @@ Do not execute until the user says go.
 Per verdict:
 
 - **DISCARD** — Edit `.harny/LEARNINGS.local.md` to remove the entry. No other artifact created.
-- **PROMOTED to CLAUDE.md** — Apply the edit (Edit tool). Remove inbox entry.
+- **PROMOTED to AGENTS.md** — Apply the edit (Edit tool). Remove inbox entry.
 - **OPEN ISSUE** — Use `gh issue list --search ...` to dedup first; then `gh issue create` with proper title prefix and `learning` label. Remove inbox entry.
 - **OPEN DISCUSSION** — `gh discussion create` with `rfc:` or `decide:` prefix. Remove inbox entry.
 - **DEFERRED** — Edit the entry in place to add `[deferred YYYY-MM-DD: <reason>]`. Keep entry.
@@ -92,7 +92,7 @@ Per verdict:
 
 ## Side-effect: stale doc drift
 
-While verifying entries, you'll often spot **unrelated documentation drift** — a CLAUDE.md paragraph describing a value that changed months ago, a `§N` reference pointing at a deleted doc, etc.
+While verifying entries, you'll often spot **unrelated documentation drift** — an AGENTS.md paragraph describing a value that changed months ago, a `§N` reference pointing at a deleted doc, etc.
 
 **Rule:**
 - **1-2 line factual fix** verifiable from code → propose inline alongside the current entry's verdict.
@@ -138,7 +138,7 @@ Track classification cohorts during the walk. At the end, emit concise cluster a
 ## What this skill does NOT do
 
 - Does not auto-classify in batches without human approval.
-- Does not edit files outside `.harny/LEARNINGS.local.md`, the proposed CLAUDE.md edits, and inline doc-drift fixes (each approved per-entry).
+- Does not edit files outside `.harny/LEARNINGS.local.md`, the proposed AGENTS.md edits, and inline doc-drift fixes (each approved per-entry).
 - Does not bulk-open issues — every Issue creation is a single, deduped, evidence-backed action.
 
 ---

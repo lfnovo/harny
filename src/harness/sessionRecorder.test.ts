@@ -54,6 +54,17 @@ describe("handleSDKEvent: result/success", () => {
     expect(typeof raw).toBe("object");
     expect(raw).not.toBeNull();
   });
+
+  test("captures Claude token, cache, cost and per-model usage", () => {
+    const message = {
+      type: "result", subtype: "success", structured_output: {}, total_cost_usd: 0.125,
+      usage: { input_tokens: 100, output_tokens: 25, cache_read_input_tokens: 60, cache_creation_input_tokens: 10 },
+      modelUsage: { "claude-test": { inputTokens: 100, outputTokens: 25, cacheReadInputTokens: 60, cacheCreationInputTokens: 10, costUSD: 0.125 } },
+    } as unknown as SDKMessage;
+    let captured: unknown;
+    handleSDKEvent(message, { ...emptyHandlers(), setUsage: (value) => { captured = value; } });
+    expect(captured).toEqual({ inputTokens: 100, outputTokens: 25, cacheReadInputTokens: 60, cacheCreationInputTokens: 10, costUsd: 0.125, models: { "claude-test": { inputTokens: 100, outputTokens: 25, cacheReadInputTokens: 60, cacheCreationInputTokens: 10, costUsd: 0.125 } } });
+  });
 });
 
 describe("handleSDKEvent: result/error_during_execution", () => {

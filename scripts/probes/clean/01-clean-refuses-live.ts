@@ -38,19 +38,8 @@ try {
       const stateDir = join(primaryCwd, ".harny", slug);
       await mkdir(stateDir, { recursive: true });
 
-      const state = {
-        schema_version: 2,
-        run_id: "test-run",
-        origin: { prompt: "x", workflow: "feature-dev", task_slug: slug, started_at: new Date().toISOString(), host: "localhost", user: "test", features: null },
-        environment: { cwd: primaryCwd, branch: `harny/${slug}`, isolation: "inline", worktree_path: null, mode: "silent" },
-        lifecycle: { status: "running", current_phase: null, ended_at: null, ended_reason: null, pid: process.pid },
-        phases: [],
-        history: [],
-        pending_question: null,
-        workflow_state: {},
-        workflow_chosen: null,
-      };
-      await writeFile(join(stateDir, "state.json"), JSON.stringify(state), "utf8");
+      const state = { schema_version: 4, run: { pid: process.pid }, execution: { status: "running" } };
+      await writeFile(join(stateDir, "run.json"), JSON.stringify(state), "utf8");
 
       let threw = false;
       let errorMsg = "";
@@ -69,8 +58,8 @@ try {
       }
 
       // State dir must still be present (no cleanup happened)
-      if (!existsSync(join(stateDir, "state.json"))) {
-        throw new Error("state.json was removed despite refusal — artifacts must be preserved");
+      if (!existsSync(join(stateDir, "run.json"))) {
+        throw new Error("run.json was removed despite refusal — artifacts must be preserved");
       }
 
       // Cleanup temp dir

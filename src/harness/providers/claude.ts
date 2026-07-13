@@ -2,11 +2,15 @@ import type { PhaseGuards } from "../guardHooks.js";
 import { runPhase, type PhaseRunResult } from "../sessionRecorder.js";
 import type { LogMode, ResolvedPhaseConfig, RunMode } from "../types.js";
 import type { AgentProvider, AgentRequest, AgentResult, AgentSession } from "./types.js";
-import { AgentPausedError } from "./types.js";
+import { AgentPausedError, AgentProviderError, type AgentUsage } from "./types.js";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { AgentEventSink } from "../transcripts/types.js";
 
 type RunPhase = typeof runPhase;
 
 export interface ClaudeProviderOptions {
+  id?: string;
+  connectionFingerprint?: string;
   workflowId: string;
   runId: string;
   taskSlug: string;
@@ -14,6 +18,8 @@ export interface ClaudeProviderOptions {
   mode?: RunMode;
   logMode?: LogMode;
   runPhase?: RunPhase;
+  defaultModel?: string;
+  env?: Record<string, string | undefined>;
 }
 
 const DEFAULT_CONFIG: ResolvedPhaseConfig = {
@@ -29,10 +35,14 @@ const DEFAULT_CONFIG: ResolvedPhaseConfig = {
 
 /** Claude SDK details terminate here; workflow executors only see AgentProvider. */
 export class ClaudeProvider implements AgentProvider {
-  readonly id = "claude";
+  readonly id: string;
+  readonly connectionFingerprint: string;
   readonly capabilities = { structuredOutput: true, resume: true, toolGuards: true, interactiveQuestions: true } as const;
 
-  constructor(private readonly options: ClaudeProviderOptions) {}
+  constructor(private readonly options: ClaudeProviderOptions) {
+    this.id = options.id ?? "claude";
+    this.connectionFingerprint = options.connectionFingerprint ?? "claude:default";
+  }
 
   run<T>(request: AgentRequest<T>): Promise<AgentResult<T>> {
     return this.execute(request);
@@ -40,37 +50,53 @@ export class ClaudeProvider implements AgentProvider {
 
   async resume<T>(session: AgentSession, request: AgentRequest<T>): Promise<AgentResult<T>> {
     if (session.provider !== this.id) throw new Error(`cannot resume ${session.provider} session with ${this.id}`);
+    if (session.connectionFingerprint !== this.connectionFingerprint) throw new Error(`provider connection changed for ${this.id}; refusing to resume session ${session.id}`);
     return await this.execute(request, session.id);
   }
 
   private async execute<T>(request: AgentRequest<T>, resumeSessionId?: string): Promise<AgentResult<T>> {
-    if (request.signal?.aborted) throw request.signal.reason ?? new Error("agent request aborted");
     const phase = request.phase ?? "agent";
-    const result = await raceAbort((this.options.runPhase ?? runPhase)({
-      phase,
-      phaseConfig: {
-        ...DEFAULT_CONFIG,
-        prompt: request.systemPrompt ?? "",
-        allowedTools: request.allowedTools ?? [],
-        model: request.model as ResolvedPhaseConfig["model"],
+    if (request.signal?.aborted) {
+      await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "cancelled", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message: abortMessage(request.signal.reason) });
+      throw request.signal.reason ?? new Error("agent request aborted");
+    }
+    await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "started", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}) });
+    try {
+      const result = await raceAbort((this.options.runPhase ?? runPhase)({
+        phase,
+        phaseConfig: {
+          ...DEFAULT_CONFIG,
+          prompt: request.systemPrompt ?? "",
+          allowedTools: request.allowedTools ?? [],
+          model: (request.model ?? this.options.defaultModel) as ResolvedPhaseConfig["model"],
+          guards: toPhaseGuards(request.guards),
+        },
+        primaryCwd: this.options.primaryCwd,
+        phaseCwd: request.cwd,
+        taskSlug: this.options.taskSlug,
+        harnessTaskId: request.taskId ?? null,
+        prompt: request.prompt,
+        outputSchema: request.schema,
+        resumeSessionId,
+        logMode: this.options.logMode ?? "compact",
+        mode: this.options.mode ?? "silent",
         guards: toPhaseGuards(request.guards),
-      },
-      primaryCwd: this.options.primaryCwd,
-      phaseCwd: request.cwd,
-      taskSlug: this.options.taskSlug,
-      harnessTaskId: request.taskId ?? null,
-      prompt: request.prompt,
-      outputSchema: request.schema,
-      resumeSessionId,
-      logMode: this.options.logMode ?? "compact",
-      mode: this.options.mode ?? "silent",
-      guards: toPhaseGuards(request.guards),
-      workflowId: this.options.workflowId,
-      runId: this.options.runId,
-    }), request.signal);
-    return normalizeResult(result);
+        workflowId: this.options.workflowId,
+        runId: this.options.runId,
+        env: request.env ? { ...process.env, ...this.options.env, ...request.env } : this.options.env,
+        onMessage: (message) => emitClaudeMessage(message, request.onEvent),
+      }), request.signal);
+      return await normalizeResult(result, this.id, this.connectionFingerprint, request.model ?? this.options.defaultModel ?? null, request.onEvent);
+    } catch (error) {
+      if (request.signal?.aborted) {
+        await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "cancelled", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message: abortMessage(request.signal.reason) });
+      }
+      throw error;
+    }
   }
 }
+
+function abortMessage(reason: unknown): string { return reason instanceof Error ? reason.message : reason === undefined ? "agent request aborted" : String(reason); }
 
 function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return promise; if (signal.aborted) return Promise.reject(signal.reason ?? new Error("agent request aborted"));
@@ -79,18 +105,60 @@ function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
 
 function toPhaseGuards(guards: string[] | undefined): PhaseGuards {
   const set = new Set(guards ?? []);
-  return { readOnly: set.has("read_only"), noPlanWrites: set.has("no_plan_writes"), noGitHistory: set.has("no_git_history"), noForgeEffects: set.has("no_forge_effects") };
+  return { readOnly: set.has("read_only"), noGitHistory: set.has("no_git_history"), noForgeEffects: set.has("no_forge_effects") };
 }
 
-function normalizeResult<T>(result: PhaseRunResult<T>): AgentResult<T> {
+async function normalizeResult<T>(result: PhaseRunResult<T>, provider: string, connectionFingerprint: string, requestedModel: string | null, sink?: AgentEventSink): Promise<AgentResult<T>> {
+  const usage = normalizeUsage(result, provider, requestedModel);
+  const session = result.sessionId ? { id: result.sessionId, provider, connectionFingerprint } : undefined;
+  if (usage) await sink?.({ type: "usage", usage });
   if (result.status === "paused_for_user_input") {
     const question = result.parked?.askUserInput.questions.map((item) => item.question).join("\n") ?? "Agent needs input";
-    throw new AgentPausedError({ id: result.sessionId, provider: "claude" }, question, result.parked?.askUserInput.questions);
+    await sink?.({ type: "lifecycle", scope: "turn", status: "paused", sessionId: result.sessionId, message: question });
+    throw new AgentPausedError({ id: result.sessionId, provider, connectionFingerprint }, question, result.parked?.askUserInput.questions, { usage });
   }
-  if (result.status === "error" || result.structuredOutput == null) throw new Error(result.error ?? "Claude returned no structured output");
+  if (result.status === "error" || result.structuredOutput == null) {
+    const message = result.error ?? "Claude returned no structured output";
+    await sink?.({ type: "error", message }); await sink?.({ type: "lifecycle", scope: "turn", status: "failed", ...(session ? { sessionId: session.id } : {}), message });
+    throw new AgentProviderError(message, { session, usage });
+  }
+  await sink?.({ type: "lifecycle", scope: "turn", status: "completed", ...(session ? { sessionId: session.id } : {}) });
   return {
     output: result.structuredOutput,
-    session: result.sessionId ? { id: result.sessionId, provider: "claude" } : undefined,
-    transcript: result.events.map((event) => JSON.stringify(event)).join("\n"),
+    session,
+    usage,
   };
+}
+
+async function emitClaudeMessage(message: SDKMessage, sink?: AgentEventSink): Promise<void> {
+  if (!sink) return;
+  const value = message as unknown as Record<string, unknown>;
+  if (value.type === "system") {
+    if (value.subtype === "init" && typeof value.session_id === "string") await sink({ type: "lifecycle", scope: "session", status: "started", sessionId: value.session_id });
+    else if (typeof value.subtype === "string") await sink({ type: "status", name: value.subtype, data: serializableObject(value) });
+    return;
+  }
+  const blocks = ((value.message as Record<string, unknown> | undefined)?.content ?? []) as unknown[];
+  if (value.type === "assistant" || value.type === "user") {
+    for (const block of blocks) {
+      if (!block || typeof block !== "object") continue;
+      const item = block as Record<string, unknown>;
+      if (item.type === "text" && typeof item.text === "string") await sink({ type: "message", role: value.type === "assistant" ? "assistant" : "user", text: item.text, ...(typeof item.id === "string" ? { id: item.id } : {}) });
+      else if ((item.type === "thinking" || item.type === "reasoning") && typeof (item.thinking ?? item.text) === "string") await sink({ type: "reasoning", text: String(item.thinking ?? item.text), ...(typeof item.id === "string" ? { id: item.id } : {}) });
+      else if (item.type === "tool_use" && typeof item.id === "string") await sink({ type: "tool", id: item.id, name: typeof item.name === "string" ? item.name : "tool", kind: "tool", status: "started", input: item.input });
+      else if (item.type === "tool_result" && typeof item.tool_use_id === "string") await sink({ type: "tool", id: item.tool_use_id, name: "tool", kind: "tool", status: item.is_error === true || item.isError === true ? "failed" : "completed", output: item.content, ...((item.is_error === true || item.isError === true) ? { error: summarize(item.content) } : {}) });
+    }
+    return;
+  }
+  if (value.type === "tool_progress" && typeof value.tool_use_id === "string") await sink({ type: "tool", id: value.tool_use_id, name: typeof value.tool_name === "string" ? value.tool_name : "tool", kind: "tool", status: "updated", output: serializableObject(value) });
+}
+
+function serializableObject(value: Record<string, unknown>): Record<string, unknown> { return Object.fromEntries(Object.entries(value).filter(([, child]) => typeof child !== "function")); }
+function summarize(value: unknown): string { const text = typeof value === "string" ? value : JSON.stringify(value); return text.length > 500 ? `${text.slice(0, 500)}…` : text; }
+
+function normalizeUsage<T>(result: PhaseRunResult<T>, provider: string, requestedModel: string | null): AgentUsage | undefined {
+  if (!result.usage) return undefined;
+  const models = result.usage.models;
+  const modelNames = Object.keys(models ?? {});
+  return { ...result.usage, provider, model: modelNames.length === 1 ? modelNames[0]! : requestedModel, ...(models && Object.keys(models).length ? { models } : {}) };
 }
