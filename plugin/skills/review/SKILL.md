@@ -1,12 +1,12 @@
 ---
 name: review
-description: Post-mortem of a Harny run. Reads run.json v4, events and transcripts. Emits evidence-backed proposals. Use after failed, retried, slow, or novel runs.
+description: Post-mortem a Harny 0.5 run from run.json v4, audit events, normalized attempt transcripts, ChangeSets, and provider usage. Use after failed, retried, slow, costly, paused, mixed-provider, or otherwise surprising runs.
 allowed-tools: Bash, Read, Write, Agent
 ---
 
 # review — post-mortem analysis of a single harny run
 
-Turns a finished harny run into structured learnings. Walks bottom-up: phase transcripts → per-phase summary → cross-phase narrative → architect proposals.
+Turn a finished Harny run into structured learnings. Walk bottom-up: attempt transcripts → node summaries → cross-run narrative → architect proposals.
 
 Sister of `/release` (release orchestration) and `/learn` + `/drain` (learnings inbox).
 
@@ -29,18 +29,18 @@ Sister of `/release` (release orchestration) and `/learn` + `/drain` (learnings 
 
 ## Process — leaves to trunk
 
-Use sub-agents aggressively to keep the main context window clean. Transcripts can be tens of thousands of lines.
+Use sub-agents for large independent transcripts when available. Transcripts can be tens of thousands of lines.
 
 ### Step 1 — Map the run
 
 Read in main context:
 - `<cwd>/.harny/<slug>/run.json` — authoritative nodes, attempts, artifacts, ChangeSets and outcome.
-- `<cwd>/.harny/<slug>/events.jsonl` — append-only audit trail. Fall back to v2 state/plan only for historical runs.
+- `<cwd>/.harny/<slug>/events.jsonl` — append-only audit trail.
 - `<cwd>/.harny/<slug>/transcripts/` — normalized event streams scoped to agent attempts.
 
-Record: workflow, total wall-clock, attempt counts per phase, terminal status, agent-emitted `problems[]`.
+Record: workflow, total wall-clock, attempt counts per node, terminal status, pending human state, ChangeSets, provider/model usage and reported-cost coverage.
 
-### Step 2 — Locate phase transcripts
+### Step 2 — Locate attempt transcripts
 
 For each agent node attempt in `run.json`, locate its local transcript:
 
@@ -51,9 +51,9 @@ For each agent node attempt in `run.json`, locate its local transcript:
 
 Each line is a normalized record with `seq`, `at`, `provider`, and a typed `event`. A cleaned run has no remaining local transcript; review before cleanup.
 
-### Step 3 — Spawn one sub-agent per phase (in parallel)
+### Step 3 — Analyze attempts independently
 
-Launch one Explore-type sub-agent per transcript with this brief:
+For large runs, launch one Explore-type sub-agent per transcript with this brief. For small runs, analyze directly:
 
 > Read `<jsonl_path>`. The file is JSONL — one normalized event per line, including messages, reasoning, tools, file changes, plans, usage, lifecycle, status, and errors. Report:
 >
@@ -66,11 +66,11 @@ Launch one Explore-type sub-agent per transcript with this brief:
 >
 > Reply in <300 words, bullets only. Cite line numbers when helpful.
 
-Run sub-agents in parallel (single message, multiple Agent tool calls).
+Run independent analyses in parallel when the host supports it.
 
-### Step 4 — Synthesize the cross-phase narrative
+### Step 4 — Synthesize the cross-node narrative
 
-In main context, weave per-phase reports into a story:
+In main context, weave per-attempt reports into a story:
 
 - Did the planner over/under-decompose? Did it skip clarification it should have asked for?
 - Did the developer's first attempt match the planner's intent?
@@ -104,10 +104,8 @@ Output structure:
 ### Headline
 <one sentence: what happened, what mattered>
 
-### Per-phase summary
-- planner (<duration>, <attempts>): <one line>
-- developer (<duration>, <attempts>): <one line>
-- validator (<duration>, <attempts>): <one line>
+### Per-node summary
+- <node> (<provider/model>, <duration>, <attempts>, <usage>): <one line>
 
 ### Confusion / errors / slippage
 <bullets with evidence — JSONL line refs or quoted snippets>
@@ -151,7 +149,7 @@ After confirmation, invite the architect to append each "Inbox captures" line vi
 - This skill REVIEWS one finished run. `/release` GUIDES release orchestration; the triage tags here feed directly into `/release`'s per-run loop.
 - Sub-agents (Explore type) are the right tool for transcript reading. Each transcript can be tens of thousands of lines.
 - Be skeptical of agent self-reports ("I implemented X correctly") — verify against actual file diffs and validator behavior.
-- Negative findings are as valuable as positive — a phase that went smoothly with no anomalies is a data point ("the prompt + codebase context were sufficient").
+- Negative findings are as valuable as positive — a node attempt that went smoothly with no anomalies is a data point ("the prompt + codebase context were sufficient").
 
 ---
 
@@ -159,4 +157,4 @@ After confirmation, invite the architect to append each "Inbox captures" line vi
 
 - **Run dir gone** (`harny clean` was run) — state, audit events, and local transcripts were removed together. Tell the architect the run is no longer reviewable from Harny's evidence.
 - **Multiple matching slugs** for the prefix — list them, ask which one.
-- **Workflow is not feature-dev** — the plan artifact may be absent or have a different shape. Adapt to the typed artifacts that exist.
+- **Workflow is not feature-dev** — planner output may be absent or have a different shape. Adapt to the node outputs that exist.

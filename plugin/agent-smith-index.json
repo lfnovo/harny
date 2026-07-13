@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "mode": "plugin",
-  "lastUpdated": "2026-05-01T21:36:40Z",
+  "lastUpdated": "2026-07-13T17:00:00Z",
   "components": {
     "skills": [
       {
@@ -34,7 +34,11 @@
       {
         "name": "harny",
         "path": "skills/harny/SKILL.md",
-        "description": "Onboarding and router for the harny plugin. Teaches the harny mental model (run anatomy, .harny/ state, architect role) and routes to focused skills. Use when adopting harny or unsure where to start.",
+        "description": "Onboard and route users through Harny's declarative Claude/Codex workflows, local run state, provider configuration, human review, PR delivery, inspection, and cleanup. Use when someone is new to Harny, asks how it works, or needs help choosing the right Harny skill or workflow.",
+        "supportingFiles": [
+          "skills/harny/workflow-recipes.md",
+          "skills/harny/feature-pr-approval.yaml"
+        ],
         "allowedTools": [
           "Bash",
           "Read"
@@ -54,7 +58,7 @@
       {
         "name": "release",
         "path": "skills/release/SKILL.md",
-        "description": "Orchestrate a release cycle across multiple harny runs. Dispatch with product-vision prompts, parallelize when safe, code-review every merge, triage findings into NOW-blocks/NOW-quick/BACKLOG. Use as release manager across N runs.",
+        "description": "Operate a release cycle across Harny 0.5 runs and draft PRs. Use when coordinating multiple scoped changes, choosing feature-dev versus feature-pr, reviewing run evidence and usage, fixing PR feedback, running release gates, merging with explicit approval, or tagging a version.",
         "allowedTools": [
           "Bash",
           "Read",
@@ -66,7 +70,7 @@
       {
         "name": "review",
         "path": "skills/review/SKILL.md",
-        "description": "Post-mortem of a Harny run. Reads run.json v4, events and transcripts. Emits evidence-backed improvement proposals.",
+        "description": "Post-mortem a Harny 0.5 run from run.json v4, audit events, normalized attempt transcripts, ChangeSets, and provider usage. Use after failed, retried, slow, costly, paused, mixed-provider, or otherwise surprising runs.",
         "allowedTools": [
           "Bash",
           "Read",
@@ -79,7 +83,7 @@
       {
         "name": "orchestrator",
         "path": "agents/orchestrator.md",
-        "description": "Dispatch and manage harny CLI runs from natural language. Resolves cwd, picks slug, detects env friction (ANTHROPIC_API_KEY etc.), reads target agent instructions, dispatches + monitors. Use to delegate harny invocation."
+        "description": "Dispatch and monitor Harny 0.5 workflows from natural-language intent. Resolve repositories, choose feature-dev or feature-pr, select provider-aware workflows and interaction mode, monitor run.json through the CLI, and report exact terminal outcomes."
       }
     ],
     "hooks": [],
@@ -109,6 +113,16 @@
     {
       "from": "skills/harny",
       "to": "skills/release",
+      "type": "references"
+    },
+    {
+      "from": "skills/harny",
+      "to": "skills/harny/workflow-recipes.md",
+      "type": "references"
+    },
+    {
+      "from": "skills/harny/workflow-recipes.md",
+      "to": "skills/harny/feature-pr-approval.yaml",
       "type": "references"
     },
     {

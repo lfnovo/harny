@@ -51,7 +51,7 @@ For each of the 10 dimensions, in order:
 
 1. **Read aloud** the dimension's "Why it matters" — one short paraphrase, not the full block. The user does not need to hear the doc verbatim.
 2. **Gather evidence from the repo** using whatever tools fit the dimension. Examples:
-   - Dim 2 (safe-reset): `git status`, look for floating files at root, check `.gitignore` coverage
+   - Dim 2 (workspace hygiene): `git status`, inspect floating files and `.gitignore` coverage
    - Dim 3 (install): identify lock files, check CI workflow vs declared dependencies
    - Dim 6 (docs): look for `AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, module-level docs
    - Dim 8 (branches): `git branch -a | wc -l`, `git branch -r`

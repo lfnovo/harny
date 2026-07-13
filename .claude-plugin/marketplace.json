@@ -1,6 +1,6 @@
 {
   "name": "harny",
-  "description": "harny ecosystem — Claude Code plugins for using the harny task launcher.",
+  "description": "Harny ecosystem — Claude Code skills for operating declarative Claude/Codex development workflows.",
   "homepage": "https://github.com/lfnovo/harny",
   "owner": {
     "name": "Luis Novo"
@@ -9,8 +9,8 @@
     {
       "name": "harny",
       "source": "./plugin",
-      "description": "Claude Code skills and orchestrator agent for using harny in any repository — capture learnings, run post-mortems, evaluate repo readiness, and orchestrate harness runs from natural language.",
-      "version": "0.2.0",
+      "description": "Claude Code skills and an orchestrator agent for Harny workflows, run review, repository readiness, PR delivery, and release management.",
+      "version": "0.3.0",
       "author": {
         "name": "Luis Novo"
       }

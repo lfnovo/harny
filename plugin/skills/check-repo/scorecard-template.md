@@ -7,7 +7,7 @@ Repo: <name>
 Date: <YYYY-MM-DD>
 
 1.  Validator gates ............... <emoji> — <one-sentence rationale citing evidence>
-2.  Safe-reset hygiene ............ <emoji> — <one-sentence rationale citing evidence>
+2.  Workspace hygiene ............. <emoji> — <one-sentence rationale citing evidence>
 3.  Deterministic install ......... <emoji> — <one-sentence rationale citing evidence>
 4.  Feedback loop time ............ <emoji> — <one-sentence rationale citing evidence>
 5.  Task granularity / modularity . <emoji> — <one-sentence rationale citing evidence>
