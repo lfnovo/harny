@@ -62,14 +62,17 @@ Avoid prescribing files, function names or implementation unless the user suppli
 
 ## 5. Dispatch
 
-Run from the repository in the background. Never interpolate raw user text directly into shell syntax. Preserve the prompt verbatim in a single-quoted heredoc whose delimiter does not occur in the prompt, and shell-escape every other dynamic argument:
+Run from the repository in the background. Never interpolate raw user text directly into shell syntax. Read the prompt body and embedded newlines without shell expansion from a single-quoted heredoc whose delimiter does not occur in the prompt, and shell-escape every other dynamic argument:
 
 ```bash
-prompt="$(cat <<'HARNY_PROMPT_EOF'
+IFS= read -r -d '' prompt <<'HARNY_PROMPT_EOF' || true
 <prompt verbatim>
 HARNY_PROMPT_EOF
-)"
-cd <shell-escaped-cwd> && harny [--workflow <shell-escaped-id-or-path>] --name <shell-escaped-slug> [--mode async] "$prompt"
+(
+  cd <shell-escaped-cwd>
+  exec harny [--workflow <shell-escaped-id-or-path>] --name <shell-escaped-slug> [--mode async] "$prompt"
+) > <shell-escaped-log-path> 2>&1 &
+harny_pid=$!
 ```
 
 For PR feedback:
@@ -78,7 +81,7 @@ For PR feedback:
 cd <cwd> && harny pr fix <number>
 ```
 
-Capture process output, the slug and the separate persisted run ID. `harny show <slug>` resolves the run and exposes its full ID; use its first eight characters only as a compact display prefix. Never place tokens or API keys on the command line.
+Capture the background PID, log path, slug and separate persisted run ID. `harny show <slug>` resolves the run and exposes its full ID; use its first eight characters only as a compact display prefix. Use the redirected log only for startup diagnostics before the run becomes discoverable. Never place tokens or API keys on the command line.
 
 ## 6. Monitor without busy polling
 
