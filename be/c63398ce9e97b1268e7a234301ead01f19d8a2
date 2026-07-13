@@ -1,0 +1,57 @@
+scripts/probes/plugin/01-contract.ts
+  s_361086fd550cc0::t_a8fcaa0b10f1f6 3,40-44
+  s_361086fd550cc0::t_35d0ab5885310e 1-2,4-36,38-39,45-46,49
+  s_361086fd550cc0::t_b1ed725f5a95ce 37
+  s_361086fd550cc0::t_60b43f35e7360a 47-48,50
+plugin/.claude-plugin/plugin.json
+  s_361086fd550cc0::t_575ee47bffd301 3-4,13
+plugin/skills/check-repo/SKILL.md
+  s_361086fd550cc0::t_a901ad1bb718ba 54
+plugin/README.md
+  s_361086fd550cc0::t_575ee47bffd301 3,53-54,60,67,71
+plugin/skills/release/SKILL.md
+  s_361086fd550cc0::t_e151b2ad21162f 3,7,9,11,13-18,20,22,24-26,28,30,32-34,36,38,40,42-47,49,51,53,55-57,59,61,65,67,69,71,73-76,78,80,82,84-90,92,94,96,98,100-102,104,106,108,110,112,114,116-124,126,128,130-133,135,137-141,143,145-149,153-156
+.claude-plugin/marketplace.json
+  s_361086fd550cc0::t_575ee47bffd301 3,12-13
+plugin/skills/harny/SKILL.md
+  s_361086fd550cc0::t_5fe6855487ada9 3,7,9,11,13,15,17-19,21,23,25-32,34,36,41-42,45,47,49-52,54,57-60,63,65,67,69-71,73,76-79,82,84,86,88,90,92,94,97-100,103,105,107,109-112,114,118,120,122-128,130,132,134-139,141,143-145
+  s_361086fd550cc0::t_a8fcaa0b10f1f6 116
+plugin/skills/harny/workflow-recipes.md
+  s_361086fd550cc0::t_a8fcaa0b10f1f6 1-6,8-10,12-13,15,17-32,34,36-58
+  s_361086fd550cc0::t_ef8f3b8616e980 7,11,14,33,35
+  s_361086fd550cc0::t_b504dda2ee0d9e 16
+plugin/skills/review/SKILL.md
+  s_361086fd550cc0::t_e9e146cb7abfec 71,73,152
+  s_361086fd550cc0::t_35b31e95dbbff9 3,9,32,38,41,43,54,56,69,107-108
+  s_361086fd550cc0::t_35d0ab5885310e 160
+plugin/skills/check-repo/dimensions.md
+  s_361086fd550cc0::t_a901ad1bb718ba 46,48,58,69,109,211
+plugin/skills/check-repo/scorecard-template.md
+  s_361086fd550cc0::t_a901ad1bb718ba 10
+plugin/agent-smith-index.json
+  s_361086fd550cc0::t_575ee47bffd301 4,37,61,86
+  s_361086fd550cc0::t_a8fcaa0b10f1f6 38-41,118-127
+  s_361086fd550cc0::t_35b31e95dbbff9 73
+plugin/agents/orchestrator.md
+  s_361086fd550cc0::t_b1ed725f5a95ce 45,48
+  s_361086fd550cc0::t_8df8a1e0d0cd75 3,10,12,14,16,18-20,22,24-27,29,31,33,35,37,39,41-44,46,50,52,54,56-59,61,63,65,67-69,71,74,77,79,81,83-86,88,90,92,94-96,98,100,102,104-110,112,115,117,119-123,127-132
+plugin/skills/harny/feature-pr-approval.yaml
+  s_361086fd550cc0::t_a8fcaa0b10f1f6 1-4,6-48,50-68
+  s_361086fd550cc0::t_907952c809c774 5,49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "bec63398ce9e97b1268e7a234301ead01f19d8a2",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
