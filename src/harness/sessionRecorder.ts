@@ -89,6 +89,7 @@ function buildQueryOptions<T>(args: {
   resumeSessionId: string | null | undefined;
   phase: PhaseName;
   setParkState: (state: { askUserInput: AskUserQuestionInput; toolUseId: string | null }) => void;
+  abortController?: AbortController;
   env?: Record<string, string | undefined>;
 }) {
   const {
@@ -101,6 +102,7 @@ function buildQueryOptions<T>(args: {
     resumeSessionId,
     phase: _phase,
     setParkState,
+    abortController,
     env,
   } = args;
 
@@ -113,6 +115,7 @@ function buildQueryOptions<T>(args: {
       : phaseConfig.allowedTools;
 
   return {
+    ...(abortController ? { abortController } : {}),
     cwd: phaseCwd,
     ...(env ? { env } : {}),
     ...(additionalDirectories.length > 0 ? { additionalDirectories } : {}),
@@ -272,6 +275,7 @@ export async function runPhase<T>(args: {
   runId: string;
   env?: Record<string, string | undefined>;
   onMessage?: (message: SDKMessage) => void | Promise<void>;
+  signal?: AbortSignal;
 }): Promise<PhaseRunResult<T>> {
   const usages: PhaseUsage[] = [];
   for (let attempt = 1; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
@@ -322,6 +326,7 @@ async function runPhaseAttempt<T>(args: {
   runId: string;
   env?: Record<string, string | undefined>;
   onMessage?: (message: SDKMessage) => void | Promise<void>;
+  signal?: AbortSignal;
 }): Promise<PhaseRunResult<T>> {
   const {
     phase,
@@ -341,6 +346,7 @@ async function runPhaseAttempt<T>(args: {
     runId,
     env,
     onMessage,
+    signal,
   } = args;
   void workflowId; void runId;
 
@@ -383,6 +389,10 @@ async function runPhaseAttempt<T>(args: {
     phaseCwd,
   });
 
+  const abortController = new AbortController();
+  const forwardAbort = () => abortController.abort(signal?.reason);
+  if (signal?.aborted) forwardAbort();
+  else signal?.addEventListener("abort", forwardAbort, { once: true });
   const queryOptions = buildQueryOptions({
     phaseConfig,
     guardHooks,
@@ -396,6 +406,7 @@ async function runPhaseAttempt<T>(args: {
       parkState = state;
     },
     env,
+    abortController,
   });
 
   await (async () => {
@@ -435,6 +446,7 @@ async function runPhaseAttempt<T>(args: {
         record.ended_at = new Date().toISOString();
       }
     })();
+  signal?.removeEventListener("abort", forwardAbort);
 
   if (parkState && record.session_id) {
     logBlock("output (paused)", "parked for async review");

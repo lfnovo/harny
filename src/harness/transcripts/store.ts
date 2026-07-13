@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { runDir } from "../state/paths.js";
 import { AgentEventSchema, TranscriptRecordSchema, type AgentEvent, type TranscriptAttemptRef, type TranscriptRecord } from "./types.js";
@@ -62,6 +62,7 @@ export class TranscriptStore {
     let raw = "";
     try { raw = await readFile(path, "utf8"); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    if (raw && !raw.endsWith("\n")) { const boundary = raw.lastIndexOf("\n"); raw = boundary < 0 ? "" : raw.slice(0, boundary + 1); await writeFile(path, raw, "utf8"); }
     const lines = raw.split("\n").filter(Boolean);
     if (!lines.length) return 1;
     const last = TranscriptRecordSchema.parse(JSON.parse(lines.at(-1)!));

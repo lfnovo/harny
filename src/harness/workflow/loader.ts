@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename, extname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { access } from "node:fs/promises";
 import { WorkflowDefinitionSchema, type NormalizedWorkflowDefinition } from "./schema.js";
@@ -32,7 +32,8 @@ export async function resolveWorkflowPath(spec: string, options: WorkflowSearchO
     if (!(await exists(path))) throw new Error(`workflow file not found: ${path}`);
     return path;
   }
-  const filename = extname(spec) ? basename(spec) : `${spec}.yaml`;
+  if (!/^[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/.test(spec)) throw new Error(`invalid workflow name: ${spec}`);
+  const filename = `${spec}.yaml`;
   const roots = [
     join(options.cwd, ".harny", "workflows"),
     join(options.home ?? homedir(), ".harny", "workflows"),

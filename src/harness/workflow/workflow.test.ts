@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { AgentProvider } from "../providers/types.js";
-import { loadWorkflow, loadWorkflowFile, resolveCommand } from "./loader.js";
+import { loadWorkflow, loadWorkflowFile, resolveCommand, resolveWorkflowPath } from "./loader.js";
 import { createCommandExecutor } from "./commandExecutor.js";
 import { WorkflowDefinitionSchema } from "./schema.js";
 import { answerWorkflow, materializeHumanExpiry, RetryWorkflowStepError, runWorkflow, type WorkflowSnapshot, type WorkflowStateStore } from "./runtime.js";
@@ -26,6 +26,7 @@ const provider: AgentProvider = {
 
 describe("workflow schema and static validation", () => {
   test("rejects workflow v1 instead of silently changing its semantics", () => { expect(() => WorkflowDefinitionSchema.parse({ ...base, version: 1 })).toThrow(); });
+  test("rejects unknown workflow keys and traversal in named workflow specs", async () => { expect(() => WorkflowDefinitionSchema.parse({ ...base, nodes: [{ ...base.nodes[0], guard: ["read_only"] }] })).toThrow("Unrecognized key"); await expect(resolveWorkflowPath("team/../../outside", { cwd: "/repo" })).rejects.toThrow("invalid workflow name"); });
   test("rejects unsupported references and guards before workspace creation", () => { const workflow = WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "agent", type: "agent", command: "work", guards: ["no_plan_writes"], inputs: { value: "${{ run.branch }}" } }] }); expect(() => validateWorkflow(workflow)).toThrow("unsupported reference"); expect(() => validateWorkflow(workflow)).toThrow("unknown guard"); });
   test("accepts a valid provider-neutral DAG", () => {
     const workflow = WorkflowDefinitionSchema.parse(base);
@@ -77,7 +78,7 @@ describe("workflow schema and static validation", () => {
 
   test("bundles feature-pr and review-fix with safe PR policies", async () => {
     const cwd = join(tmpdir(), "no-pr-overrides"); const featurePr = (await loadWorkflow("feature-pr", { cwd })).definition; const reviewFix = (await loadWorkflow("review-fix", { cwd })).definition;
-    expect(featurePr.nodes.find((node) => node.type === "pull_request")).toMatchObject({ type: "pull_request", draft: true, existing: "allow" });
+    expect(featurePr.nodes.find((node) => node.type === "pull_request")).toMatchObject({ type: "pull_request", base: "${{ inputs.base }}", draft: true, existing: "allow" });
     expect(reviewFix.nodes.find((node) => node.type === "pull_request")).toMatchObject({ type: "pull_request", existing: "require" });
   });
 
@@ -122,6 +123,7 @@ class MemoryStore implements WorkflowStateStore {
 }
 
 describe("persistent sequential scheduler", () => {
+  test("refuses to resume a snapshot whose node set no longer matches the workflow", async () => { const store = new MemoryStore(); store.state = { workflow: "test-flow", status: "running", nodes: { obsolete: { id: "obsolete", status: "pending", attempts: 0 } } }; await expect(runWorkflow({ workflow: WorkflowDefinitionSchema.parse(base), store, executors: {} })).rejects.toThrow("nodes do not match"); });
   test("notifies an observer without making it authoritative", async () => {
     const store = new MemoryStore(); const events: string[] = [];
     const workflow = WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "one", type: "command", command: ["true"] }] });
@@ -150,6 +152,7 @@ describe("persistent sequential scheduler", () => {
     expect(result.status).toBe("done");
     expect(result.nodes.develop?.attempts).toBe(2);
   });
+  test("top-level retries honor backoff", async () => { const workflow = WorkflowDefinitionSchema.parse({ ...base, nodes: [{ ...base.nodes[0], retry: { max_attempts: 2, backoff_ms: 20 } }, base.nodes[1]] }); let calls = 0; const started = Date.now(); const result = await runWorkflow({ workflow, store: new MemoryStore(), executors: { agent: async () => { if (++calls === 1) throw new Error("retry"); return { changeset: "abc" }; }, commit: async () => ({}) } }); expect(result.status).toBe("done"); expect(Date.now() - started).toBeGreaterThanOrEqual(15); });
 
   test("persists provider usage on every attempt before retry and derives no aggregate state", async () => {
     const workflow = WorkflowDefinitionSchema.parse({ ...base, nodes: [{ ...base.nodes[0], retry: { max_attempts: 2 } }, base.nodes[1]] });
@@ -192,6 +195,15 @@ describe("persistent sequential scheduler", () => {
     const result = await runWorkflow({ workflow, store, executors: { command: async (node) => { if (node.type === "command") calls.push(node.command.join(" ")); return {}; } } });
     expect(calls).toEqual(["echo one", "check one", "echo two", "check two"]);
     expect(result.status).toBe("done");
+  });
+
+  test("foreach resolves aliases in predicates and records skipped dependencies", async () => {
+    const workflow = WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "tasks", type: "foreach", items: ["one"], as: "task", max_items: 1, steps: [
+      { id: "optional", type: "command", command: ["false"], when: { equals: ["${{ task }}", "never"] } },
+      { id: "after", type: "command", command: ["echo", "${{ task }}"], depends_on: ["optional"] },
+    ] }] });
+    const calls: string[] = []; const result = await runWorkflow({ workflow, store: new MemoryStore(), executors: { command: async (node) => { if (node.type === "command") calls.push(node.command.join(" ")); return {}; } } });
+    expect(result.status).toBe("done"); expect(calls).toEqual(["echo one"]); expect(result.nodes.tasks?.steps?.["0.optional"]?.status).toBe("skipped");
   });
 
   test("assigns stable transcript identities to top-level and foreach attempts", async () => {
@@ -267,8 +279,9 @@ describe("persistent sequential scheduler", () => {
     const executor = createCommandExecutor(process.cwd()); const controller = new AbortController();
     const ok = await executor(WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "run", type: "command", command: ["printf", "hello"], depends_on: [], inputs: {} }] }).nodes[0]!, { snapshot: { workflow: "x", status: "running", nodes: {} }, signal: controller.signal, attempt: { instanceId: "run", attempt: 1 }, reportAttempt: async () => {} });
     expect(ok).toEqual({ stdout: "hello", stderr: "", exit_code: 0 });
-    expect(executor(WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "bad", type: "command", command: ["false"], depends_on: [], inputs: {} }] }).nodes[0]!, { snapshot: { workflow: "x", status: "running", nodes: {} }, signal: controller.signal, attempt: { instanceId: "bad", attempt: 1 }, reportAttempt: async () => {} })).rejects.toThrow("exit 1");
+    await expect(executor(WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "bad", type: "command", command: ["false"], depends_on: [], inputs: {} }] }).nodes[0]!, { snapshot: { workflow: "x", status: "running", nodes: {} }, signal: controller.signal, attempt: { instanceId: "bad", attempt: 1 }, reportAttempt: async () => {} })).rejects.toThrow("exit 1");
   });
+  test("command executor bounds persisted output", async () => { const executor = createCommandExecutor(process.cwd()); const node = WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "loud", type: "command", command: [process.execPath, "-e", "process.stdout.write('x'.repeat(1100000))"] }] }).nodes[0]!; const output = await executor(node, { snapshot: { workflow: "x", status: "running", nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "loud", attempt: 1 }, reportAttempt: async () => {} }) as { stdout: string }; expect(output.stdout.length).toBeLessThan(1_050_000); expect(output.stdout).toContain("output truncated"); });
 
   test("human node parks asynchronously and resumes from persisted answer", async () => {
     const workflow = WorkflowDefinitionSchema.parse({ ...base, defaults: { provider: "claude", timeout: 60_000 }, outcome: { type: "none" }, nodes: [
@@ -289,6 +302,11 @@ describe("persistent sequential scheduler", () => {
     const failed = new MemoryStore(); failed.state = expired(); expect((await materializeHumanExpiry(failed, new Date("2020-01-02")))?.status).toBe("failed");
     const resumed = new MemoryStore(); resumed.state = expired("continue"); const value = await materializeHumanExpiry(resumed, new Date("2020-01-02"));
     expect(value?.status).toBe("running"); expect(value?.nodes.review?.output).toEqual({ expired: true, fallback: "continue" });
+  });
+  test("nested foreach human answers and expiry requeue the parent", async () => {
+    const nested = (fallback?: string): WorkflowSnapshot => ({ workflow: "flow", status: "paused", nodes: { tasks: { id: "tasks", status: "paused", attempts: 1, steps: { "0.review": { id: "0.review", status: "paused", attempts: 1 } } } }, pendingHuman: { nodeId: "tasks:0:review", question: "?", askedAt: "2020-01-01T00:00:00.000Z", expiresAt: "2030-01-01T00:00:00.000Z", fallback } });
+    const answered = new MemoryStore(); answered.state = nested(); const answer = await answerWorkflow(answered, "yes", "tasks:0:review"); expect(answer.nodes.tasks?.status).toBe("pending"); expect(answer.nodes.tasks?.steps?.["0.review"]?.status).toBe("completed");
+    const expired = new MemoryStore(); expired.state = nested("continue"); expired.state.pendingHuman!.expiresAt = "2020-01-01T00:00:00.000Z"; const expiry = await materializeHumanExpiry(expired, new Date("2020-01-02")); expect(expiry?.nodes.tasks?.status).toBe("pending"); expect(expiry?.nodes.tasks?.steps?.["0.review"]?.output).toEqual({ expired: true, fallback: "continue" });
   });
   test("cancel is a finite built-in terminal outcome", async () => {
     const workflow = WorkflowDefinitionSchema.parse({ ...base, outcome: { type: "none" }, nodes: [{ id: "stop", type: "cancel", reason: "user requested", depends_on: [], inputs: {} }] });

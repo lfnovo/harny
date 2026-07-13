@@ -72,7 +72,7 @@ function parseArgs(argv: string[]): CliOptions {
         throw new Error(`${arg} requires a value`);
       }
       if (arg === '--subdir') options.subdirs.push(value);
-      else options.only.push(...value.split(',').filter(Boolean));
+      else { const selectors = value.split(',').map((item) => item.trim()).filter(Boolean); if (!selectors.length) throw new Error('--only requires at least one non-empty selector'); options.only.push(...selectors); }
       continue;
     }
     throw new Error(`unknown option: ${arg} (see --help)`);

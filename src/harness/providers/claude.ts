@@ -4,7 +4,7 @@ import type { LogMode, ResolvedPhaseConfig, RunMode } from "../types.js";
 import type { AgentProvider, AgentRequest, AgentResult, AgentSession } from "./types.js";
 import { AgentPausedError, AgentProviderError, type AgentUsage } from "./types.js";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentEventSink } from "../transcripts/types.js";
+import { toJsonObject, toJsonValue, type AgentEventSink } from "../transcripts/types.js";
 
 type RunPhase = typeof runPhase;
 
@@ -84,14 +84,20 @@ export class ClaudeProvider implements AgentProvider {
         workflowId: this.options.workflowId,
         runId: this.options.runId,
         env: request.env ? { ...process.env, ...this.options.env, ...request.env } : this.options.env,
+        signal: request.signal,
         onMessage: (message) => emitClaudeMessage(message, request.onEvent),
       }), request.signal);
       return await normalizeResult(result, this.id, this.connectionFingerprint, request.model ?? this.options.defaultModel ?? null, request.onEvent);
     } catch (error) {
       if (request.signal?.aborted) {
         await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "cancelled", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message: abortMessage(request.signal.reason) });
+        throw request.signal.reason ?? error;
       }
-      throw error;
+      if (error instanceof AgentProviderError || error instanceof AgentPausedError) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      await request.onEvent?.({ type: "error", message });
+      await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "failed", ...(resumeSessionId ? { sessionId: resumeSessionId } : {}), message });
+      throw new AgentProviderError(message, resumeSessionId ? { session: { id: resumeSessionId, provider: this.id, connectionFingerprint: this.connectionFingerprint } } : {}, { cause: error });
     }
   }
 }
@@ -135,7 +141,7 @@ async function emitClaudeMessage(message: SDKMessage, sink?: AgentEventSink): Pr
   const value = message as unknown as Record<string, unknown>;
   if (value.type === "system") {
     if (value.subtype === "init" && typeof value.session_id === "string") await sink({ type: "lifecycle", scope: "session", status: "started", sessionId: value.session_id });
-    else if (typeof value.subtype === "string") await sink({ type: "status", name: value.subtype, data: serializableObject(value) });
+    else if (typeof value.subtype === "string") await sink({ type: "status", name: value.subtype, data: toJsonObject(value) });
     return;
   }
   const blocks = ((value.message as Record<string, unknown> | undefined)?.content ?? []) as unknown[];
@@ -145,16 +151,15 @@ async function emitClaudeMessage(message: SDKMessage, sink?: AgentEventSink): Pr
       const item = block as Record<string, unknown>;
       if (item.type === "text" && typeof item.text === "string") await sink({ type: "message", role: value.type === "assistant" ? "assistant" : "user", text: item.text, ...(typeof item.id === "string" ? { id: item.id } : {}) });
       else if ((item.type === "thinking" || item.type === "reasoning") && typeof (item.thinking ?? item.text) === "string") await sink({ type: "reasoning", text: String(item.thinking ?? item.text), ...(typeof item.id === "string" ? { id: item.id } : {}) });
-      else if (item.type === "tool_use" && typeof item.id === "string") await sink({ type: "tool", id: item.id, name: typeof item.name === "string" ? item.name : "tool", kind: "tool", status: "started", input: item.input });
-      else if (item.type === "tool_result" && typeof item.tool_use_id === "string") await sink({ type: "tool", id: item.tool_use_id, name: "tool", kind: "tool", status: item.is_error === true || item.isError === true ? "failed" : "completed", output: item.content, ...((item.is_error === true || item.isError === true) ? { error: summarize(item.content) } : {}) });
+      else if (item.type === "tool_use" && typeof item.id === "string") await sink({ type: "tool", id: item.id, name: typeof item.name === "string" ? item.name : "tool", kind: "tool", status: "started", input: toJsonValue(item.input) });
+      else if (item.type === "tool_result" && typeof item.tool_use_id === "string") await sink({ type: "tool", id: item.tool_use_id, name: "tool", kind: "tool", status: item.is_error === true || item.isError === true ? "failed" : "completed", output: toJsonValue(item.content), ...((item.is_error === true || item.isError === true) ? { error: summarize(item.content) } : {}) });
     }
     return;
   }
-  if (value.type === "tool_progress" && typeof value.tool_use_id === "string") await sink({ type: "tool", id: value.tool_use_id, name: typeof value.tool_name === "string" ? value.tool_name : "tool", kind: "tool", status: "updated", output: serializableObject(value) });
+  if (value.type === "tool_progress" && typeof value.tool_use_id === "string") await sink({ type: "tool", id: value.tool_use_id, name: typeof value.tool_name === "string" ? value.tool_name : "tool", kind: "tool", status: "updated", output: toJsonObject(value) });
 }
 
-function serializableObject(value: Record<string, unknown>): Record<string, unknown> { return Object.fromEntries(Object.entries(value).filter(([, child]) => typeof child !== "function")); }
-function summarize(value: unknown): string { const text = typeof value === "string" ? value : JSON.stringify(value); return text.length > 500 ? `${text.slice(0, 500)}…` : text; }
+function summarize(value: unknown): string { let text: string; try { const encoded = typeof value === "string" ? value : JSON.stringify(value); text = encoded === undefined ? String(value) : encoded; } catch { try { text = String(value); } catch { text = "<unserializable>"; } } return text.length > 500 ? `${text.slice(0, 500)}…` : text; }
 
 function normalizeUsage<T>(result: PhaseRunResult<T>, provider: string, requestedModel: string | null): AgentUsage | undefined {
   if (!result.usage) return undefined;

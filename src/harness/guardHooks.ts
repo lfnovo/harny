@@ -59,8 +59,8 @@ const WRITE_TOOLS_MATCHER = WRITE_TOOLS.join("|");
 const FORBIDDEN_GIT_COMMAND =
   /\bgit\s+(?:[^;|&\s]+\s+)*?(commit|push|reset|rebase|merge|revert|cherry-pick|tag|am)(?:\s|;|\||&|$)|--amend\b/;
 
-const FORBIDDEN_FORGE_COMMAND =
-  /\bgh\s+pr\s+(create|edit|merge|ready|close|reopen|comment|review)(?:\s|;|\||&|$)|\bgh\s+api\b[^;|&]*(?:(?:--method|-X)\s*(POST|PUT|PATCH|DELETE)\b|(?:-f|-F|--field|--raw-field|--input)(?:\s|=))/i;
+const FORBIDDEN_PR_COMMAND =
+  /\bgh\s+pr\s+["']?(create|edit|merge|ready|close|reopen|comment|review)["']?(?:\s|;|\||&|$)/i;
 
 function denyPreToolUse(reason: string): HookJSONOutput {
   return {
@@ -124,11 +124,19 @@ function developerForgePublisher(): HookCallback {
   return async (input) => {
     if (input.hook_event_name !== "PreToolUse" || input.tool_name !== "Bash") return allowPreToolUse();
     const command = readStringField(input.tool_input, "command");
-    if (command == null || !FORBIDDEN_FORGE_COMMAND.test(command)) return allowPreToolUse();
+    if (command == null || !isForbiddenForgeCommand(command)) return allowPreToolUse();
     return denyPreToolUse(
       "Pull-request publication is a privileged workflow effect. Do not mutate pull requests or call write-capable forge APIs from an agent; the pull_request executor will publish after validated commits.",
     );
   };
+}
+
+function isForbiddenForgeCommand(command: string): boolean {
+  if (FORBIDDEN_PR_COMMAND.test(command)) return true;
+  if (!/\bgh\s+api\b/i.test(command)) return false;
+  const method = command.match(/(?:--method(?:\s+|=)|-X\s*)(GET|POST|PUT|PATCH|DELETE)\b/i)?.[1]?.toUpperCase();
+  if (method) return method !== "GET";
+  return /(?:^|\s)(?:-f|-F|--field|--raw-field|--input)(?:\s|=)/.test(command);
 }
 
 function operatesOutsidePrimary(command: string, primaryResolved: string): boolean {

@@ -430,6 +430,7 @@
     let lastListSig = null, lastDetailSig = null, detailAnimate = true;
     const msOf = (iso) => (iso ? new Date(iso).getTime() : null);
     function liveDur(startIso, endIso) {
+      if (!startIso) return '<span>—</span>';
       if (endIso) return `<span>${fmtDuration(durationMs(startIso, endIso))}</span>`;
       const s = msOf(startIso);
       return `<span data-dur-start="${s}">${fmtDuration(Date.now() - s)}</span>`;
@@ -504,6 +505,10 @@
     function renderMarkdown(s) {
       if (!s) return '';
       return DOMPurify.sanitize(marked.parse(String(s)));
+    }
+    function renderTranscriptMarkdown(s) {
+      if (!s) return '';
+      return DOMPurify.sanitize(marked.parse(String(s)), { FORBID_TAGS: ['img', 'picture', 'source', 'video', 'audio', 'iframe'], FORBID_ATTR: ['src', 'srcset', 'poster'] });
     }
 
     function eventSubstance(e, state, plan) {
@@ -885,8 +890,8 @@
       return items.map(record => {
         const e = record.event; const when = fmtTime(record.at).split(' ').pop();
         if (e.type === 'request') return `<div class="tr-event"><div class="tr-label">request · ${escapeHtml(when)}</div><details class="tr-sub"><summary>Prompt</summary>${jsonPayload({ prompt:e.prompt, system_prompt:e.systemPrompt, model:e.model, tools:e.tools, guards:e.guards })}</details></div>`;
-        if (e.type === 'message') return `<div class="tr-event message"><div class="tr-label">${escapeHtml(e.role)} · ${escapeHtml(when)}</div><div class="tr-text">${renderMarkdown(e.text)}</div></div>`;
-        if (e.type === 'reasoning') return `<div class="tr-event"><details class="tr-sub"><summary>Reasoning <span class="tr-status">${escapeHtml(when)}</span></summary><div class="tr-text">${renderMarkdown(e.text)}</div></details></div>`;
+        if (e.type === 'message') return `<div class="tr-event message"><div class="tr-label">${escapeHtml(e.role)} · ${escapeHtml(when)}</div><div class="tr-text">${renderTranscriptMarkdown(e.text)}</div></div>`;
+        if (e.type === 'reasoning') return `<div class="tr-event"><details class="tr-sub"><summary>Reasoning <span class="tr-status">${escapeHtml(when)}</span></summary><div class="tr-text">${renderTranscriptMarkdown(e.text)}</div></details></div>`;
         if (e.type === 'tool') return `<div class="tr-event"><details class="tr-sub"><summary>${escapeHtml(e.name)} <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload({ kind:e.kind, input:e.input, output:e.output, error:e.error })}</details></div>`;
         if (e.type === 'file_change') return `<div class="tr-event"><details class="tr-sub"><summary>File changes <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.changes)}</details></div>`;
         if (e.type === 'plan') return `<div class="tr-event"><details class="tr-sub"><summary>Agent plan <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.items)}</details></div>`;

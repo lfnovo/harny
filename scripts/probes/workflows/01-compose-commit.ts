@@ -210,24 +210,26 @@ try {
       });
 
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "harny-probe-"));
-      const msgFile = path.join(tmpDir, "COMMIT_EDITMSG");
-      fs.writeFileSync(msgFile, msg, "utf8");
+      try {
+        const msgFile = path.join(tmpDir, "COMMIT_EDITMSG");
+        fs.writeFileSync(msgFile, msg, "utf8");
 
-      // Init a git repo and teach it both separators so task= is recognized alongside validator:
-      await $`git init ${tmpDir}`.quiet();
-      await $`git config trailer.separators ':='`.cwd(tmpDir).quiet();
+        // Init a git repo and teach it both separators so task= is recognized alongside validator:
+        await $`git init ${tmpDir}`.quiet();
+        await $`git config trailer.separators ':='`.cwd(tmpDir).quiet();
 
-      const parsed = await $`git interpret-trailers --parse < ${msgFile}`.cwd(tmpDir).quiet();
-      const stdout = parsed.stdout.toString();
-      const validatorLines = stdout
-        .split("\n")
-        .filter((l) => l.startsWith("validator"));
+        const parsed = await $`git interpret-trailers --parse < ${msgFile}`.cwd(tmpDir).quiet();
+        const stdout = parsed.stdout.toString();
+        const validatorLines = stdout
+          .split("\n")
+          .filter((l) => l.startsWith("validator"));
 
-      if (validatorLines.length !== 1)
-        throw new Error(
-          `expected exactly 1 validator trailer line, got ${validatorLines.length}: ${JSON.stringify(validatorLines)}`,
-        );
-      console.log(`PASS ${name}`);
+        if (validatorLines.length !== 1)
+          throw new Error(
+            `expected exactly 1 validator trailer line, got ${validatorLines.length}: ${JSON.stringify(validatorLines)}`,
+          );
+        console.log(`PASS ${name}`);
+      } finally { fs.rmSync(tmpDir, { recursive: true, force: true }); }
     })(),
     hardDeadline(),
   ]);

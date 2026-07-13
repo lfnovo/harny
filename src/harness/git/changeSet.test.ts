@@ -21,20 +21,20 @@ test("ChangeSet enforces implemented = validated = committed", async () => {
 test("ChangeSet rejects a file changed after validation", async () => {
   const cwd = await repo(); await writeFile(join(cwd, "base.txt"), "first\n");
   const changeSet = await captureChangeSet(cwd); await writeFile(join(cwd, "base.txt"), "tampered\n");
-  expect(assertChangeSetUnchanged(cwd, changeSet)).rejects.toThrow("changed after validation");
+  await expect(assertChangeSetUnchanged(cwd, changeSet)).rejects.toThrow("changed after validation");
 });
 
 test("ChangeSet rejects a new file appearing after validation", async () => {
   const cwd = await repo(); await writeFile(join(cwd, "base.txt"), "first\n");
   const changeSet = await captureChangeSet(cwd); await writeFile(join(cwd, "surprise.txt"), "surprise\n");
-  expect(commitChangeSet(cwd, "unsafe", changeSet)).rejects.toThrow("changed after validation");
+  await expect(commitChangeSet(cwd, "unsafe", changeSet)).rejects.toThrow("changed after validation");
 });
 
 test("ChangeSet rejects generated dependencies and credential-like files unless explicitly allowed", async () => {
   const cwd = await repo(); await mkdir(join(cwd, "node_modules/pkg"), { recursive: true }); await writeFile(join(cwd, "node_modules/pkg/index.js"), "generated\n");
   const generated = await captureChangeSet(cwd);
-  expect(assertChangeSetAllowed(cwd, generated)).rejects.toThrow("protected paths");
+  await expect(assertChangeSetAllowed(cwd, generated)).rejects.toThrow("protected paths");
   await expect(assertChangeSetAllowed(cwd, generated, { allowPaths: ["node_modules/"] })).resolves.toBeUndefined();
   await writeFile(join(cwd, ".env"), "SECRET=value\n");
-  expect(assertChangeSetAllowed(cwd, await captureChangeSet(cwd))).rejects.toThrow(".env");
+  await expect(assertChangeSetAllowed(cwd, await captureChangeSet(cwd))).rejects.toThrow(".env");
 });

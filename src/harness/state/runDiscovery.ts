@@ -8,11 +8,10 @@ import { materializeHumanExpiry } from "../workflow/runtime.js";
 async function load(pointer: RunPointer): Promise<RunSnapshot | null> {
   const store = new RunStore(pointer.cwd, pointer.task_slug);
   let run = await store.load();
-  const pending = run?.execution.pendingHuman;
-  const expiredFallback = pending?.fallback && Date.now() >= Date.parse(pending.expiresAt);
-  if (run?.execution.status === "paused" && !expiredFallback) {
+  if (run?.execution.status === "paused") {
     const execution = await materializeHumanExpiry(new RunWorkflowPersistence(store));
     if (execution?.status === "failed") { const ended = new Date().toISOString(); run = await store.mutate((value) => { value.run.ended_at = ended; value.run.ended_reason = "human input expired"; value.workspace.reserved = false; }, { type: "run.human_expired" }); await patchPointer(run.run.id, { status: "failed", ended_at: ended }); }
+    else if (execution?.status === "running" && !execution.pendingHuman) { run = await store.load(); if (run) await patchPointer(run.run.id, { status: "running", ended_at: null }); }
   }
   return run;
 }

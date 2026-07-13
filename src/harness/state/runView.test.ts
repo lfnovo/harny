@@ -16,3 +16,8 @@ test("run view derives provider totals while retaining attempt and model detail"
   expect(view.phases[0]).toMatchObject({ session_id: "session", usage: { input_tokens: 9 }, attempts_detail: [{ usage: { model: "claude-test", models: { "claude-test": { inputTokens: 9 } } } }] });
   expect("usage" in run).toBe(false);
 });
+
+test("run view keeps pending attempts honest and tolerates malformed planner tasks", () => {
+  const run: RunSnapshot = { schema_version: 4, run: { id: "run", task_slug: "view", workflow: "flow", started_at: "2026-01-01T00:00:00.000Z", ended_at: null, ended_reason: null, pid: 1, parent_run_id: null }, origin: { prompt: "x", workflow_source: "flow", cwd: "/repo", host: "h", user: "u" }, workspace: { isolation: "inline", primary_cwd: "/repo", cwd: "/repo", branch: "", worktree_path: null, reserved: true }, inputs: {}, changesets: {}, execution: { workflow: "flow", status: "running", nodes: { planner: { id: "planner", status: "completed", attempts: 1, output: { tasks: "not-an-array" } }, pending: { id: "pending", status: "pending", attempts: 0 } } } };
+  const view = toRunView(run); expect(view.phases.find((phase) => phase.name === "pending")).toMatchObject({ attempt: 0, started_at: null }); expect(view.plan?.tasks).toEqual([]);
+});

@@ -13,7 +13,7 @@ test("review-fix preflight pins the PR head and delegates all mutations to the w
     async run(request) { requests.push(request); return { status: "done", branch: "harny/fix", state: null }; },
   };
   await handlePrFix({ kind: "pr-fix", number: 42 }, { assistantName: null, logMode: "quiet" }, deps);
-  expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ workflowId: "review-fix", startPoint: "abc123", inputs: { expected_remote_sha: "abc123", pull_request: { head: "feature/review" } } }); expect(released).toBe(true);
+  expect(requests).toHaveLength(1); expect(requests[0]).toMatchObject({ workflowId: "review-fix", startPoint: "abc123", inputs: { expected_remote_sha: "abc123", pull_request: { head: "feature/review" } } }); expect((requests[0]?.inputs?.tasks as Array<{ description: string }>)[0]?.description).toContain("[FEEDBACK_DATA]"); expect(released).toBe(true);
 });
 
 test("review-fix refuses a head changed during preflight", async () => {

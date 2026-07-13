@@ -2,7 +2,7 @@ import { Codex, type CodexOptions, type ThreadEvent, type ThreadOptions, type Tu
 import { z } from "zod";
 import type { AgentProvider, AgentRequest, AgentResult, AgentSession, AgentUsage } from "./types.js";
 import { AgentProviderError } from "./types.js";
-import type { AgentEvent } from "../transcripts/types.js";
+import { toJsonValue, type AgentEvent } from "../transcripts/types.js";
 
 interface CodexThread {
   readonly id: string | null;
@@ -63,18 +63,25 @@ export class CodexProvider implements AgentProvider {
     } catch (error) {
       const message = failure ?? (error instanceof Error ? error.message : String(error));
       await emitFailure(request, new Error(message), thread.id);
-      throw providerError(message, error, thread, normalizeUsage(rawUsage, this.id, model ?? null), this.connectionFingerprint);
+      throw providerError(message, error, thread, normalizeUsage(rawUsage, this.id, model ?? null), this.id, this.connectionFingerprint);
     }
     const usage = normalizeUsage(rawUsage, this.id, model ?? null);
-    if (failure) throw providerError(failure, undefined, thread, usage, this.connectionFingerprint);
-    if (!finalResponse) throw providerError("Codex returned no structured output", undefined, thread, usage, this.connectionFingerprint);
-    let raw: unknown;
-    try { raw = JSON.parse(finalResponse); }
-    catch (error) { throw providerError(`Codex returned invalid structured output: ${String(error)}`, error, thread, usage, this.connectionFingerprint); }
-    let output: T;
-    try { output = request.schema.parse(raw); }
-    catch (error) { throw providerError(`Codex output failed schema validation: ${String(error)}`, error, thread, usage, this.connectionFingerprint); }
-    return { output, session: session(thread, this.id, this.connectionFingerprint), usage };
+    try {
+      if (failure) throw providerError(failure, undefined, thread, usage, this.id, this.connectionFingerprint);
+      if (!finalResponse) throw providerError("Codex returned no structured output", undefined, thread, usage, this.id, this.connectionFingerprint);
+      let raw: unknown;
+      try { raw = JSON.parse(finalResponse); }
+      catch (error) { throw providerError(`Codex returned invalid structured output: ${String(error)}`, error, thread, usage, this.id, this.connectionFingerprint); }
+      let output: T;
+      try { output = request.schema.parse(raw); }
+      catch (error) { throw providerError(`Codex output failed schema validation: ${String(error)}`, error, thread, usage, this.id, this.connectionFingerprint); }
+      await request.onEvent?.({ type: "lifecycle", scope: "turn", status: "completed", ...(thread.id ? { sessionId: thread.id } : {}) });
+      return { output, session: session(thread, this.id, this.connectionFingerprint), usage };
+    } catch (error) {
+      const normalized = error instanceof AgentProviderError ? error : providerError(String(error), error, thread, usage, this.id, this.connectionFingerprint);
+      await emitFailure(request, normalized, thread.id);
+      throw normalized;
+    }
   }
 }
 
@@ -100,22 +107,21 @@ function session(thread: CodexThread, provider: string, connectionFingerprint: s
   return thread.id ? { id: thread.id, provider, connectionFingerprint } : undefined;
 }
 
-function providerError(message: string, cause: unknown, thread: CodexThread, usage: AgentUsage | undefined, connectionFingerprint: string): AgentProviderError {
-  return new AgentProviderError(message, { session: session(thread, usage?.provider ?? "codex", connectionFingerprint), usage }, cause === undefined ? undefined : { cause });
+function providerError(message: string, cause: unknown, thread: CodexThread, usage: AgentUsage | undefined, provider: string, connectionFingerprint: string): AgentProviderError {
+  return new AgentProviderError(message, { session: session(thread, provider, connectionFingerprint), usage }, cause === undefined ? undefined : { cause });
 }
 
 function normalizeEvent(event: ThreadEvent, provider: string, model: string | null): AgentEvent[] {
   if (event.type === "thread.started") return [{ type: "lifecycle", scope: "session", status: "started", sessionId: event.thread_id }];
   if (event.type === "turn.started") return [{ type: "lifecycle", scope: "turn", status: "started" }];
-  if (event.type === "turn.completed") { const usage = normalizeUsage(event.usage, provider, model)!; return [{ type: "usage", usage }, { type: "lifecycle", scope: "turn", status: "completed" }]; }
-  if (event.type === "turn.failed") return [{ type: "error", message: event.error.message }, { type: "lifecycle", scope: "turn", status: "failed", message: event.error.message }];
-  if (event.type === "error") return [{ type: "error", message: event.message }];
+  if (event.type === "turn.completed") { const usage = normalizeUsage(event.usage, provider, model)!; return [{ type: "usage", usage }]; }
+  if (event.type === "turn.failed" || event.type === "error") return [];
   const status = event.type === "item.started" ? "started" : event.type === "item.updated" ? "updated" : "completed";
   const item = event.item;
   if (item.type === "agent_message") return event.type === "item.completed" ? [{ type: "message", role: "assistant", text: item.text, id: item.id }] : [];
   if (item.type === "reasoning") return [{ type: "reasoning", text: item.text, id: item.id }];
   if (item.type === "command_execution") return [{ type: "tool", id: item.id, name: "shell", kind: "command", status: item.status === "failed" ? "failed" : status, input: { command: item.command }, output: item.aggregated_output, ...(item.exit_code !== undefined && item.exit_code !== 0 ? { error: `exit ${item.exit_code}` } : {}) }];
-  if (item.type === "mcp_tool_call") return [{ type: "tool", id: item.id, name: `${item.server}/${item.tool}`, kind: "mcp", status: item.status === "failed" ? "failed" : status, input: item.arguments, output: item.result, ...(item.error ? { error: item.error.message } : {}) }];
+  if (item.type === "mcp_tool_call") return [{ type: "tool", id: item.id, name: `${item.server}/${item.tool}`, kind: "mcp", status: item.status === "failed" ? "failed" : status, input: toJsonValue(item.arguments), output: toJsonValue(item.result), ...(item.error ? { error: item.error.message } : {}) }];
   if (item.type === "web_search") return [{ type: "tool", id: item.id, name: "web_search", kind: "web_search", status, input: { query: item.query } }];
   if (item.type === "file_change") return [{ type: "file_change", id: item.id, status: item.status === "failed" ? "failed" : status, changes: item.changes }];
   if (item.type === "todo_list") return [{ type: "plan", id: item.id, status, items: item.items }];

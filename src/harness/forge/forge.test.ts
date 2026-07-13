@@ -16,6 +16,7 @@ test("GitHub provider creates then reads back, and updates idempotently", async 
   const spec: PullRequestSpec = { repository: "o/r", base: "main", head: "feature", title: "Feature", body: "Body", draft: true, expectedHeadSha: "abc" };
   const created = await provider.createPullRequest(spec); expect(created.number).toBe(7); await provider.updatePullRequest(created, { ...spec, title: "Updated" });
   expect(calls.filter((call) => call[1] === "create")).toHaveLength(1); expect(calls.filter((call) => call[1] === "edit")).toHaveLength(1);
+  expect(calls.filter((call) => call[1] === "list").every((call) => call.includes("--base") && call.includes("main"))).toBe(true);
 });
 test("GitHub provider surfaces missing authentication before creating", async () => {
   const provider = new GitHubForgeProvider(async () => ({ code: 4, stdout: "", stderr: "To get started with GitHub CLI, run: gh auth login" }));
@@ -36,9 +37,12 @@ test("pull_request executor pushes without force, verifies remote SHA and is ide
   const context = { snapshot: { workflow: "pr", status: "running" as const, nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "pr", attempt: 1 }, reportAttempt: async () => {} };
   await executor(prNode(), context); await executor(prNode(), context);
   expect(forge.creates).toBe(1); expect(forge.updates).toBe(1); expect(gitCalls.filter((call) => call[0] === "push").every((call) => !call.includes("--force"))).toBe(true);
+  expect(gitCalls.find((call) => call[0] === "push")).toContain(`${sha}:refs/heads/feature`); expect(gitCalls).toContainEqual(["remote", "get-url", "--push", "origin"]);
 });
+
+test("pull_request executor rejects a push URL for another repository", async () => { const executor = createPullRequestExecutor({ cwd: "/repo", forge: new FakeForge(), expectedSha: async () => "a".repeat(40), git: async (args) => args.includes("--push") ? "git@github.com:evil/r.git" : "git@github.com:o/r.git" }); await expect(executor(prNode(), { snapshot: { workflow: "pr", status: "running", nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "pr", attempt: 1 }, reportAttempt: async () => {} })).rejects.toThrow("push URL targets"); });
 
 test("pull_request executor refuses a divergent remote head before publishing", async () => {
   const forge = new FakeForge(); const calls: string[][] = []; const executor = createPullRequestExecutor({ cwd: "/repo", forge, expectedSha: async () => "a".repeat(40), expectedRemoteSha: "c".repeat(40), git: async (args) => { calls.push(args); return args[0] === "remote" ? "https://github.com/o/r.git" : args[0] === "ls-remote" ? `${"b".repeat(40)}\trefs/heads/feature` : ""; } });
-  expect(executor(prNode(), { snapshot: { workflow: "pr", status: "running", nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "pr", attempt: 1 }, reportAttempt: async () => {} })).rejects.toThrow("remote head changed during run"); expect(calls.some((call) => call[0] === "push")).toBe(false); expect(forge.creates).toBe(0);
+  await expect(executor(prNode(), { snapshot: { workflow: "pr", status: "running", nodes: {} }, signal: new AbortController().signal, attempt: { instanceId: "pr", attempt: 1 }, reportAttempt: async () => {} })).rejects.toThrow("remote head changed during run"); expect(calls.some((call) => call[0] === "push")).toBe(false); expect(forge.creates).toBe(0);
 });

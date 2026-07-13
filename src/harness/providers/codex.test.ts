@@ -41,17 +41,24 @@ test("CodexProvider resumes only a matching provider connection", async () => {
   const provider = new CodexProvider({ client: client([message("{}")], calls), connectionFingerprint: "configured" });
   await provider.resume!({ id: "thread", provider: "codex", connectionFingerprint: "configured" }, { cwd: "/repo", prompt: "again", schema: z.object({}) });
   expect(calls[0]?.resumed).toBe("thread");
-  expect(provider.resume!({ id: "x", provider: "claude", connectionFingerprint: "configured" }, { cwd: "/repo", prompt: "bad", schema: z.object({}) })).rejects.toThrow("cannot resume");
-  expect(provider.resume!({ id: "x", provider: "codex", connectionFingerprint: "old" }, { cwd: "/repo", prompt: "bad", schema: z.object({}) })).rejects.toThrow("connection changed");
+  await expect(provider.resume!({ id: "x", provider: "claude", connectionFingerprint: "configured" }, { cwd: "/repo", prompt: "bad", schema: z.object({}) })).rejects.toThrow("cannot resume");
+  await expect(provider.resume!({ id: "x", provider: "codex", connectionFingerprint: "old" }, { cwd: "/repo", prompt: "bad", schema: z.object({}) })).rejects.toThrow("connection changed");
 });
 
 test("CodexProvider surfaces stream and schema errors with partial metadata", async () => {
   const calls: Run[] = [];
   const failed = new CodexProvider({ client: client([{ type: "turn.failed", error: { message: "auth failed" } }, usage], calls) });
   expect(failed.capabilities.toolGuards).toBe(false);
-  expect(failed.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toMatchObject({ message: "auth failed", metadata: { usage: { inputTokens: 7 } } });
+  await expect(failed.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toMatchObject({ message: "auth failed", metadata: { usage: { inputTokens: 7 } } });
   const malformed = new CodexProvider({ client: client([message("not-json")], []) });
-  expect(malformed.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toThrow("invalid structured output");
+  await expect(malformed.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toThrow("invalid structured output");
+});
+
+test("CodexProvider preserves named identity and emits failed after post-stream validation", async () => {
+  const failedEvents: AgentEvent[] = []; const named = new CodexProvider({ id: "codex_proxy", connectionFingerprint: "proxy", client: client([{ type: "turn.failed", error: { message: "failed" } }], []) });
+  await expect(named.run({ cwd: "/repo", prompt: "go", schema: z.object({}), onEvent: (event) => { failedEvents.push(event); } })).rejects.toMatchObject({ metadata: { session: { provider: "codex_proxy", connectionFingerprint: "proxy" } } });
+  expect(failedEvents.at(-1)).toMatchObject({ type: "lifecycle", status: "failed" });
+  const parseEvents: AgentEvent[] = []; const malformed = new CodexProvider({ client: client([message("bad-json"), usage], []) }); await expect(malformed.run({ cwd: "/repo", prompt: "go", schema: z.object({}), onEvent: (event) => { parseEvents.push(event); } })).rejects.toThrow("invalid structured output"); expect(parseEvents.at(-1)).toMatchObject({ type: "lifecycle", status: "failed" }); expect(parseEvents).not.toContainEqual(expect.objectContaining({ type: "lifecycle", status: "completed" }));
 });
 
 test("CodexProvider preserves the specific streamed API error when the exec wrapper exits generically", async () => {

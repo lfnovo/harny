@@ -6,8 +6,8 @@ export type GhRunner = (args: string[]) => Promise<{ code: number; stdout: strin
 export class GitHubForgeProvider implements ForgeProvider {
   readonly id = "github";
   constructor(private readonly run: GhRunner = runGh) {}
-  async findPullRequest(spec: Pick<PullRequestSpec, "repository" | "head">): Promise<PullRequestArtifact | null> {
-    const result = await this.run(["pr", "list", "--repo", spec.repository, "--head", spec.head, "--state", "open", "--json", "number,url,baseRefName,headRefName,headRefOid,isDraft", "--limit", "1"]);
+  async findPullRequest(spec: Pick<PullRequestSpec, "repository" | "base" | "head">): Promise<PullRequestArtifact | null> {
+    const result = await this.run(["pr", "list", "--repo", spec.repository, "--base", spec.base, "--head", spec.head, "--state", "open", "--json", "number,url,baseRefName,headRefName,headRefOid,isDraft", "--limit", "1"]);
     assertGh(result, "find pull request"); const row = PullRequestRowsSchema.parse(JSON.parse(result.stdout))[0];
     return row ? { repository: spec.repository, number: row.number, url: row.url, base: row.baseRefName, head: row.headRefName, headSha: row.headRefOid, draft: row.isDraft } : null;
   }

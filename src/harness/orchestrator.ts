@@ -62,6 +62,7 @@ export async function runHarness(args: HarnessRequest): Promise<HarnessResult> {
   log(`[harny] workflow=${definition.name} task=${taskSlug}`);
   await git.assertIsGitRepo(primaryCwd);
   await git.assertHasInitialCommit(primaryCwd);
+  const baseBranch = typeof args.inputs?.base === "string" ? args.inputs.base : await discoverBaseBranch(primaryCwd);
 
   const store = new RunStore(primaryCwd, taskSlug);
   const existing = await store.load();
@@ -76,7 +77,7 @@ export async function runHarness(args: HarnessRequest): Promise<HarnessResult> {
     run: { id: runId, task_slug: taskSlug, workflow: definition.name, started_at: startedAt, ended_at: null, ended_reason: null, pid: process.pid, parent_run_id: args.parentRunId ?? null },
     origin: { prompt: args.userPrompt, workflow_source: requestedWorkflow, cwd: primaryCwd, host: hostname(), user: userInfo().username },
     workspace: { isolation, primary_cwd: primaryCwd, cwd: workspace.cwd, branch: workspace.branch, worktree_path: workspace.worktreePath, reserved: true },
-    inputs: structuredClone(args.inputs ?? {}),
+    inputs: structuredClone({ base: baseBranch, ...(args.inputs ?? {}) }),
     execution: { workflow: definition.name, status: "running", nodes: Object.fromEntries(definition.nodes.map((node) => [node.id, { id: node.id, status: "pending" as const, attempts: 0 }])) },
     changesets: {},
   };
@@ -124,4 +125,11 @@ async function handleExisting(existing: RunSnapshot, store: RunStore, log: (mess
 async function releaseWorkspace(provider: WorkspaceProvider, workspace: Awaited<ReturnType<WorkspaceProvider["prepare"]>>, outcome: HarnessResult["status"], log: (message: string) => void, warn: (message: string) => void): Promise<void> {
   try { await provider.release(workspace, outcome); if (workspace.worktreePath) log(outcome === "done" ? `[harny] worktree removed: ${workspace.worktreePath}` : `[harny] worktree preserved: ${workspace.worktreePath} (branch: ${workspace.branch})`); }
   catch (error) { warn(`[harny] worktree cleanup failed: ${(error as Error).message}`); }
+}
+async function discoverBaseBranch(cwd: string): Promise<string> {
+  for (const args of [["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], ["symbolic-ref", "--short", "HEAD"]]) {
+    const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "ignore" }); const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    if (code === 0) return stdout.trim().replace(/^origin\//, "");
+  }
+  throw new Error("could not determine the repository base branch; pass inputs.base explicitly");
 }

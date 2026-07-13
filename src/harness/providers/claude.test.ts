@@ -24,29 +24,32 @@ test("ClaudeProvider resumes only its own sessions", async () => {
   });
   await provider.resume!({ id: "old", provider: "claude", connectionFingerprint: "claude:default" }, { cwd: "/repo", prompt: "again", schema: z.object({}) });
   expect(resume).toBe("old");
-  expect(provider.resume!({ id: "x", provider: "codex", connectionFingerprint: "codex:default" }, { cwd: "/repo", prompt: "bad", schema: z.object({}) })).rejects.toThrow("cannot resume");
+  await expect(provider.resume!({ id: "x", provider: "codex", connectionFingerprint: "codex:default" }, { cwd: "/repo", prompt: "bad", schema: z.object({}) })).rejects.toThrow("cannot resume");
 });
 
 test("ClaudeProvider turns SDK errors into provider errors", async () => {
   const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo",
     runPhase: (async () => ({ sessionId: "", status: "error", error: "overloaded", structuredOutput: null, resultSubtype: null, events: [] })) as any,
   });
-  expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toThrow("overloaded");
+  await expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toThrow("overloaded");
 });
 
 test("ClaudeProvider preserves usage when an interactive request parks", async () => {
   const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo",
     runPhase: (async () => ({ sessionId: "parked", status: "paused_for_user_input", error: null, structuredOutput: null, resultSubtype: "error_during_execution", events: [], usage: { inputTokens: 12, outputTokens: 3, costUsd: 0.02 }, parked: { askUserInput: { questions: [{ question: "Choose?", header: "Choice", options: [{ label: "A", description: "A" }], multiSelect: false }] }, toolUseId: "tool" } })) as any,
   });
-  expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toMatchObject({ session: { id: "parked" }, metadata: { usage: { provider: "claude", inputTokens: 12, costUsd: 0.02 } } });
+  await expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}) })).rejects.toMatchObject({ session: { id: "parked" }, metadata: { usage: { provider: "claude", inputTokens: 12, costUsd: 0.02 } } });
 });
 
 test("ClaudeProvider observes cancellation", async () => {
   const events: AgentEvent[] = [];
-  const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo", runPhase: (() => new Promise(() => {})) as any }); const controller = new AbortController();
+  let receivedSignal: AbortSignal | undefined; const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo", runPhase: ((args: any) => { receivedSignal = args.signal; return new Promise(() => {}); }) as any }); const controller = new AbortController();
   const result = provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}), signal: controller.signal, onEvent: (event) => { events.push(event); } }); controller.abort(new Error("cancelled")); await expect(result).rejects.toThrow("cancelled");
+  expect(receivedSignal).toBe(controller.signal);
   expect(events.at(-1)).toMatchObject({ type: "lifecycle", status: "cancelled", message: "cancelled" });
 });
+
+test("ClaudeProvider normalizes thrown SDK errors and terminal lifecycle", async () => { const events: AgentEvent[] = []; const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo", runPhase: (async () => { throw new Error("transport down"); }) as any }); await expect(provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}), onEvent: (event) => { events.push(event); } })).rejects.toMatchObject({ name: "Error", message: "transport down" }); expect(events.at(-1)).toMatchObject({ type: "lifecycle", status: "failed" }); });
 
 test("ClaudeProvider streams normalized messages, reasoning and tool payloads", async () => {
   const events: AgentEvent[] = [];

@@ -2,7 +2,25 @@
 
 ## Start a parkable run
 
-Use `--mode async` with a workflow containing a `human` node or an interactive-capable agent:
+Use `--mode async` with a workflow containing a `human` node or an interactive-capable agent. For example, save this project workflow as `.harny/workflows/approval.yaml`:
+
+```yaml
+version: 2
+name: approval
+defaults:
+  provider: claude
+  timeout: 86400000
+workspace:
+  isolation: inline
+outcome:
+  type: none
+nodes:
+  - id: approval
+    type: human
+    question: Approve this run?
+```
+
+Then run it:
 
 ```bash
 harny --mode async --workflow approval --name approval-run "prepare for review"

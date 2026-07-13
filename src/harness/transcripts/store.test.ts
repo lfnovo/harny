@@ -36,6 +36,15 @@ test("ignores an incomplete final line but rejects completed corruption", async 
   await expect(value.read(ref)).rejects.toThrow("invalid transcript record at line 1");
 });
 
+test("recovers appends after a torn final record", async () => {
+  const value = await store(); const ref = { instanceId: "planner", attempt: 1 }; const path = value.path(ref);
+  await value.append(ref, "claude", { type: "message", role: "assistant", text: "first" }); await appendFile(path, "{partial", "utf8");
+  const recovered = new TranscriptStore(root, "run"); await recovered.append(ref, "claude", { type: "message", role: "assistant", text: "second" });
+  expect((await recovered.read(ref)).events.map((record) => record.event.type === "message" ? record.event.text : "")).toEqual(["first", "second"]);
+});
+
+test("rejects payloads that cannot round-trip as JSON", async () => { const value = await store(); await expect(value.append({ instanceId: "agent", attempt: 1 }, "codex", { type: "tool", id: "x", name: "tool", kind: "tool", status: "completed", output: 1n } as never)).rejects.toThrow(); });
+
 test("keeps complete large tool payloads", async () => {
   const value = await store(); const ref = { instanceId: "agent", attempt: 1 }; const output = "x".repeat(300_000);
   await value.append(ref, "codex", { type: "tool", id: "tool", name: "shell", kind: "command", status: "completed", output });

@@ -122,10 +122,12 @@ async function runValidator(provider: AgentProvider, node: AgentNode, context: N
 }
 
 async function runFinalValidator(provider: AgentProvider, node: AgentNode, context: NodeExecutionContext, args: WorkflowRunRequest) {
+  const expectedState = await captureChangeSet(args.cwd);
   const plan = context.snapshot.nodes.planner?.output ?? args.inputs?.tasks ?? "No explicit plan artifact";
   const prompt = `Validate the final accumulated repository state after all task commits. Re-run every established project-wide gate (typecheck, tests, lint, build when present), confirm the worktree is clean, and verify the complete plan rather than only the last task.\n\nPlan:\n${JSON.stringify(plan, null, 2)}`;
   const finalInstructions = `${resolvePrompt("feature-dev", args.variant, "validator", args.primaryCwd)}\n\nFINAL VALIDATION OVERRIDE: all task ChangeSets have already been committed by the privileged runtime, so a clean git diff is required and is not a no-op failure. Validate the accumulated committed branch and all plan acceptance criteria. Prefix evidence as FINAL/AC entries as appropriate; the per-task one-entry rule does not limit this aggregate report.`;
   const result = await withValidatorScratch(args.cwd, `final-${context.attempt.attempt}`, (env) => callAgent(provider, node, context, args, { phase: "final_validator", cwd: args.cwd, prompt, systemPrompt: finalInstructions + validatorScratchInstructions(env.TMPDIR!), schema: ValidatorSchema, allowedTools: DEFAULT_VALIDATOR.allowedTools, model: node.model ?? DEFAULT_VALIDATOR.model, guards: node.guards, env }));
+  await assertChangeSetUnchanged(args.cwd, expectedState);
   if (result.output.verdict !== "pass") throw new Error(`final validation ${result.output.verdict}: ${result.output.reasons.join("; ")}`);
   return result.output;
 }

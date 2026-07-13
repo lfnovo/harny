@@ -46,7 +46,7 @@ nodes:
     type: pull_request
     title: "Harny feature"
     body: "Created by Harny"
-    base: main
+    base: "${{ inputs.base }}"
     head: "${{ inputs.branch }}"
     draft: true
     existing: allow

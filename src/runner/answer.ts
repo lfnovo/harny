@@ -14,14 +14,15 @@ export async function handleAnswer(cmd: { kind: "answer"; runId: string; text?: 
   const afterExpiry = await materializeHumanExpiry(persistence);
   if (afterExpiry?.status === "failed") { const ended = new Date().toISOString(); await store.mutate((state) => { state.run.ended_at = ended; state.run.ended_reason = "human input expired"; state.workspace.reserved = false; }, { type: "run.human_expired" }); await patchPointer(run.run.id, { status: "failed", ended_at: ended }); throw new Error(`Run ${cmd.runId} expired before it was answered.`); }
   const fallbackReady = afterExpiry?.status === "running" && !afterExpiry.pendingHuman;
+  const expectedNodeId = afterExpiry?.pendingHuman?.nodeId;
   let value: unknown;
   if (!fallbackReady) {
     if (cmd.json !== undefined) { try { value = JSON.parse(cmd.json); } catch (error) { throw new Error(`--json is invalid: ${String(error)}`); } }
     else if (cmd.text !== undefined) value = cmd.text;
-    else { const rl = createInterface({ input: process.stdin, output: process.stdout }); try { value = await rl.question(`${run.execution.pendingHuman?.question ?? "Answer"}\n> `); } finally { rl.close(); } }
-    await answerWorkflow(persistence, value);
+    else { const rl = createInterface({ input: process.stdin, output: process.stdout }); try { value = await rl.question(`${afterExpiry?.pendingHuman?.question ?? "Answer"}\n> `); } finally { rl.close(); } }
+    await answerWorkflow(persistence, value, expectedNodeId);
   }
-  await store.mutate((state) => { state.run.pid = process.pid; state.run.ended_reason = null; }, { type: fallbackReady ? "run.human_fallback_resumed" : "run.answered", node_id: run.execution.pendingHuman?.nodeId, data: fallbackReady ? undefined : { answer: value } });
+  await store.mutate((state) => { state.run.pid = process.pid; state.run.ended_reason = null; }, { type: fallbackReady ? "run.human_fallback_resumed" : "run.answered", node_id: expectedNodeId, data: fallbackReady ? undefined : { answer: value } });
   const result = await continueRun({ run: (await store.load())!, mode: "async", logMode: "compact" });
   if (result.status === "waiting_human") console.log(`[harny] run paused again: ${run.run.id}`);
   else console.log(`[harny] status=${result.status} branch=${run.workspace.branch}`);
