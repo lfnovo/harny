@@ -1,0 +1,343 @@
+src/harness/providers/codex.ts
+  s_361086fd550cc0::t_e259042c972053 26,34-35
+  s_361086fd550cc0::t_ec5db37efc6356 1-25,27-33,36-60
+src/runner/run.ts
+  s_361086fd550cc0::t_987f5c58c78fe5 18-19
+  s_361086fd550cc0::t_7d908e8e0ac934 21
+  s_361086fd550cc0::t_76c60eadbe21db 6
+src/runner/scan.ts
+  s_361086fd550cc0::t_598fc78d2831b8 12
+  s_361086fd550cc0::t_0b683e12b3501b 3-4,17-18,27
+src/harness/workflow/humanExecutor.ts
+  s_361086fd550cc0::t_e3ffa8178e10e5 1-20
+src/viewer/server.ts
+  s_361086fd550cc0::t_598fc78d2831b8 2
+  s_361086fd550cc0::t_54cdfb33223134 11-12,14,25-27
+  s_361086fd550cc0::t_7535de0c08e2c3 13,24,31-32,204,206-217,226-228,231-232,267-269
+  s_361086fd550cc0::t_080ba015347dc9 30,33,319
+  s_361086fd550cc0::t_9e3956ad2fea90 28-29
+src/harness/forge/github.ts
+  s_361086fd550cc0::t_0fda4af2016cca 1-25
+src/harness/clean.ts
+  s_361086fd550cc0::t_f22a60f86b82ff 85,91,95,102-103,167-168
+scripts/probes/orchestrator/03-declarative-phoenix-wrap.ts
+  s_361086fd550cc0::t_848cb7f9f80686 2,4,7,24,26,48,50
+src/harness/state/v3/reader.ts
+  s_361086fd550cc0::t_7273bfdf12a88b 1-13
+src/harness/workflow/runtime.ts
+  s_361086fd550cc0::t_e3ffa8178e10e5 17-19,65-66,69,82,85-88,93,95-101
+  s_361086fd550cc0::t_96713eaadca722 2,4,10,13,21-26,28-31,35-39,41-42,44-45,48,50-55,61,64,70,72-76,79-81,102-103,187-192
+  s_361086fd550cc0::t_6a2fe2d9f46e61 12,14-16,20,116-118,121,123,130,135,137-145
+  s_361086fd550cc0::t_19ce80bcf16a5a 3,27,49,68,83
+  s_361086fd550cc0::t_42940be362d8cc 6-7,63,67,71
+  s_361086fd550cc0::t_52ceffb86b55d5 122
+  s_361086fd550cc0::t_a567f46e7a0942 1,104-105,107-111,114-115,124-125,148-161,174-186
+  s_361086fd550cc0::t_a2d9b15c466baf 136
+  s_361086fd550cc0::t_0ef0e46bb81120 8,89-92,94,132,134
+  s_361086fd550cc0::t_1104ac61112236 11,128
+  s_361086fd550cc0::t_72bbef94dee2ab 57
+  s_361086fd550cc0::t_8c9d53b32bd096 5,9,46-47,59-60,62
+  s_361086fd550cc0::t_ed59ff19bcf653 56,58,84
+  s_361086fd550cc0::t_c86defa3d1724f 126,129,133,146
+  s_361086fd550cc0::t_5067b72290d9ec 40,77-78
+  s_361086fd550cc0::t_8860febd3e092a 43,162-173
+  s_361086fd550cc0::t_e01e5820bb521c 32-34,106,112-113,119-120,127,131,147
+src/harness/forge/forge.test.ts
+  s_361086fd550cc0::t_99607d645ee196 20-23
+  s_361086fd550cc0::t_e49ada40acec33 1-19,24-44
+plugin/skills/harny/SKILL.md
+  s_361086fd550cc0::t_d02437d8a1e69d 21,33,42-43,184,188
+src/harness/forge/pullRequestExecutor.ts
+  s_361086fd550cc0::t_e49ada40acec33 5-6,9-12
+  s_361086fd550cc0::t_0fda4af2016cca 1-4,7-8,13-23
+src/harness/state/v3/index.ts
+  s_361086fd550cc0::t_7273bfdf12a88b 1-3
+  s_361086fd550cc0::t_35abef14c88c77 4
+package.json
+  s_361086fd550cc0::t_e4330835029197 4,17,20
+src/harness/forge/gitHubRemote.ts
+  s_361086fd550cc0::t_0fda4af2016cca 1-5
+src/harness/workflow/prompts/default/validator.md
+  s_361086fd550cc0::t_881da446e59821 36
+src/harness/observability/CLAUDE.md
+  s_361086fd550cc0::t_02cc83faf6e63e 28
+src/harness/workflow/prompts/_test-variant/planner.md
+  s_361086fd550cc0::t_881da446e59821 1
+plugin/agent-smith-index.json
+  s_361086fd550cc0::t_d02437d8a1e69d 69
+src/runner/summary.ts
+  s_361086fd550cc0::t_6ee454c7ed3f3a 3-4,98,117-118,130-136,140-141,149-150,153,161,170,172,175
+src/viewer/index.html
+  s_361086fd550cc0::t_e4330835029197 719
+src/harness/workflow/workflow.test.ts
+  s_361086fd550cc0::t_5067b72290d9ec 121
+  s_361086fd550cc0::t_ed59ff19bcf653 255-258
+  s_361086fd550cc0::t_2b949a525053b5 86-89,218,220
+  s_361086fd550cc0::t_e01e5820bb521c 178-193,213,242
+  s_361086fd550cc0::t_73c537fe3effbe 90-96
+  s_361086fd550cc0::t_8860febd3e092a 247-254
+  s_361086fd550cc0::t_b6beb58852a3c1 70-75
+  s_361086fd550cc0::t_6dd226b9237be4 1,3-5,8,11-62,107-116,124-153,168
+  s_361086fd550cc0::t_b6f752f6103632 64-69
+  s_361086fd550cc0::t_5f14778244f145 2,6-7,97-99,101-106,214-217,219
+  s_361086fd550cc0::t_19ce80bcf16a5a 117-120,122-123
+  s_361086fd550cc0::t_8c9d53b32bd096 243-246
+  s_361086fd550cc0::t_6f888055ac3f7d 194-212
+  s_361086fd550cc0::t_bff00d7f9e7c8e 9-10,221-241
+  s_361086fd550cc0::t_52ceffb86b55d5 63,76-85,154-167,169-177,259
+  s_361086fd550cc0::t_bf72beafb372cf 100
+src/harness/git/changeSet.ts
+  s_361086fd550cc0::t_23734cc7ddd66c 28-32
+  s_361086fd550cc0::t_7cd97b49083059 1-27,33-54
+scripts/probes/orchestrator/04-feature-dev-declarative-smoke.ts
+  s_361086fd550cc0::t_848cb7f9f80686 2-4,6,9,12-22,25-36,40-44,47-50,53-57,60
+scripts/probes/scripts/01-run-probes-filters.ts
+  s_361086fd550cc0::t_7affa73933cac2 50
+src/harness/providers/claude.test.ts
+  s_361086fd550cc0::t_e259042c972053 34-37
+  s_361086fd550cc0::t_2af2b2c500144a 1-3,5-15,17-25,27-32
+src/harness/workspace/provider.ts
+  s_361086fd550cc0::t_153086ad815f6f 1-44
+src/harness/providers/claude.ts
+  s_361086fd550cc0::t_0ef0e46bb81120 5,86-89
+  s_361086fd550cc0::t_a7287ff1a854ca 41,43
+  s_361086fd550cc0::t_e259042c972053 49,70,73,75-77
+  s_361086fd550cc0::t_2af2b2c500144a 1-4,7,9-10,12-13,16,19-40,42,44-48,50-69,71-72,80-82,85,90-95
+  s_361086fd550cc0::t_56a803c18fa526 78
+  s_361086fd550cc0::t_91e6d53263ed0c 83
+src/harness/workflow/featureDev.test.ts
+  s_361086fd550cc0::t_6001bbe4d2ac66 9-11,103-109,111
+  s_361086fd550cc0::t_82a695c6140ca0 21-25,53-54,59,64-65,67,72-73,79,85,91,93,99,115
+  s_361086fd550cc0::t_092ed26a673189 8,94-98,100-102
+  s_361086fd550cc0::t_d01aa43d15ac6b 6,12,117-126
+  s_361086fd550cc0::t_a414ffdc9960bd 110
+  s_361086fd550cc0::t_ae98e890f4a358 30,38,112-114,116
+  s_361086fd550cc0::t_c12a7f04bebdca 34-37,39-46,57,61-63,66,68-71,74-78,80-84,86-90,92
+  s_361086fd550cc0::t_26ddece7480065 1-5,7,13-20,26-29,31-33,47-52,55-56,58,60,127
+src/harness/state/v3/schema.ts
+  s_361086fd550cc0::t_6ee454c7ed3f3a 11
+  s_361086fd550cc0::t_7273bfdf12a88b 1-10,12-22
+plugin/skills/review/SKILL.md
+  s_361086fd550cc0::t_d02437d8a1e69d 3,37-38
+  s_361086fd550cc0::t_598fc78d2831b8 44,160
+src/harness/workflow/validate.ts
+  s_361086fd550cc0::t_96713eaadca722 1-22,24,26-27,29-32,36-37,40,54-87
+  s_361086fd550cc0::t_73c537fe3effbe 28,38
+  s_361086fd550cc0::t_52ceffb86b55d5 25,41-45,47,49-53
+  s_361086fd550cc0::t_1c44d82bb5ea97 33-35
+  s_361086fd550cc0::t_2b949a525053b5 23,39,48
+  s_361086fd550cc0::t_6a2fe2d9f46e61 46
+src/harness/workflow/prompts/default/planner.md
+  s_361086fd550cc0::t_881da446e59821 38
+src/harness/state/v3/store.ts
+  s_361086fd550cc0::t_7273bfdf12a88b 1-36
+src/runner/answer.ts
+  s_361086fd550cc0::t_6a73b20164fdc3 10-12,35-38
+  s_361086fd550cc0::t_ad1301eb056384 40-42
+  s_361086fd550cc0::t_8c40bdd3e788dd 13,34
+  s_361086fd550cc0::t_f829ce351b1bd4 25,27-33
+  s_361086fd550cc0::t_9dbdafb082d24f 1-9,15-24,26,39,43-44
+src/harness/workflow/declarativeRunner.ts
+  s_361086fd550cc0::t_8d122a65f47652 3,6,18,21-25
+  s_361086fd550cc0::t_f24a4bc6e2ade0 32
+  s_361086fd550cc0::t_92cab50c3eecaa 1-2,4-5,7-17,19-20,26-31,33,36-45
+  s_361086fd550cc0::t_d7973a4ad04195 34-35
+CHANGELOG.md
+  s_361086fd550cc0::t_5424402c62bea6 7-19
+src/harness/orchestrator.test.ts
+  s_361086fd550cc0::t_2f06511e2ceb04 69
+  s_361086fd550cc0::t_5a6e47bf12ad59 11,81-82,93-95
+  s_361086fd550cc0::t_b1daad5e9b8a6c 10
+  s_361086fd550cc0::t_e9f2bf67082221 45
+  s_361086fd550cc0::t_6ee454c7ed3f3a 179
+  s_361086fd550cc0::t_6c5f2259e89db2 52-60
+  s_361086fd550cc0::t_6ff50d6849caf9 2,66-68,70-72
+  s_361086fd550cc0::t_192ac2cebf2d99 50-51
+  s_361086fd550cc0::t_2a3f836ae30c84 61-65,96-97
+  s_361086fd550cc0::t_d4b528bfcbc4cf 29,73-80
+  s_361086fd550cc0::t_536b09079e0261 7,23-28,30-39
+  s_361086fd550cc0::t_4b92c21d8ac932 83-92
+  s_361086fd550cc0::t_c1f492b57a24cc 155,171,177-178
+  s_361086fd550cc0::t_25b78c684bd1c9 266,290
+  s_361086fd550cc0::t_70e38f057b115e 8-9,16,40-44,46-49
+plugin/README.md
+  s_361086fd550cc0::t_d02437d8a1e69d 1,3
+src/harness/workflow/persistence.ts
+  s_361086fd550cc0::t_683bf19938cd2f 21
+  s_361086fd550cc0::t_42940be362d8cc 25-26
+  s_361086fd550cc0::t_26b0fb3255bf60 13,42
+  s_361086fd550cc0::t_b45a253ee3681a 19-20,22,30
+  s_361086fd550cc0::t_98a4dd214bfd85 27-28,45
+  s_361086fd550cc0::t_e3af2c77debb79 37
+  s_361086fd550cc0::t_aada1669e2fa00 1-4,6-11,16-18,31-36,41,43-44
+  s_361086fd550cc0::t_246fb6b9aea450 5,12,23-24,38-40
+plugin/agents/orchestrator.md
+  s_361086fd550cc0::t_a5068d06c703d7 90-91
+src/harness/state/lease.ts
+  s_361086fd550cc0::t_acb9f4acf8d918 1-20
+src/runner/show.ts
+  s_361086fd550cc0::t_02cc83faf6e63e 70
+  s_361086fd550cc0::t_ec28e1122ae100 1-3,9-12,15-20,27-34,36
+  s_361086fd550cc0::t_61a8bec1c1d162 35
+scripts/probes/_templates/validator-smoke.ts
+  s_361086fd550cc0::t_f0822650eb4fac 2-4,6-32,34
+src/harness/orchestrator.ts
+  s_361086fd550cc0::t_02cc83faf6e63e 51,86,111
+  s_361086fd550cc0::t_eddaa047ee8050 17,186,195
+  s_361086fd550cc0::t_6c2b6e72fe523c 18,124-130
+  s_361086fd550cc0::t_97eae4e8305a64 53,69,71-72,187-191
+  s_361086fd550cc0::t_76c60eadbe21db 12,63
+  s_361086fd550cc0::t_153086ad815f6f 3,21,54,134-137,154
+  s_361086fd550cc0::t_848cb7f9f80686 194,199-205,211
+  s_361086fd550cc0::t_230ba2a5c9fed8 20,68,70,73
+  s_361086fd550cc0::t_c1f492b57a24cc 102-106
+  s_361086fd550cc0::t_9e320a98ec85db 155,160-161
+  s_361086fd550cc0::t_987f5c58c78fe5 196
+  s_361086fd550cc0::t_be76bc1117d987 207
+  s_361086fd550cc0::t_6a73b20164fdc3 145
+  s_361086fd550cc0::t_efe80878f05d9f 9-11,52
+  s_361086fd550cc0::t_7d908e8e0ac934 64,67,142,144,183,192-193,197,210
+  s_361086fd550cc0::t_d1e4e64692d839 19
+  s_361086fd550cc0::t_6ff50d6849caf9 65-66
+  s_361086fd550cc0::t_35abef14c88c77 16,146
+  s_361086fd550cc0::t_c9625aad421ea1 13-15,55,115-123,147
+  s_361086fd550cc0::t_8ef95becd957ed 138
+  s_361086fd550cc0::t_95048abd708336 198
+plugin/skills/release/SKILL.md
+  s_361086fd550cc0::t_a5068d06c703d7 207
+src/harness/testing/CLAUDE.md
+  s_361086fd550cc0::t_756303449af3e5 1,3,5,7-11,13
+src/runner/ls.ts
+  s_361086fd550cc0::t_866f0ca7ac5fc6 1,6-9,16-20
+src/harness/workflow/bundled/review-fix.yaml
+  s_361086fd550cc0::t_acb9f4acf8d918 1-39
+CLAUDE.md
+  s_361086fd550cc0::t_02cc83faf6e63e 21
+  s_361086fd550cc0::t_f0822650eb4fac 3,8,14-15,17,19,36,38-41
+src/harness/state/registry.ts
+  s_361086fd550cc0::t_35abef14c88c77 26,32,71,82-84
+  s_361086fd550cc0::t_a8ea23b3c958d6 85-86
+src/harness/workflow/bundled/feature-dev.yaml
+  s_361086fd550cc0::t_b6f752f6103632 1-44
+src/harness/state/lease.test.ts
+  s_361086fd550cc0::t_acb9f4acf8d918 1-11
+  s_361086fd550cc0::t_6046cdb4c00af9 12-15
+src/harness/workflow/bundled/feature-pr.yaml
+  s_361086fd550cc0::t_acb9f4acf8d918 1-51
+src/harness/workflow/promptResolver.test.ts
+  s_361086fd550cc0::t_e6f06991c0472c 10
+src/harness/testing/index.ts
+  s_361086fd550cc0::t_0a8c9cf9b06eb3 1-3,5,9,11,13,15,17-19,22
+src/harness/forge/index.ts
+  s_361086fd550cc0::t_0fda4af2016cca 1-4
+src/harness/workflow/prompts/default/developer.md
+  s_361086fd550cc0::t_881da446e59821 23
+src/harness/workspace/provider.test.ts
+  s_361086fd550cc0::t_153086ad815f6f 1-11
+src/harness/types.ts
+  s_361086fd550cc0::t_be76bc1117d987 20-22
+src/runner/prFix.ts
+  s_361086fd550cc0::t_eb9ca181c26216 1-11,13-15,20-23,48,51,53,58-71,77,79-82,84-85
+  s_361086fd550cc0::t_c4de7f1c0cd0c1 16,52
+  s_361086fd550cc0::t_e035fc3b3ce82f 33-34,42,54,75,78
+  s_361086fd550cc0::t_e6f06991c0472c 12
+  s_361086fd550cc0::t_7290de65f482b2 17-19,24-32,35-41,43-47,49-50,55-57,72-74,76,83
+src/harness/git/changeSet.test.ts
+  s_361086fd550cc0::t_7cd97b49083059 1-31
+src/harness/workflow/promptResolver.ts
+  s_361086fd550cc0::t_e6f06991c0472c 4
+src/harness/workflow/featureDevShared.ts
+  s_361086fd550cc0::t_e6f06991c0472c 4-5,10
+src/runner.ts
+  s_361086fd550cc0::t_d8b758ab2fc40e 12,41,63,82,175-177,220
+  s_361086fd550cc0::t_ad1226d916532c 40,59,160
+  s_361086fd550cc0::t_e28942644f1670 62
+src/harness/workflow/commandExecutor.ts
+  s_361086fd550cc0::t_e6cdd4fa29ac9d 1-16
+plugin/skills/drain/patterns.md
+  s_361086fd550cc0::t_f0822650eb4fac 16
+  s_361086fd550cc0::t_756303449af3e5 57
+src/harness/forge/types.ts
+  s_361086fd550cc0::t_0fda4af2016cca 1-8
+src/harness/workflow/featureDev.ts
+  s_361086fd550cc0::t_f24a4bc6e2ade0 134
+  s_361086fd550cc0::t_5a207c48e5622f 4,49,76,84,88,100,102,114,124,137
+  s_361086fd550cc0::t_b6f752f6103632 13
+  s_361086fd550cc0::t_092ed26a673189 17,127
+  s_361086fd550cc0::t_e3fa8bf3691ab5 14-16,126,128-133
+  s_361086fd550cc0::t_20eba88c444562 136
+  s_361086fd550cc0::t_5016798a0f7a06 86,159
+  s_361086fd550cc0::t_3e394c2e9fc8ad 151,155-156
+  s_361086fd550cc0::t_d050ef3995145a 3,11,50-56,62,82,99
+  s_361086fd550cc0::t_246fb6b9aea450 87,103,123
+  s_361086fd550cc0::t_2cca0a91479a56 18,41,45
+  s_361086fd550cc0::t_b45a253ee3681a 19-21,43,135
+  s_361086fd550cc0::t_8c9d53b32bd096 139
+  s_361086fd550cc0::t_9207ba70b76822 77,158
+  s_361086fd550cc0::t_987f5c58c78fe5 42,46
+  s_361086fd550cc0::t_803a8493e62043 1-2,5-7,10,12,22-40,48,57-58,61,63-75,78-81,83,85,89-98,101,104-113,115-122,125,138,140-148,152-154,157
+  s_361086fd550cc0::t_e6f06991c0472c 8-9
+  s_361086fd550cc0::t_2588dbc525f744 44,47,59-60,149-150
+src/harness/providers/types.ts
+  s_361086fd550cc0::t_2af2b2c500144a 16-17,19
+  s_361086fd550cc0::t_0ef0e46bb81120 35-38
+  s_361086fd550cc0::t_96713eaadca722 1-15,18,20-34,39-45
+src/harness/workflow/observer.ts
+  s_361086fd550cc0::t_5067b72290d9ec 2
+  s_361086fd550cc0::t_19ce80bcf16a5a 1,3-14
+src/harness/workflow/loader.ts
+  s_361086fd550cc0::t_e6cdd4fa29ac9d 3-4,21-56
+  s_361086fd550cc0::t_96713eaadca722 1,5-20
+  s_361086fd550cc0::t_0f9ea5a51d0151 2
+src/harness/state/v3/store.test.ts
+  s_361086fd550cc0::t_6ee454c7ed3f3a 10
+  s_361086fd550cc0::t_7273bfdf12a88b 1-9,11-22
+src/runner.test.ts
+  s_361086fd550cc0::t_ad1226d916532c 43
+  s_361086fd550cc0::t_1dd899a10a2e71 66-75
+  s_361086fd550cc0::t_e0c2a3fb68abbe 37-40
+src/harness/workflow/schema.ts
+  s_361086fd550cc0::t_0fda4af2016cca 47
+  s_361086fd550cc0::t_a567f46e7a0942 50,53-61,63-65,78
+  s_361086fd550cc0::t_96713eaadca722 3-5,7,9-16,18-22,24-32,34-40,42,44-46,48,51-52,66,68-74,76-77,79
+  s_361086fd550cc0::t_6a2fe2d9f46e61 6
+  s_361086fd550cc0::t_92cab50c3eecaa 41
+README.md
+  s_361086fd550cc0::t_e4330835029197 1,3,5,7,9,11-12,15,17,19-21,23-24,26-27,29-30,33,35,37,39-40,43,45-46,49,51,53-59,61,63-65,67,69,71-76,79,81,83-84,87,89-95,97,99,101,103-106,108,110,112,114-119,121,123,126-133,136-161,163,167,170-171,176
+  s_361086fd550cc0::t_7d908e8e0ac934 174
+src/harness/state/registry.test.ts
+  s_361086fd550cc0::t_1031a35f70ea7f 75
+src/harness/providers/codex.test.ts
+  s_361086fd550cc0::t_ec5db37efc6356 1-23
+  s_361086fd550cc0::t_e259042c972053 24-27
+src/runner/prFix.test.ts
+  s_361086fd550cc0::t_47c75b46aacfbf 1-6,8-37,39-42,44-49,51-54
+  s_361086fd550cc0::t_f3ab05c869529a 7,38,43,50
+src/harness/state/v3/discovery.ts
+  s_361086fd550cc0::t_35abef14c88c77 1-4,10-12,22-29
+  s_361086fd550cc0::t_83b92236f1c492 7-9,13-16,18-21
+  s_361086fd550cc0::t_0b683e12b3501b 5-6,30-33
+  s_361086fd550cc0::t_f829ce351b1bd4 17
+src/harness/workflow/index.ts
+  s_361086fd550cc0::t_e6cdd4fa29ac9d 6
+  s_361086fd550cc0::t_96713eaadca722 1-4
+  s_361086fd550cc0::t_aada1669e2fa00 8
+  s_361086fd550cc0::t_e3ffa8178e10e5 7
+  s_361086fd550cc0::t_19ce80bcf16a5a 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "0347e0bd1f338776e16da357d640175c834ed042",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
