@@ -1,0 +1,19 @@
+plugin/agents/orchestrator.md
+  s_361086fd550cc0::t_207263df0b411e 65,68,71-75,84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "a7c8ab7e087f2144a8a6ec859021b02b7bac5592",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
