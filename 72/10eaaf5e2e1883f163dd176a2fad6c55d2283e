@@ -1,0 +1,126 @@
+src/harness/transcripts/store.ts
+  s_361086fd550cc0::t_ba3c13546294f0 1,65
+src/harness/transcripts/types.ts
+  s_361086fd550cc0::t_ba3c13546294f0 4-6,15
+  s_361086fd550cc0::t_3a6c59ebb4104a 7-8
+src/harness/orchestrator.ts
+  s_361086fd550cc0::t_14b8febcffb79c 80
+  s_361086fd550cc0::t_ec8e345a540de9 65,129-134
+  s_361086fd550cc0::t_c2fc34411174a3 135
+src/harness/transcripts/store.test.ts
+  s_361086fd550cc0::t_2237ba8ff342fc 39-47
+src/harness/state/runDiscovery.ts
+  s_361086fd550cc0::t_ff43f94d29c7d6 11,14
+src/harness/git/changeSet.ts
+  s_361086fd550cc0::t_8aeb6fd9ca2a4e 2,19,85-86
+  s_361086fd550cc0::t_52765c1aca38ab 22,84,87-91
+src/runner/answer.ts
+  s_361086fd550cc0::t_ff43f94d29c7d6 17,22-23,25
+scripts/run-probes.ts
+  s_361086fd550cc0::t_787a02402b371c 75
+src/harness/providers/codex.ts
+  s_361086fd550cc0::t_3a6c59ebb4104a 5,124
+  s_361086fd550cc0::t_ac861107e2c129 66,69-84,110-111,117-118
+src/harness/providers/codex.test.ts
+  s_361086fd550cc0::t_7e50cda8d1e36f 44-45,52,54
+  s_361086fd550cc0::t_162739619c5d2a 57-61
+  s_361086fd550cc0::t_8d3cc1ccbc4ccd 55-56
+src/harness/workflow/runtime.ts
+  s_361086fd550cc0::t_52708613913c84 89,101
+  s_361086fd550cc0::t_61f4b92c91e8c9 7,13,18,42-46,103,105,110,117-118,142-144,149,214,216
+src/harness/workflow/declarativeFeature.test.ts
+  s_361086fd550cc0::t_065aa9500f83b8 16,22,37
+src/harness/state/runStore.test.ts
+  s_361086fd550cc0::t_d6d8e88e19c484 14
+src/harness/workflow/schema.ts
+  s_361086fd550cc0::t_7e50cda8d1e36f 7,11-14,43-48,61,71,75-76,78
+src/harness/forge/forge.test.ts
+  s_361086fd550cc0::t_0f8c505101047f 19,40,43
+  s_361086fd550cc0::t_bfc2da8e16ed1e 47
+  s_361086fd550cc0::t_0107076e5430dc 44
+src/harness/providers/claude.test.ts
+  s_361086fd550cc0::t_bfc2da8e16ed1e 27,34,41
+  s_361086fd550cc0::t_5fe7cecb1c0ff0 46,48,52
+  s_361086fd550cc0::t_18eec521f1cf52 53
+src/harness/state/lease.ts
+  s_361086fd550cc0::t_bcb90ce268b3e3 10-11,13
+src/harness/forge/github.ts
+  s_361086fd550cc0::t_14b8febcffb79c 9-10
+src/harness/state/runView.ts
+  s_361086fd550cc0::t_1c1f2827e1503e 10,19,21,23-24,33
+src/harness/guardHooks.ts
+  s_361086fd550cc0::t_fc330ca78cab7c 62-63,127,134-139
+  s_361086fd550cc0::t_2cec29f0fce919 140-141
+src/harness/forge/pullRequestExecutor.ts
+  s_361086fd550cc0::t_14b8febcffb79c 11-12,16
+src/harness/workflow/loader.ts
+  s_361086fd550cc0::t_3bb3d899f97efa 2,36
+  s_361086fd550cc0::t_7e50cda8d1e36f 35
+src/harness/workflow/bundled/feature-pr.yaml
+  s_361086fd550cc0::t_14b8febcffb79c 49
+src/harness/workflow/declarativeRunner.ts
+  s_361086fd550cc0::t_9b17c873ce56e6 125,130
+docs/guides/human-review.md
+  s_361086fd550cc0::t_787a02402b371c 5-23
+scripts/probes/workflows/01-compose-commit.ts
+  s_361086fd550cc0::t_787a02402b371c 213-232
+src/runner/prFix.test.ts
+  s_361086fd550cc0::t_f497c204986520 16
+src/harness/sessionRecorder.ts
+  s_361086fd550cc0::t_9678931ad62926 92,105,118,278,329,349,392-395,409,449
+src/viewer/index.html
+  s_361086fd550cc0::t_fc330ca78cab7c 509-512,893-894
+  s_361086fd550cc0::t_1c1f2827e1503e 433
+src/harness/git/changeSet.test.ts
+  s_361086fd550cc0::t_7e50cda8d1e36f 24,30,36,39
+src/runner/prFix.ts
+  s_361086fd550cc0::t_60b554174467b0 27,34-36,44-45,47
+  s_361086fd550cc0::t_8ab85b0da3f496 46
+src/harness/workflow/commandExecutor.ts
+  s_361086fd550cc0::t_4fdd3c8d39f4f1 3-4,9-10,12,19-23
+  s_361086fd550cc0::t_f949148cfd9d5d 24
+src/harness/state/runView.test.ts
+  s_361086fd550cc0::t_b4bd779ce32099 19-23
+src/harness/workflow/workflow.test.ts
+  s_361086fd550cc0::t_a5f1482c9f168a 284
+  s_361086fd550cc0::t_bfc2da8e16ed1e 282
+  s_361086fd550cc0::t_21e43bc4488375 6,29,81,126,200-206
+  s_361086fd550cc0::t_5eb1baabb773fb 155
+  s_361086fd550cc0::t_ea1a06f7dcc9a6 207,306-310
+  s_c8ffb1cc3059a6::t_9c6519f06b30ca 208
+src/harness/providers/claude.ts
+  s_361086fd550cc0::t_3a6c59ebb4104a 7,144,154-155,159
+  s_361086fd550cc0::t_9678931ad62926 87,94,96-100,162
+src/harness/forge/types.ts
+  s_361086fd550cc0::t_14b8febcffb79c 5
+src/harness/state/runStore.ts
+  s_361086fd550cc0::t_bcb90ce268b3e3 49
+  s_361086fd550cc0::t_3e9e84ccd5d435 1,23,27,30,44-48,50-60
+  s_361086fd550cc0::t_376c9303e36688 61
+src/harness/guardHooks.test.ts
+  s_361086fd550cc0::t_fbbd767b73f91d 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "7210eaaf5e2e1883f163dd176a2fad6c55d2283e",
+  "prompts": {},
+  "sessions": {
+    "s_361086fd550cc0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f58b9-e511-79e2-b749-42ff2b47a107",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    },
+    "s_c8ffb1cc3059a6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4129fbb0-e99e-4aeb-9fc5-8d02ad82871d",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
