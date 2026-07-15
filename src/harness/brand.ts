@@ -32,49 +32,23 @@ export const PALETTE = {
 export const TAGLINE = "the harness that herds";
 
 /**
- * The collie at 18x18, as raw RGBA.
+ * The collie at 18x18, drawn by hand.
  *
- * Baked from the illustration the viewer serves at /collie.png, so the terminal and
- * the browser show the same dog — but baked as pixel art, not as a downsample.
+ * Converting the illustration was tried at length and never read as a dog. Every
+ * mechanical step was individually right — ten declared colours so the ice-blue
+ * eyes could not be averaged away, sampling by vote so no invented grey appeared
+ * along an edge, two cells per pixel so the blocks looked chosen — and the result
+ * was still a smudge. A face at this size is not a smaller face. It has to be
+ * decided: at 18px an ear IS three pixels of pink because someone says so, and a
+ * muzzle IS a white blob with a black bar for a nose. Sampling can only average
+ * what is there; it cannot choose what to keep.
  *
- * Simply resizing the 603px artwork gave 312 distinct colours across 341 pixels:
- * nearly every pixel its own intermediate tone, which reads as mud. Crisp terminal
- * mascots are not higher resolution, they are lower resolution drawn deliberately,
- * with flat colour and hard edges. So the pixels snap to a declared ten-colour
- * palette and the alpha is thresholded rather than feathered.
- *
- * Two things that palette had to be taught, both found by looking:
- *   - Letting an algorithm pick the palette (median-cut) drops the brand. It
- *     allocates by pixel frequency, and the ice-blue eyes are ~6px of 341, so they
- *     get merged into the coat.
- *   - A gap in the ramp gets filled by whatever is nearest, and pink's green sits
- *     mid-way between the fur and the white — without mid-greys, pink became the
- *     closest match for every antialiased edge and speckled the whole face.
- *
- * Sampled by vote, not by average. Resampling filters mean each output pixel, and
- * the mean of a black-and-white edge is a grey that appears nowhere in the source
- * — that invented tone, repeated along every edge, is what made the sprite look
- * grainy no matter how few colours the palette had. Taking the palette colour that
- * dominates each source block instead yields flat regions, because every pixel is
- * a colour the artwork actually contains.
- *
- * The eyes are placed, not derived: each is about two pixels here, and no sampler
- * preserves that against dark fur. Their coordinates come from measuring the
- * artwork; see scripts in the design notes.
- *
- * The coat is mid-graphite in the artwork itself, which is what lets one image
- * serve a near-black terminal and a white one.
- *
- * Size is a straight trade against banner height: with half-blocks the dog's
- * width in pixels IS the column count, so detail costs rows. 24 (12 rows) is
- * where the ruff's fur and the ear pink resolve; 16 loses both.
- *
- * Quadrant glyphs would double the horizontal resolution at the same height,
- * but a cell carries only two colours -- the eyes are ~2px of ice against dark
- * fur and get crushed to a flat bar. Exact colour beat extra pixels here.
+ * Kept as raw RGBA with hard alpha. The sprite itself lives in the design notes as
+ * a character grid, which is the form worth editing — change a letter, rebuild.
+ * Seven colours, no antialiasing, no tone that was not put there on purpose.
  */
 const COLLIE_RGBA_B64 =
-  "AAAAAAAAAAA4PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAA4PUf/JCgw/zg9R/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg9R/8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/U1pm/zg9R/84PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAA4PUf/OD1H/zg9R/92fYr/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/yQoMP84PUf/OD1H/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/yQoMP/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/yQoMP84PUf/OD1H/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/yQoMP/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/yQoMP84PUf/OD1H/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/yQoMP/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/84PUf/OD1H/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/zg9R/+Pv+j/j7/o/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/zg9R/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/zg9R/8UFhr/j7/o/zg9R//09ff/9PX3/4+/6P+Pv+j/OD1H/zg9R/84PUf/AAAAAAAAAAAAAAAAAAAAAAAAAAA4PUf/OD1H/zg9R/84PUf/j7/o/zg9R//09ff/9PX3/xQWGv+Pv+j/OD1H/zg9R/84PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/84PUf/OD1H//T19//09ff/9PX3//T19/84PUf/OD1H/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/84PUf/9PX3//T19/8UFhr/FBYa//T19//09ff/OD1H/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/yQoMP8kKDD/9PX3//T19/8UFhr/FBYa//T19//09ff/JCgw/yQoMP8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8LI0P/CyND/wsjQ/xQWGv9TWmb/U1pm/xQWGv/CyND/9PX3/8LI0P8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPT19//09ff/wsjQ//T19//Jh5L/yYeS//T19//CyND/9PX3//T19/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCyND/wsjQ/8LI0P/CyND/wsjQ/8LI0P/CyND/wsjQ/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwsjQ/8LI0P/CyND/wsjQ/8LI0P/CyND/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCyND/wsjQ/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  "AAAAAAAAAAAAAAAAAAAAACQoMP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQoMP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8mHkv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8mHkv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/8mHkv8kKDD/OkBL/zpAS/86QEv/OkBL/zpAS/86QEv/JCgw/8mHkv/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/8mHkv8kKDD/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/JCgw/8mHkv/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/8mHkv8kKDD/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/JCgw/8mHkv/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/yQoMP86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/yQoMP/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/zpAS/86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/zpAS/8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/zpAS/86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/zpAS/86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/4+/6P86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/4+/6P86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/4+/6P86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/4+/6P86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/zpAS/86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/zpAS/86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/zpAS/86QEv/9PX3//T19//09ff/9PX3//T19//09ff/OkBL/zpAS/86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/zpAS//09ff/9PX3//T19//09ff/9PX3//T19//09ff/9PX3/zpAS/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw//T19//09ff/9PX3/xQWGv8UFhr/FBYa/xQWGv/09ff/9PX3//T19/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPT19//09ff/9PX3/xQWGv8UFhr/FBYa/xQWGv/09ff/9PX3//T19/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMLI0P/09ff/9PX3//T19//09ff/9PX3//T19//09ff/9PX3/8LI0P8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCyND/9PX3//T19//09ff/9PX3//T19//09ff/wsjQ/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwsjQ/8LI0P/09ff/9PX3/8LI0P/CyND/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 const COLLIE_PX = 18;
 /** Below this the pixel is background, not dog. */
