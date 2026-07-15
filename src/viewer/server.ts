@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { listRuns, listRunsInCwd } from "../harness/state/runDiscovery.js";
 import type { RunSnapshot } from "../harness/state/runSchema.js";
 import { RunStore } from "../harness/state/runStore.js";
-import { toRunView } from "../harness/state/runView.js";
+import { summarizeExecution, toRunView } from "../harness/state/runView.js";
 import { TranscriptStore } from "../harness/transcripts/store.js";
 
 function cwdHashOf(cwd: string): string {
@@ -180,11 +180,12 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
           task_slug: r.run.task_slug,
           workflow: r.run.workflow,
           status: r.execution.status === "paused" ? "waiting_human" : r.execution.status,
-          current_phase: null,
           started_at: r.run.started_at,
           ended_at: r.run.ended_at,
           phases_total: Object.keys(r.execution.nodes).length,
-          retries: 0,
+          // Both were constants. current_phase: null made the list's pipeline fall
+          // back to Planner for every running run, whatever it was actually doing.
+          ...summarizeExecution(r),
         }));
         return jsonRes({ runs: summarized });
       }

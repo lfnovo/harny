@@ -14,6 +14,41 @@ export interface RunView {
   usage: UsageSummary;
 }
 
+export interface ExecutionSummary { current_phase: string | null; retries: number }
+
+/**
+ * What the run list needs to draw a pipeline: which phase is live, and how many
+ * attempts were spent beyond the first.
+ *
+ * It lives here rather than in the viewer because it walks nodes and steps exactly
+ * the way `toRunView` does, and must name them identically -- a step is
+ * `tasks:0.developer`, which is what the viewer matches its roles on. Two walks
+ * would be two chances to drift.
+ *
+ * Only leaves count. A `foreach` container reports `running` for as long as any of
+ * its children run, so counting it would make every task-phase run look like it was
+ * sitting in `tasks`, and its attempts would double-count its children's.
+ */
+export function summarizeExecution(run: RunSnapshot): ExecutionSummary {
+  let current: string | null = null;
+  let last: string | null = null;
+  let retries = 0;
+  const leaf = (name: string, node: NodeInstance) => {
+    retries += Math.max(0, (node.attemptHistory?.length ?? node.attempts) - 1);
+    // First running wins: with a live node the run is there, whatever ran before.
+    if (!current && (node.status === "running" || node.status === "paused")) current = name;
+    if (node.status === "completed" || node.status === "failed") last = name;
+  };
+  for (const node of Object.values(run.execution.nodes)) {
+    const steps = Object.entries(node.steps ?? {});
+    if (!steps.length) leaf(node.id, node);
+    else for (const [key, step] of steps) leaf(`${node.id}:${key}`, step);
+  }
+  // Nothing running: the run is over, or between nodes. Either way the last phase
+  // that did something is the truthful answer, and it beats falling back to Planner.
+  return { current_phase: current ?? last, retries };
+}
+
 export function toRunView(run: RunSnapshot, events: RunEvent[] = []): RunView {
   const phases: RunView["phases"] = [];
   const add = (name: string, instanceId: string, node: NodeInstance) => { const attempt = node.attemptHistory?.at(-1); phases.push({ name, instance_id: instanceId, attempt: attempt?.number ?? node.attempts, started_at: attempt?.startedAt ?? null, ended_at: attempt?.endedAt ?? null, status: node.status === "paused" ? "parked" : node.status === "skipped" ? "completed" : node.status, verdict: node.output === undefined ? null : JSON.stringify(node.output), session_id: attempt?.session?.id ?? null, usage: summarizeAttempts(node.attemptHistory), attempts_detail: (node.attemptHistory ?? []).map((item) => ({ number: item.number, status: item.status, started_at: item.startedAt, ended_at: item.endedAt ?? null, error: item.error ?? null, usage: item.usage ?? null, transcript_available: false })) }); };
