@@ -94,27 +94,17 @@ function at(x: number, y: number): Px {
  * foreground/background on U+2580, which is what makes it read as a solid image
  * instead of the gappy mush braille gives you at this size.
  *
- * `stretch` widens the art to cancel the terminal's cell shape. Two stacked
- * pixels are only square when the cell is exactly twice as tall as it is wide;
- * that is the usual default, but line spacing is a user setting (Warp's lands
- * near 1:2.4, which makes the dog 20% too tall). Columns are duplicated rather
- * than resampled, so a stretched dog is still the same ten flat colours — no
- * interpolation, no new tones, no mush.
- *
  * Truecolor only. There is no meaningful degraded form — without per-pixel
  * colour every cell is the same block and the dog is a rectangle — so callers
  * fall back to a text banner instead.
  */
-export function collieRows(stretch = 1): string[] {
-  const width = Math.max(1, Math.round(COLLIE_PX * stretch));
+export function collieRows(): string[] {
   const rows: string[] = [];
   for (let y = 0; y < COLLIE_PX; y += 2) {
     let line = "";
-    for (let x = 0; x < width; x++) {
-      // nearest-neighbour source column; at stretch = 1 this is the identity
-      const sx = Math.min(COLLIE_PX - 1, Math.floor(x / stretch));
-      const top = at(sx, y);
-      const bot = at(sx, y + 1);
+    for (let x = 0; x < COLLIE_PX; x++) {
+      const top = at(x, y);
+      const bot = at(x, y + 1);
       if (!top && !bot) line += "\x1b[0m ";
       else if (top && !bot) line += `\x1b[0m\x1b[38;2;${top[0]};${top[1]};${top[2]}m▀`;
       else if (!top && bot) line += `\x1b[0m\x1b[38;2;${bot[0]};${bot[1]};${bot[2]}m▄`;
@@ -129,8 +119,6 @@ export type BannerOpts = {
   version: string;
   /** Right-hand detail lines, e.g. providers or run counts. Kept short. */
   detail?: string[];
-  /** Horizontal correction for this terminal's cell shape; 1 = the 1:2 default. */
-  stretch?: number;
 };
 
 const WORDMARK = "h a r n y";
@@ -140,7 +128,7 @@ const WORDMARK = "h a r n y";
  * the text form, because the dog needs per-pixel colour to be a dog.
  */
 export function banner(opts: BannerOpts, level: number): string {
-  const { version, detail = [], stretch = 1 } = opts;
+  const { version, detail = [] } = opts;
   if (level < 3) {
     // No art: a rectangle of identical blocks says nothing. Stay quiet instead.
     return `harny ${version} — ${TAGLINE}`;
@@ -152,7 +140,7 @@ export function banner(opts: BannerOpts, level: number): string {
   // Mid-tone silver is legible against both a near-black and a white terminal.
   const dim = (s: string) => `\x1b[38;2;150;157;168m${s}\x1b[0m`;
 
-  const art = collieRows(stretch);
+  const art = collieRows();
   // Wordmark sits beside the dog rather than under it: keeps the banner to the
   // art's own height instead of stacking two blocks of vertical space.
   const text = [wordmark(WORDMARK), dim(TAGLINE), "", dim(`v${version}`), ...detail.map(dim)];
