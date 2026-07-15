@@ -557,6 +557,8 @@
       return `<span data-iso="${escapeHtml(iso)}" title="${escapeHtml(fmtTime(iso))}">${escapeHtml(fmtRelative(iso))}</span>`;
     }
     function updateTimers() {
+      // Before the text pass: it rebuilds the nodes the text pass then walks.
+      refreshTimeline();
       const now = Date.now();
       document.querySelectorAll('[data-dur-start]').forEach(el => {
         // ISO, not ms: parseInt on an ISO string yields the year and reads as truthy.
@@ -772,7 +774,7 @@
     }
 
     let pollHandle = null;
-    function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } }
+    function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } liveTimelineState = null; }
 
     const openDetails = new Set();
     const transcriptCache = new Map();
@@ -951,45 +953,101 @@
       return n > 0 ? `${leaf} ${n + 1}` : leaf;
     }
     const ROLE_VAR = ['var(--plan)', 'var(--run)', 'var(--done)'];
-    function timelineHtml(state) {
+    /**
+     * Geometry only. Split from the markup because the bars have to be recomputed
+     * every second (see refreshTimeline) and re-rendering them was not an option:
+     * .tl-bar carries a grow-in animation, so rebuilding the DOM would replay it
+     * forever, and a title tooltip cannot survive its own element being replaced.
+     */
+    function timelineGeom(state) {
       const all = (state.phases || []).filter(p => p.started_at);
       const rows = all.filter(p => !isContainer(p, all));
-      if (!rows.length) return '';
       const t0 = msOf(state.origin.started_at);
       const endMs = state.lifecycle.ended_at ? msOf(state.lifecycle.ended_at) : Date.now();
       const span = Math.max(1, endMs - t0);
-      const bars = rows.map(p => {
-        const a = msOf(p.started_at);
-        const b = p.ended_at ? msOf(p.ended_at) : Date.now();
-        const left = Math.max(0, (a - t0) / span * 100);
-        // Sub-second phases (the commit) would otherwise be invisible; floor the
-        // width so every phase that happened can be seen to have happened.
-        const width = Math.max(0.8, (b - a) / span * 100);
-        const role = phaseRole(p.name);
-        const color = role >= 0 ? ROLE_VAR[role] : 'var(--text-dim)';
-        const live = p.status === 'running';
-        const failed = p.status === 'failed';
-        const pct = Math.round((b - a) / span * 100);
-        const cls = ['tl-bar', live ? 'live' : '', failed ? 'fail' : ''].filter(Boolean).join(' ');
-        return `<div class="tl-row" title="${escapeHtml(`${p.name} · ${fmtDuration(b - a)} · ${pct}% of the run`)}">
-          <div class="tl-name">${escapeHtml(phaseLabel(p.name))}</div>
+      return {
+        span,
+        rows: rows.map(p => {
+          const a = msOf(p.started_at);
+          const b = p.ended_at ? msOf(p.ended_at) : Date.now();
+          const left = Math.max(0, (a - t0) / span * 100);
+          // Sub-second phases (the commit) would otherwise be invisible; floor the
+          // width so every phase that happened can be seen to have happened.
+          const width = Math.max(0.8, (b - a) / span * 100);
+          const role = phaseRole(p.name);
+          const live = p.status === 'running';
+          const failed = p.status === 'failed';
+          return {
+            p, live, failed,
+            color: failed ? 'var(--fail)' : role >= 0 ? ROLE_VAR[role] : 'var(--text-dim)',
+            left: left.toFixed(2), width: Math.min(width, 100 - left).toFixed(2),
+            dur: fmtDuration(b - a), pct: Math.round((b - a) / span * 100),
+          };
+        }),
+      };
+    }
+    function tlTitle(g) { return `${g.p.name} · ${g.dur} · ${g.pct}% of the run`; }
+    function tlAxis(span) {
+      // A four-tick axis: enough to read proportion at a glance, few enough to stay quiet.
+      return [0, 0.25, 0.5, 0.75, 1].map(f =>
+        `<span style="left:${(f * 100).toFixed(0)}%">${f === 0 ? '0s' : fmtDuration(span * f)}</span>`).join('');
+    }
+    function timelineInner(state) {
+      const { span, rows } = timelineGeom(state);
+      if (!rows.length) return '';
+      const bars = rows.map(g => `<div class="tl-row" title="${escapeHtml(tlTitle(g))}">
+          <div class="tl-name">${escapeHtml(phaseLabel(g.p.name))}</div>
           <div class="tl-track"><div class="tl-grid"></div><div class="tl-lane">
-            <div class="${cls}" style="--c:${failed ? 'var(--fail)' : color}; left:${left.toFixed(2)}%; width:${Math.min(width, 100 - left).toFixed(2)}%">
-              ${live ? `<span class="tl-dog">${COLLIE_IC_TAG}</span>` : ''}
+            <div class="${['tl-bar', g.live ? 'live' : '', g.failed ? 'fail' : ''].filter(Boolean).join(' ')}" style="--c:${g.color}; left:${g.left}%; width:${g.width}%">
+              ${g.live ? `<span class="tl-dog">${COLLIE_IC_TAG}</span>` : ''}
             </div>
           </div></div>
           <div class="tl-meta">
-            <span class="tl-dur"${live ? ` data-dur-start="${escapeHtml(p.started_at)}"` : ''}>${fmtDuration(b - a)}</span>
-            <span class="tl-pct">${pct >= 1 ? `${pct}%` : ''}</span>
+            <span class="tl-dur"${g.live ? ` data-dur-start="${escapeHtml(g.p.started_at)}"` : ''}>${g.dur}</span>
+            <span class="tl-pct">${g.pct >= 1 ? `${g.pct}%` : ''}</span>
           </div>
-        </div>`;
-      }).join('');
-      // A four-tick axis: enough to read proportion at a glance, few enough to stay quiet.
-      const axis = [0, 0.25, 0.5, 0.75, 1].map(f =>
-        `<span style="left:${(f * 100).toFixed(0)}%">${f === 0 ? '0s' : fmtDuration(span * f)}</span>`).join('');
-      return `<div class="card timeline reveal" style="--i:2">${bars}
-        <div class="tl-axis"><div></div><div class="tl-axis-in">${axis}</div><div></div></div>
-      </div>`;
+        </div>`).join('');
+      return `${bars}
+        <div class="tl-axis"><div></div><div class="tl-axis-in">${tlAxis(span)}</div><div></div></div>`;
+    }
+
+    /**
+     * The bars are a function of Date.now(), but the page only re-renders when the
+     * run's JSON signature changes -- and a running phase changes nothing as it runs:
+     * started_at is already set and ended_at stays null. So the "Live pipeline" froze
+     * at whatever the clock said when the last phase transition happened, which left
+     * the running phase pinned at its 0.8% minimum width and the phase before it
+     * stretched to 100%. Only F5 fixed it, which is the tell: a view that needs a
+     * reload is a view that is not live.
+     *
+     * So the geometry is recomputed on the timer instead, from the last known state.
+     * innerHTML rather than outerHTML: replacing the card would restart its reveal
+     * animation once a second.
+     */
+    let liveTimelineState = null;
+    function refreshTimeline() {
+      if (!liveTimelineState) return;
+      const card = document.querySelector('.card.timeline');
+      if (!card) return;
+      const { span, rows } = timelineGeom(liveTimelineState);
+      const els = card.querySelectorAll('.tl-row');
+      // A phase started or ended: the row count moved, so the shape is the poll's
+      // job, not the timer's. Bail and let the next draw rebuild it.
+      if (els.length !== rows.length) return;
+      rows.forEach((g, i) => {
+        const row = els[i];
+        const bar = row.querySelector('.tl-bar');
+        if (bar) { bar.style.left = `${g.left}%`; bar.style.width = `${g.width}%`; }
+        row.title = tlTitle(g);
+        const pct = row.querySelector('.tl-pct');
+        if (pct) pct.textContent = g.pct >= 1 ? `${g.pct}%` : '';
+        // Ended phases have a fixed duration; only the live one's text moves, and
+        // the data-dur-start pass right after this owns that.
+        const dur = row.querySelector('.tl-dur');
+        if (dur && !g.live) dur.textContent = g.dur;
+      });
+      const axis = card.querySelector('.tl-axis-in');
+      if (axis) axis.innerHTML = tlAxis(span);
     }
 
     function transcriptPanels(p) {
@@ -1203,6 +1261,11 @@
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/sibling-branches`).catch(() => ({ siblingBranches: [] })),
           ]);
 
+          // The timeline redraws on the timer, so it needs the freshest state even on
+          // the ticks where the signature says nothing changed. Cleared once the run
+          // ends: then the bars are history and history does not move.
+          liveTimelineState = state.lifecycle.ended_at ? null : state;
+
           const sig = JSON.stringify({ state, plan, commits, gitErr, siblingBranches });
           if (sig === lastDetailSig && app.querySelector('.head')) { await refreshTranscripts(cwdHash, slug); return; }
           const animate = detailAnimate;
@@ -1400,7 +1463,7 @@
               <p>${escapeHtml(state.origin.prompt)}</p>
             </div>
             <div class="section-h reveal" style="--i:2"><h2>${live ? 'Live pipeline' : 'Timeline'}</h2><span class="meta">where the time went</span></div>
-            ${timelineHtml(state)}
+            <div class="card timeline reveal" style="--i:2">${timelineInner(state)}</div>
             ${outcomeHtml()}
             ${planHtml}
             <div class="section-h reveal" style="--i:5"><h2>Phases</h2><span class="meta">grouped by iteration</span></div>
