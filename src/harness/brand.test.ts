@@ -105,6 +105,14 @@ describe("banner", () => {
     expect(first).toBeLessThan(lines.length - 1);
   });
 
+  test("detail lines past the art continue below it instead of vanishing", () => {
+    // The art is 21 rows and `detail` is unbounded; the overflow used to fall off
+    // the end of the loop without a word.
+    const detail = Array.from({ length: 25 }, (_, i) => `line-${i + 1}`);
+    const out = banner({ version: "1.2.3", detail }, 3);
+    for (const line of detail) expect(out, line).toContain(line);
+  });
+
   test("fits a standard terminal", () => {
     const plain = banner({ version: "1.2.3", detail: ["claude + codex"] }, 3)
       .split("\n")

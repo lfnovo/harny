@@ -190,7 +190,8 @@ export function collieRows(): string[] {
 
 export type BannerOpts = {
   version: string;
-  /** Right-hand detail lines, e.g. providers or run counts. Kept short. */
+  /** Right-hand detail lines, e.g. providers or run counts. Kept short: past the
+   *  art's 21 rows they continue below it rather than beside it. */
   detail?: string[];
 };
 
@@ -220,10 +221,15 @@ export function banner(opts: BannerOpts, level: number): string {
   // Centre the text against the art rather than pinning it to fixed rows, so
   // resizing the sprite cannot silently leave it stranded at the top.
   const top = Math.max(0, Math.floor((art.length - text.length) / 2));
+  // The art is only 21 rows, and `detail` is not bounded. Lines past the last row
+  // used to fall off the end without a word; they now continue below the dog, in
+  // the same column, so nothing the caller passed can go missing in silence.
+  const gutter = " ".repeat(2 + COLLIE_W + 3);
   const out: string[] = [""];
   art.forEach((row, i) => {
     out.push(`  ${row}   ${text[i - top] ?? ""}`.trimEnd());
   });
+  for (const overflow of text.slice(art.length - top)) out.push(`${gutter}${overflow}`.trimEnd());
   out.push("");
   return out.join("\n");
 }
