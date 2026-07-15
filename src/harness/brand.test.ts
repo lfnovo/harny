@@ -4,8 +4,8 @@ import { collieRows, banner, PALETTE, TAGLINE } from "./brand.js";
 
 /**
  * The sprite is a private character grid, so these tests read it back out of the
- * source the same way `docs/design/collie-sprite.py` does. That keeps one copy: a
- * fixture here would be a second sprite that could drift from the shipped one.
+ * source. That keeps one copy: a fixture here would be a second sprite, free to
+ * drift from the one that ships.
  */
 function sprite(): { colors: Map<string, string>, rows: string[] } {
   const src = readFileSync(new URL("./brand.ts", import.meta.url), "utf8");

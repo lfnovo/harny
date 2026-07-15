@@ -74,9 +74,10 @@ export const TAGLINE = "the harness that herds";
  * drawing by coin flip in ~16% of cells and visibly changes the dog's face. Fewer
  * rows has to come from art drawn smaller, not from art squeezed smaller.
  *
- * The grid below is the source of truth and the form worth editing -- change a
- * letter and rebuild. `docs/design/collie-sprite.py` reads it back to render a
- * preview, so there is only ever one copy.
+ * The grid below is the source of truth and the form worth editing: change a
+ * letter and run the CLI. It is the only copy -- brand.test.ts reads it back out
+ * of this file rather than holding a fixture, which would be a second sprite free
+ * to drift from the one that ships.
  */
 const COLORS: Record<string, readonly [number, number, number]> = {
   k: [0x16, 0x18, 0x20], // ink: outline, nose, pupil
