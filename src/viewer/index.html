@@ -397,10 +397,18 @@
     .tr-tool.bad { color:var(--fail); }
     .tr-kind { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); flex:0 0 auto; }
     .tr-peek { color:var(--text-dim); font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    /* .tr-status is a generic right-aligned slot: sometimes a status word, sometimes
+       a timestamp. Only the status words get an s-* class, and those carry --p, so a
+       status reads the same colour here as it does in a pill. Timestamps stay dim. */
     .tr-status { margin-left:auto; color:var(--text-dim); }
+    .tr-status.s-done, .tr-status.s-running, .tr-status.s-failed,
+    .tr-status.s-waiting, .tr-status.s-pending { color:var(--p); font-weight:560; }
 
+    /* The bare .tnode is the PENDING node -- every other state adds a class or is
+       reached through .phase.ok, which drops the border for a tick. It was green,
+       which is the done colour, so phases that had not started yet read as finished. */
     .tnode { justify-self:center; width:12px; height:12px; border-radius:50%; box-sizing:border-box;
-             background:var(--surface); border:2px solid var(--done); }
+             background:var(--surface); border:2px solid var(--border-2); }
     .tnode.run { background:var(--run); border-color:var(--run); animation:pulse 1.6s infinite; }
     .tnode.planner { border-color:var(--plan); }
     .tnode.fail { background:var(--fail); border-color:var(--fail); }
@@ -543,8 +551,7 @@
     function liveDur(startIso, endIso) {
       if (!startIso) return '<span>—</span>';
       if (endIso) return `<span>${fmtDuration(durationMs(startIso, endIso))}</span>`;
-      const s = msOf(startIso);
-      return `<span data-dur-start="${s}">${fmtDuration(Date.now() - s)}</span>`;
+      return `<span data-dur-start="${escapeHtml(startIso)}">${fmtDuration(Date.now() - msOf(startIso))}</span>`;
     }
     function agoSpan(iso) {
       return `<span data-iso="${escapeHtml(iso)}" title="${escapeHtml(fmtTime(iso))}">${escapeHtml(fmtRelative(iso))}</span>`;
@@ -552,8 +559,9 @@
     function updateTimers() {
       const now = Date.now();
       document.querySelectorAll('[data-dur-start]').forEach(el => {
-        const s = parseInt(el.dataset.durStart, 10);
-        if (s) el.textContent = fmtDuration(now - s);
+        // ISO, not ms: parseInt on an ISO string yields the year and reads as truthy.
+        const s = Date.parse(el.dataset.durStart);
+        if (Number.isFinite(s)) el.textContent = fmtDuration(now - s);
       });
       document.querySelectorAll('[data-iso]').forEach(el => { el.textContent = fmtRelative(el.dataset.iso); });
     }
@@ -921,7 +929,7 @@
         <span class="act-dot"></span>
         <span class="act-name">${escapeHtml(e.name)}</span>
         ${arg ? `<span class="act-arg mono" title="${escapeHtml(arg)}">${escapeHtml(shortenArg(arg))}</span>` : ''}
-        <span class="act-time num" ${live ? `data-dur-start="${escapeHtml(since)}"` : ''}>${live ? liveDur(since, null) : escapeHtml(e.status)}</span>
+        <span class="act-time num">${live ? liveDur(since, null) : escapeHtml(e.status)}</span>
       </div><div class="act-sum">${escapeHtml(bits.join(' · '))}</div>`;
     }
 
@@ -989,7 +997,7 @@
       if (!attempts.length) return '';
       return `<div class="transcripts">${attempts.map(a => {
         const key = `${p.instance_id}:${a.number}`;
-        return `<details class="transcript" data-detail-id="transcript-${escapeHtml(key)}" data-instance="${escapeHtml(p.instance_id)}" data-attempt="${a.number}"><summary><span>Transcript · attempt ${a.number}</span><span class="tr-status">${escapeHtml(a.status)}</span></summary><div class="transcript-body" data-transcript-key="${escapeHtml(key)}"><span class="mut">Open to load events.</span></div></details>`;
+        return `<details class="transcript" data-detail-id="transcript-${escapeHtml(key)}" data-instance="${escapeHtml(p.instance_id)}" data-attempt="${a.number}"><summary><span>Transcript · attempt ${a.number}</span><span class="tr-status ${statusCls(a.status)}">${escapeHtml(a.status)}</span></summary><div class="transcript-body" data-transcript-key="${escapeHtml(key)}"><span class="mut">Open to load events.</span></div></details>`;
       }).join('')}</div>`;
     }
     function jsonPayload(value) {
@@ -1063,11 +1071,11 @@
           // The arg is the point: "Read" says nothing, "Read src/text.ts" says it all.
           const arg = toolArg(e);
           const bad = e.status === 'failed';
-          out.push(`<div class="tr-event${bad ? ' error' : ''}"><details class="tr-sub"><summary><span class="tr-tool${bad ? ' bad' : ''}">${escapeHtml(e.name)}</span>${arg ? `<span class="tr-peek mono" title="${escapeHtml(arg)}">${escapeHtml(shortenArg(arg, 68))}</span>` : ''}<span class="tr-status">${escapeHtml(bad ? 'failed' : when)}</span></summary>${jsonPayload({ kind:e.kind, input:e.input, output:e.output, error:e.error })}</details></div>`);
+          out.push(`<div class="tr-event${bad ? ' error' : ''}"><details class="tr-sub"><summary><span class="tr-tool${bad ? ' bad' : ''}">${escapeHtml(e.name)}</span>${arg ? `<span class="tr-peek mono" title="${escapeHtml(arg)}">${escapeHtml(shortenArg(arg, 68))}</span>` : ''}<span class="tr-status ${bad ? 's-failed' : ''}">${escapeHtml(bad ? 'failed' : when)}</span></summary>${jsonPayload({ kind:e.kind, input:e.input, output:e.output, error:e.error })}</details></div>`);
           continue;
         }
         if (e.type === 'file_change') { const n = (e.changes || []).length; out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">files</span><span class="tr-peek mono">${escapeHtml((e.changes || []).map(c => c.path).join(', '))}</span><span class="tr-status">${n} changed</span></summary>${jsonPayload(e.changes)}</details></div>`); continue; }
-        if (e.type === 'plan') { out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">plan</span><span class="tr-peek">${escapeHtml((e.items || []).map(i => i.text).join(' · '))}</span><span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.items)}</details></div>`); continue; }
+        if (e.type === 'plan') { out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">plan</span><span class="tr-peek">${escapeHtml((e.items || []).map(i => i.text).join(' · '))}</span><span class="tr-status ${statusCls(e.status)}">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.items)}</details></div>`); continue; }
         if (e.type === 'usage') { out.push(`<div class="tr-event"><div class="tr-label">usage</div><div class="tr-text mono">${escapeHtml(usageLine(e.usage))}</div></div>`); continue; }
         if (e.type === 'error') { out.push(`<div class="tr-event error"><div class="tr-label">error${e.retryable ? ' · retryable' : ''}</div><div class="tr-text">${escapeHtml(e.message)}</div></div>`); continue; }
         out.push(`<div class="tr-event"><div class="tr-label">${escapeHtml(e.name || e.type)}</div>${jsonPayload(e.data)}</div>`);
@@ -1119,6 +1127,12 @@
         }),
       ]);
     }
+    /** Status words share the pill palette: one status, one colour, everywhere. */
+    const STATUS_CLS = { completed:'s-done', done:'s-done', skipped:'s-done', running:'s-running',
+                         in_progress:'s-running', failed:'s-failed', cancelled:'s-failed',
+                         parked:'s-waiting', paused:'s-waiting', waiting_human:'s-waiting', pending:'s-pending' };
+    const statusCls = (s) => STATUS_CLS[s] || '';
+
     function phaseRow(p) {
       const dur = liveDur(p.started_at, p.ended_at);
       const sid = p.session_id ? p.session_id.slice(0, 8) : '—';
