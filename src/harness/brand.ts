@@ -32,71 +32,139 @@ export const PALETTE = {
 export const TAGLINE = "the harness that herds";
 
 /**
- * The collie at 18x18, drawn by hand.
+ * The collie at 46x52, extracted from the reference artwork at its own native grid.
  *
- * Converting the illustration was tried at length and never read as a dog. Every
- * mechanical step was individually right — ten declared colours so the ice-blue
- * eyes could not be averaged away, sampling by vote so no invented grey appeared
- * along an edge, two cells per pixel so the blocks looked chosen — and the result
- * was still a smudge. A face at this size is not a smaller face. It has to be
- * decided: at 18px an ear IS three pixels of pink because someone says so, and a
- * muzzle IS a white blob with a black bar for a nose. Sampling can only average
- * what is there; it cannot choose what to keep.
+ * The earlier attempts converted a 1254px illustration and never read as a dog, so
+ * the sprite was drawn by hand instead. This one is neither: the reference IS pixel
+ * art, so there was nothing to convert. Its native grid is 64x64 (found by scoring
+ * candidate sizes for intra-cell flatness -- 64 is a sharp minimum), and every cell
+ * is one flat colour. Sampling at that grid by vote is lossless; the extra 1190px of
+ * the file are upscale and JPEG noise, and averaging them is what produced mud before.
  *
- * Kept as raw RGBA with hard alpha. The sprite itself lives in the design notes as
- * a character grid, which is the form worth editing — change a letter, rebuild.
- * Seven colours, no antialiasing, no tone that was not put there on purpose.
+ * Two details the extraction had to decide rather than measure:
+ *
+ *   - The palette is declared, not derived. Twelve entries, and the two mid-greys
+ *     are load-bearing: without them the ramp has a hole between the fur and the
+ *     white, and pink -- whose green sits exactly there -- becomes the nearest
+ *     colour to every mid-tone. That speckled the muzzle on two earlier bakes.
+ *
+ *   - The artwork outlines the dog in pure black on a pure black field, so colour
+ *     alone cannot tell contour from background. Only reachability can: flood from
+ *     the border, and the 108px of black the flood never reaches are outline. Left
+ *     transparent they are invisible on a dark terminal and holes on a light one.
+ *
+ * The grid below is the source of truth and the form worth editing -- change a
+ * letter and rebuild. `docs/design/collie-sprite.py` reads it back to render a
+ * preview, so there is only ever one copy.
  */
-const COLLIE_RGBA_B64 =
-  "AAAAAAAAAAAAAAAAAAAAACQoMP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACQoMP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8mHkv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8mHkv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/8mHkv8kKDD/OkBL/zpAS/86QEv/OkBL/zpAS/86QEv/JCgw/8mHkv/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/8mHkv8kKDD/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/JCgw/8mHkv/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/8mHkv8kKDD/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/JCgw/8mHkv/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/yQoMP86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/yQoMP/Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/zpAS/86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/zpAS/8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/zpAS/86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/zpAS/86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/4+/6P86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/4+/6P86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/4+/6P86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/4+/6P86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/zpAS/86QEv/OkBL/zpAS//09ff/9PX3/zpAS/86QEv/OkBL/zpAS/86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OkBL/zpAS/86QEv/9PX3//T19//09ff/9PX3//T19//09ff/OkBL/zpAS/86QEv/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/zpAS//09ff/9PX3//T19//09ff/9PX3//T19//09ff/9PX3/zpAS/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw//T19//09ff/9PX3/xQWGv8UFhr/FBYa/xQWGv/09ff/9PX3//T19/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPT19//09ff/9PX3/xQWGv8UFhr/FBYa/xQWGv/09ff/9PX3//T19/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMLI0P/09ff/9PX3//T19//09ff/9PX3//T19//09ff/9PX3/8LI0P8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCyND/9PX3//T19//09ff/9PX3//T19//09ff/wsjQ/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwsjQ/8LI0P/09ff/9PX3/8LI0P/CyND/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const COLORS: Record<string, readonly [number, number, number]> = {
+  k: [0x14, 0x16, 0x1a], // ink: outline, nose, pupil
+  d: [0x24, 0x28, 0x30], // fur, shadowed
+  "#": [0x3a, 0x40, 0x4b], // fur
+  "+": [0x4e, 0x56, 0x63], // fur, lit
+  ":": [0x76, 0x7d, 0x8a], // }  the ramp between fur and white. Remove either and
+  "-": [0x9c, 0xa3, 0xad], // }  pink becomes the nearest colour to every mid grey.
+  s: [0xc2, 0xc8, 0xd0], // white, shadowed
+  w: [0xf4, 0xf5, 0xf7], // white: blaze, muzzle, ruff
+  b: [0x8f, 0xbf, 0xe8], // the eye. The one accent.
+  l: [0xd6, 0xe8, 0xf7], // the eye, catchlight
+  p: [0xc9, 0x87, 0x92], // inner ear
+  t: [0xa8, 0x5f, 0x68], // tongue
+};
 
-const COLLIE_PX = 18;
-/** Below this the pixel is background, not dog. */
-const ALPHA_FLOOR = 100;
+/** `.` is background: the terminal's own, never painted. */
+const SPRITE: string[] = [
+  "...###..................................####..",
+  "..#####................................#####..",
+  "..#kkk##..............................##kkk#..",
+  "..#kkk###............................###kkk#..",
+  "..#ktkk###.dd.....................d.###kktk#..",
+  "..dkttkk###dd#..................#dd###kkttkd..",
+  "..dktttkk###ddk................k#####kktttkd..",
+  "..kkptttkk####k.k............k.k####kktttpkk..",
+  "..kkpptttkk###d.kd..wwwwwww.dd.d###kktttppkk..",
+  "..kkpppkd#kkd#dd##d#wwwwww#d##d###kk#dkpppkk..",
+  "..kkppppkd##########wwwwww##########dkppppkk..",
+  ".kkkpppt#kd########dwwwwwwd########dk+tpppkkk.",
+  ".kkkppkddkdd########swwwwsd#######ddkdddptkkk.",
+  ".kdkkptkdkk##########wwww##########kkdktpkkdk.",
+  "..d#ktptkkd##########wwwwd#########dkktptk#d..",
+  "..k##kpkkd###########wwww###########dkkpk##k..",
+  "...d##d#k############wwww############k####d...",
+  ".kkkd###d#####www####wwww####www#####d###dkkk.",
+  "..kdddd######wddws###wwww###sw##w######ddkdd..",
+  "...kkdd#######ddd####wwww####dddd#######dkk...",
+  "....kd#d#############wwww####d########d#dk....",
+  "...kk#d######kkkd####wwww####dkkkdd####d#kk...",
+  "..kk#dd#####kk#+kdd#+wwww#dddk+#kkd####dd#kk..",
+  "...kkd#####kkswwkk##swwwwsd#kwkksskd####dkk...",
+  "....k######kw+wkkkd#wwwwww##kwkk+wkd#####k....",
+  "...k######ddwbkkk:ddwwwwww#dbkkkbwdd#######...",
+  "..#########ddw:kkwd#wwwwww#dw:k:wdd#####d##...",
+  ".d###d########wbb#dwwwwwwww##bbwdd##########d.",
+  "##ddd##########dddwwwwwwwwwwddd##########dddd#",
+  ".kkk###########d#wwwwwwwwwwww#dd##########kkk.",
+  "..k#############wwwwkkkkkkwwwwdd##########dk..",
+  "..k##dd########wwwwkk####kkwwwwdd######dd##k..",
+  "..d#dd########wwwwwkkkkkkkkwwwwwd#######dd#d..",
+  ".kdddd######dwwwwwwkkkkkkkkwwwwwwdd#####dkkdk.",
+  ".kkkk###d##kkwwwwwwkkkkkkkkwwwwwwkd##d###kkkk.",
+  ".k.kd#ddddkkkwkwwwwwkkkkkkwwwwwkwkkkdddd#dk.k.",
+  "...kddkkkkkkkwwkwwwwwskkswwwwwkwwkkkkkdkddk...",
+  "...kddkkkksss-wklwwwwskkswwwwlkl-ssskkkkkdk...",
+  "...kk.kkksswss-lksws-kkkk-swsks-sswsskkk.kk...",
+  "...k..kksswwwss-skkkddkkddkkks-sswwwlskk..k...",
+  ".......-sswwwwsssskktt##ttkksssswwwwss-.......",
+  ".......ss.wwwwws-wkkppttppkkw-swwwww.s-.......",
+  ".......s..wwwwwss-wkwppppwkw-sswwwww..s.......",
+  "..........ww-wwws-swkppppkws-swww-ww..........",
+  "..........sw.wwwws-lwkkkkwl-swwww.ws..........",
+  "...........s.swwwws-swwwws-swwwws.s...........",
+  "..............swwswss----sswswws..............",
+  "...............sw.wwwsssswww.ws...............",
+  "................s.-wwwwwwwws.s................",
+  "...................s-wwww-s...................",
+  ".....................-lls.....................",
+  "......................--......................",
+];
 
-let decoded: Uint8Array | null = null;
-function pixels(): Uint8Array {
-  if (!decoded) decoded = Uint8Array.from(atob(COLLIE_RGBA_B64), (c) => c.charCodeAt(0));
-  return decoded;
-}
+const COLLIE_W = SPRITE[0]!.length;
+const COLLIE_H = SPRITE.length;
 
-type Px = readonly [number, number, number] | null;
-function at(x: number, y: number): Px {
-  if (y >= COLLIE_PX) return null;
-  const data = pixels();
-  const i = (y * COLLIE_PX + x) * 4;
-  const a = data[i + 3] ?? 0;
-  if (a < ALPHA_FLOOR) return null;
-  return [data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0];
+function at(x: number, y: number): readonly [number, number, number] | null {
+  const ch = SPRITE[y]?.[x];
+  return ch && ch !== "." ? (COLORS[ch] ?? null) : null;
 }
 
 /**
- * The collie as rows of full blocks, two cells per pixel.
+ * The collie as rows of half blocks.
  *
- * Half-blocks (one cell, two stacked pixels) pack more detail into fewer rows,
- * and that is exactly what made this read as a shrunken photo rather than as
- * pixel art: at 9x9 screen pixels each, the blocks are too fine to look chosen.
- * Two cells side by side make one ~18x18 square — the size Claude Code's own
- * mascot uses, and the size at which a block reads as a deliberate mark.
+ * A terminal cell is about twice as tall as it is wide, so U+2580 -- foreground on
+ * the top half, background on the bottom -- makes each half a square. That is the
+ * whole trick: square pixels at two per row, so 52 rows of art cost 26 rows of
+ * terminal. Painting a pixel with two full blocks side by side is square too, but
+ * costs one terminal row each, and 52 of them is not a banner.
  *
- * The trade is height. A collie needs more pixels than a simple blob does (ears,
- * blaze, eyes, muzzle all have to survive), and bigger pixels over more of them
- * costs rows: 18 lines against the 12 half-blocks would take. Their creature fits
- * in 8 because it is a body with four legs, not a face.
+ * An earlier note here claimed half blocks made the dog read as a shrunken photo.
+ * That was true of the art at the time, not of the technique: it was a conversion
+ * with 312 averaged colours, and it would have looked like mud at any block size.
  *
- * Truecolor only. There is no meaningful degraded form — without per-pixel
- * colour every cell is the same block and the dog is a rectangle — so callers
- * fall back to a text banner instead.
+ * Truecolor only. Without per-pixel colour every cell is the same block and the dog
+ * is a rectangle, so callers fall back to a text banner instead.
  */
 export function collieRows(): string[] {
   const rows: string[] = [];
-  for (let y = 0; y < COLLIE_PX; y++) {
+  for (let y = 0; y < COLLIE_H; y += 2) {
     let line = "";
-    for (let x = 0; x < COLLIE_PX; x++) {
-      const px = at(x, y);
-      // Two cells wide: on the usual 1:2 cell this is a square, and the glyph is
-      // U+2588 rather than a half-block so there is no top/bottom seam.
-      line += px ? `\x1b[38;2;${px[0]};${px[1]};${px[2]}m██` : "\x1b[0m  ";
+    for (let x = 0; x < COLLIE_W; x++) {
+      const top = at(x, y);
+      const bot = at(x, y + 1);
+      // Reset every cell: a transparent half has to show the terminal's own
+      // background, which means clearing whatever the previous cell set.
+      if (top && bot) line += `\x1b[0m\x1b[38;2;${top[0]};${top[1]};${top[2]};48;2;${bot[0]};${bot[1]};${bot[2]}m\u2580`;
+      else if (top) line += `\x1b[0m\x1b[38;2;${top[0]};${top[1]};${top[2]}m\u2580`;
+      else if (bot) line += `\x1b[0m\x1b[38;2;${bot[0]};${bot[1]};${bot[2]}m\u2584`;
+      else line += "\x1b[0m ";
     }
     rows.push(`${line}\x1b[0m`);
   }
