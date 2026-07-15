@@ -160,16 +160,6 @@
     .mascot .shadow { position:absolute; left:50%; bottom:-18px; width:96px; height:16px; transform:translateX(-50%);
                       background:radial-gradient(closest-side, rgba(0,0,0,.35), transparent); animation:shadow 5s ease-in-out infinite; }
     @keyframes shadow { 0%,100%{opacity:.55; transform:translateX(-50%) scale(1)} 50%{opacity:.3; transform:translateX(-50%) scale(.8)} }
-    .eyes { animation:blink 5.5s infinite; transform-origin:center; transform-box:fill-box; }
-    @keyframes blink { 0%,92%,100%{transform:scaleY(1)} 96%{transform:scaleY(.12)} }
-    .pupils { animation:look 9s ease-in-out infinite; }
-    @keyframes look {
-      0%,6%{transform:translate(0,-2px)}
-      22%,30%{transform:translate(0,-2px)}
-      41%,61%{transform:translate(4px,2px)}
-      74%,94%{transform:translate(-4px,2px)}
-      100%{transform:translate(0,-2px)}
-    }
 
     .agent-legend { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; max-width:760px; margin:20px auto 0; }
     .leg { text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; }
@@ -233,8 +223,6 @@
     .back { display:inline-flex; align-items:center; gap:6px; color:var(--accent-2); text-decoration:none; font-size:13px; font-weight:520; }
     .back:hover { text-decoration:underline; }
     .head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:14px 0 4px; flex-wrap:wrap; }
-    .cta-out { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; background:var(--accent);
-               color:#fff; font-size:13px; font-weight:560; text-decoration:none; }
     .metaline { color:var(--text-mut); font-size:13px; margin:9px 0 26px; display:flex; gap:9px;
                 align-items:baseline; flex-wrap:wrap; }
     /* A rule, not a glyph: a "·" sits on the text baseline and drifts when the
@@ -307,7 +295,6 @@
     .ask p { margin:0; font-size:13.5px; color:var(--text-mut); line-height:1.6; text-wrap:pretty;
              display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .ask.open p { -webkit-line-clamp:unset; }
-    .ask .more { margin-top:7px; font-size:11.5px; color:var(--accent-2); cursor:pointer; user-select:none; }
 
     /* ---- outcome: what the run produced. The reason the page gets opened. ---- */
     .outcome { padding:4px 0; margin-bottom:24px; }
@@ -333,7 +320,6 @@
     /* ---- provenance: last on the page, but not behind a click ---- */
     .fold { margin-bottom:24px; }
     .fold-body { padding:2px 18px 18px; }
-    .usage-line { font-size:12.5px; color:var(--text-mut); padding:12px 0 14px; }
 
     /* ---- usage by attempt: a table, because these are columns to compare ---- */
     .ua { width:100%; border-collapse:collapse; font-size:12px; margin:16px 0 22px; }
@@ -465,7 +451,7 @@
     .task-body { padding:4px 16px 16px 72px; color:var(--text-mut); font-size:12.5px; }
     .events { display:grid; gap:2px; }
     .ev { display:flex; gap:10px; align-items:baseline; font-size:12.5px; padding:4px 0; }
-    .ev .when { color:var(--text-dim); min-width:60px; } .ev .ph { color:var(--text-mut); min-width:92px; }
+    .ev .when { color:var(--text-dim); min-width:60px; }
     .ev .msg { font-weight:500; } .ev .msg.pass { color:var(--done); } .ev .msg.fail { color:var(--fail); }
 
     .pipe { display:inline-flex; align-items:center; }
@@ -477,7 +463,6 @@
     .pipe .cn.on { background:var(--accent-line); }
 
                     background:var(--surface-2); border:1px solid var(--border); color:var(--text-dim); }
-    .ic.collie img { width:100%; height:100%; }
                          border-radius:50%; background:var(--run); box-shadow:0 0 10px 1px var(--run); animation:cnflow 1.7s linear infinite; }
     @keyframes cnflow { 0%{left:0; opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:100%; opacity:0} }
                       background:color-mix(in srgb,var(--sc) 22%,transparent); }
@@ -485,9 +470,6 @@
 
     .animate .reveal { animation:revealUp .55s cubic-bezier(.2,.7,.2,1) both; animation-delay:calc(var(--i,0)*70ms); }
     @keyframes revealUp { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
-    .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 10px; border-radius:999px;
-            background:var(--surface); border:1px solid var(--border); color:var(--text-mut); }
-    .chip .cd { width:6px; height:6px; border-radius:50%; background:var(--run); animation:pulse 1.6s infinite; }
     .live-hd { display:inline-flex; width:6px; height:6px; border-radius:50%; background:var(--done); margin-left:8px; vertical-align:middle; animation:pulse 1.8s infinite; }
 
     .gg { position:relative; }
