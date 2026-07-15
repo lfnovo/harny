@@ -32,6 +32,7 @@ Local-first TypeScript runtime for declarative, auditable AI development workflo
 
 - `bin/harny.ts` — published bin entrypoint.
 - `src/runner.ts` — CLI entry, arg parsing, subcommands (`clean|ls|show|answer|ui`).
+- `src/runner/output.ts` — terminal colour detection (`colorLevel`). Decides whether colour is possible; deliberately never paints.
 - `src/harness/orchestrator.ts` — run lifecycle, Git/worktree setup, and declarative runtime dispatch.
 - `src/harness/sessionRecorder.ts` — `runPhase<T>()`, SDK seam.
 - `src/harness/state/` — atomic `run.json`, audit events, discovery, views, attempts, and ChangeSets.
@@ -40,6 +41,7 @@ Local-first TypeScript runtime for declarative, auditable AI development workflo
 - `src/harness/forge/` — privileged, idempotent GitHub draft-PR delivery.
 - `src/harness/transcripts/` — normalized event contract and attempt-scoped JSONL store.
 - `src/viewer/` — read-only HTTP + SPA, booted via `harny ui`.
+- `src/harness/brand.ts` — identity: palette, the collie sprite, and the CLI banner. The viewer duplicates the hexes on purpose — it is served as a static string and cannot import this module.
 - `src/harness/workflows/composeCommit.ts` — commit-message composer.
 - `src/harness/guardHooks.ts` — `PhaseGuards` (`readOnly` blocks `Write|Edit|MultiEdit|NotebookEdit`; Bash not blocked — validator needs it).
 - `src/harness/coldInstall.ts` — cold-worktree `bun install`.
