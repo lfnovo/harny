@@ -11,6 +11,7 @@ import { handleRun } from "./runner/run.js";
 import { handlePrFix } from "./runner/prFix.js";
 import { startUpdateCheck, printUpdateNotice } from "./runner/updateCheck.js";
 import { colorLevel } from "./runner/output.js";
+import { queryCellRatio, stretchFor } from "./runner/cellSize.js";
 import { banner } from "./harness/brand.js";
 import pkg from "../package.json" with { type: "json" };
 
@@ -30,12 +31,16 @@ const MACHINE_READABLE = new Set(["ls", "show"]);
  * quiet mode, a pipe, a terminal without truecolor, or a machine-readable
  * subcommand all skip it. Goes to stderr so it can never land in captured stdout.
  */
-function printBanner(logMode: LogMode, subcommand: string | null): void {
+async function printBanner(logMode: LogMode, subcommand: string | null): Promise<void> {
   if (logMode === "quiet") return;
   if (subcommand && MACHINE_READABLE.has(subcommand)) return;
   const level = colorLevel(process.stderr);
   if (level < 3) return;
-  console.error(banner({ version: pkg.version, detail: ["claude + codex"] }, level));
+  // Half-block art assumes a cell twice as tall as it is wide; line spacing is a
+  // user setting, so ask rather than assume. Returns null on any terminal that
+  // will not say, and the art falls back to the neutral 1:2.
+  const stretch = stretchFor(await queryCellRatio());
+  console.error(banner({ version: pkg.version, detail: ["claude + codex"], stretch }, level));
 }
 
 export function printHelp(): void {
@@ -217,7 +222,7 @@ export async function main() {
   const { logMode, registryCmd } = parsed;
   if (parsed.versionFlag) { printVersion(); process.exit(0); }
   if (parsed.helpFlag) { printHelp(); process.exit(0); }
-  printBanner(logMode, registryCmd?.kind ?? null);
+  await printBanner(logMode, registryCmd?.kind ?? null);
   if (!registryCmd && !parsed.prompt) {
     console.log(
       [
