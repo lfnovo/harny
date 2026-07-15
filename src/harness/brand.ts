@@ -32,7 +32,8 @@ export const PALETTE = {
 export const TAGLINE = "the harness that herds";
 
 /**
- * The collie at 46x52, extracted from the reference artwork at its own native grid.
+ * The collie at 36x40, extracted from the reference artwork at its own native grid
+ * and then scaled down by vote.
  *
  * The earlier attempts converted a 1254px illustration and never read as a dog, so
  * the sprite was drawn by hand instead. This one is neither: the reference IS pixel
@@ -52,6 +53,15 @@ export const TAGLINE = "the harness that herds";
  *     alone cannot tell contour from background. Only reachability can: flood from
  *     the border, and the 108px of black the flood never reaches are outline. Left
  *     transparent they are invisible on a dark terminal and holes on a light one.
+ *
+ * The extraction lands at 46x52, which is 26 rows of terminal on every invocation
+ * and was simply too much banner. Scaling down is the one step where mud could
+ * still creep back in, so it is a vote as well -- an average would invent tones
+ * that the palette does not contain, which is the whole failure mode above. The
+ * vote is biased by 1/frequency^0.35: a plain majority erases the eye, because six
+ * pixels of ice always lose to the fur surrounding them. 36x40 is the floor. Below
+ * it the eyes smudge to a single blue pixel and the muzzle stops holding its shape;
+ * at that size the face would have to be drawn, not resampled.
  *
  * The grid below is the source of truth and the form worth editing -- change a
  * letter and rebuild. `docs/design/collie-sprite.py` reads it back to render a
@@ -74,58 +84,46 @@ const COLORS: Record<string, readonly [number, number, number]> = {
 
 /** `.` is background: the terminal's own, never painted. */
 const SPRITE: string[] = [
-  "...###..................................####..",
-  "..#####................................#####..",
-  "..#kkk##..............................##kkk#..",
-  "..#kkk###............................###kkk#..",
-  "..#ktkk###.dd.....................d.###kktk#..",
-  "..dkttkk###dd#..................#dd###kkttkd..",
-  "..dktttkk###ddk................k#####kktttkd..",
-  "..kkptttkk####k.k............k.k####kktttpkk..",
-  "..kkpptttkk###d.kd..wwwwwww.dd.d###kktttppkk..",
-  "..kkpppkd#kkd#dd##d#wwwwww#d##d###kk#dkpppkk..",
-  "..kkppppkd##########wwwwww##########dkppppkk..",
-  ".kkkpppt#kd########dwwwwwwd########dk+tpppkkk.",
-  ".kkkppkddkdd########swwwwsd#######ddkdddptkkk.",
-  ".kdkkptkdkk##########wwww##########kkdktpkkdk.",
-  "..d#ktptkkd##########wwwwd#########dkktptk#d..",
-  "..k##kpkkd###########wwww###########dkkpk##k..",
-  "...d##d#k############wwww############k####d...",
-  ".kkkd###d#####www####wwww####www#####d###dkkk.",
-  "..kdddd######wddws###wwww###sw##w######ddkdd..",
-  "...kkdd#######ddd####wwww####dddd#######dkk...",
-  "....kd#d#############wwww####d########d#dk....",
-  "...kk#d######kkkd####wwww####dkkkdd####d#kk...",
-  "..kk#dd#####kk#+kdd#+wwww#dddk+#kkd####dd#kk..",
-  "...kkd#####kkswwkk##swwwwsd#kwkksskd####dkk...",
-  "....k######kw+wkkkd#wwwwww##kwkk+wkd#####k....",
-  "...k######ddwbkkk:ddwwwwww#dbkkkbwdd#######...",
-  "..#########ddw:kkwd#wwwwww#dw:k:wdd#####d##...",
-  ".d###d########wbb#dwwwwwwww##bbwdd##########d.",
-  "##ddd##########dddwwwwwwwwwwddd##########dddd#",
-  ".kkk###########d#wwwwwwwwwwww#dd##########kkk.",
-  "..k#############wwwwkkkkkkwwwwdd##########dk..",
-  "..k##dd########wwwwkk####kkwwwwdd######dd##k..",
-  "..d#dd########wwwwwkkkkkkkkwwwwwd#######dd#d..",
-  ".kdddd######dwwwwwwkkkkkkkkwwwwwwdd#####dkkdk.",
-  ".kkkk###d##kkwwwwwwkkkkkkkkwwwwwwkd##d###kkkk.",
-  ".k.kd#ddddkkkwkwwwwwkkkkkkwwwwwkwkkkdddd#dk.k.",
-  "...kddkkkkkkkwwkwwwwwskkswwwwwkwwkkkkkdkddk...",
-  "...kddkkkksss-wklwwwwskkswwwwlkl-ssskkkkkdk...",
-  "...kk.kkksswss-lksws-kkkk-swsks-sswsskkk.kk...",
-  "...k..kksswwwss-skkkddkkddkkks-sswwwlskk..k...",
-  ".......-sswwwwsssskktt##ttkksssswwwwss-.......",
-  ".......ss.wwwwws-wkkppttppkkw-swwwww.s-.......",
-  ".......s..wwwwwss-wkwppppwkw-sswwwww..s.......",
-  "..........ww-wwws-swkppppkws-swww-ww..........",
-  "..........sw.wwwws-lwkkkkwl-swwww.ws..........",
-  "...........s.swwwws-swwwws-swwwws.s...........",
-  "..............swwswss----sswswws..............",
-  "...............sw.wwwsssswww.ws...............",
-  "................s.-wwwwwwwws.s................",
-  "...................s-wwww-s...................",
-  ".....................-lls.....................",
-  "......................--......................",
+  "...##...........................###.",
+  "..####.........................####.",
+  "..#kk##.......................##kk#.",
+  "..#kkk##.d.................d.##kkk#.",
+  "..dttkk##dd..............#dd##kktkd.",
+  "..dtttkk##dk.............k###kkttkd.",
+  "..kptttkk##d.k..wwwww.dd.###ktttpkk.",
+  "..kpppkdkkddd#d#wwwwwd##d##kkdkppkk.",
+  "..kppppd########wwwww#######dkpppkk.",
+  ".kkppptkdd#####dswwwsd#####dd+tppkkk",
+  ".kdkptkdk########www########kdktpkdk",
+  "..dktptkd########wwwd#######dktpt#d.",
+  "..k#kpkd#########www########dkkpk#k.",
+  ".kkd#d#####www###www###ww####d###dk.",
+  "..kddd####wddws##www##sw#w#####dddd.",
+  "...kdd#####ddd###www###ddd######dk..",
+  "...kddd####kkd###www###dkkdd##ddkk..",
+  "..kkdd####k#+kd#+www#ddk+kkd###ddkk.",
+  "...kd####kswwkk#swwwsdkwksskd###dk..",
+  "...k####dd+wkk:dwwwww#bwk+wdd#####..",
+  "..#######dd:kkd#wwwwwdw:k:dd####d#..",
+  ".d##d######wbbdwwwwwww#bbdd########d",
+  "##dd########dddwwwwwwwddd#######dddd",
+  ".kk#########dwwwwwwwwwwwdd#######dk.",
+  "..k#dd######wwwkk###kkwwwd#####dd#k.",
+  "..ddd######wwwwkkkkkkkwwwd######d#d.",
+  ".kddd####kwwwwwkkkkkkkwwwwdd#d##kkdk",
+  ".k.d#dddkkkkwwwwkkkkkwwwwkkkdddddk.k",
+  "...ddkkkkkkwkwwwwskswwwwkwkkkkdkdk..",
+  "...kdkkksss-llws-kks-wsls-ssskkkkk..",
+  "...k.kkswwss-skkddkddkks-swwlskk.k..",
+  "......-swwwssssktt#ttksssswwss-.....",
+  "......sswwwws-wkpttppkw-swwwws-.....",
+  "......s.wwwwss-kwpppww-ssw-ww.s.....",
+  "........swwwww-lwkkkwlswww.ws.......",
+  ".........sswwws-swwws-wwws.s........",
+  "...........sswwss---swsws...........",
+  ".............s-wwwwwws.s............",
+  "...............s-www-s..............",
+  ".................-ls................",
 ];
 
 const COLLIE_W = SPRITE[0]!.length;
@@ -141,9 +139,9 @@ function at(x: number, y: number): readonly [number, number, number] | null {
  *
  * A terminal cell is about twice as tall as it is wide, so U+2580 -- foreground on
  * the top half, background on the bottom -- makes each half a square. That is the
- * whole trick: square pixels at two per row, so 52 rows of art cost 26 rows of
+ * whole trick: square pixels at two per row, so 40 rows of art cost 20 rows of
  * terminal. Painting a pixel with two full blocks side by side is square too, but
- * costs one terminal row each, and 52 of them is not a banner.
+ * costs one terminal row each, and 40 of them is not a banner.
  *
  * An earlier note here claimed half blocks made the dog read as a shrunken photo.
  * That was true of the art at the time, not of the technique: it was a conversion
