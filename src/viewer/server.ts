@@ -113,6 +113,7 @@ async function loadHtml(): Promise<string> {
   return await readFile(here, "utf8");
 }
 
+
 function jsonRes(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -154,6 +155,14 @@ export async function startViewer(opts: ViewerOptions = {}): Promise<{
       if (path === "/" || path === "/index.html") {
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+
+      // The mascot ships as a file, not a data URI: inlining it cost ~68KB of base64
+      // in a 92KB page. `files` in package.json already publishes all of src/.
+      if (path === "/collie.png") {
+        return new Response(Bun.file(new URL("./collie.png", import.meta.url)), {
+          headers: { "cache-control": "public, max-age=86400" },
         });
       }
 

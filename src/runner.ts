@@ -10,10 +10,32 @@ import { handleClean } from "./runner/clean.js";
 import { handleRun } from "./runner/run.js";
 import { handlePrFix } from "./runner/prFix.js";
 import { startUpdateCheck, printUpdateNotice } from "./runner/updateCheck.js";
+import { colorLevel } from "./runner/output.js";
+import { banner } from "./harness/brand.js";
 import pkg from "../package.json" with { type: "json" };
 
 export function printVersion(): void {
   console.log(`harny ${pkg.version}`);
+}
+
+/**
+ * Subcommands whose stdout is consumed by something other than a human:
+ * `show --tail` is NDJSON and `ls` is a parseable table. A banner would corrupt
+ * both, so they never get one even on a colour-capable TTY.
+ */
+const MACHINE_READABLE = new Set(["ls", "show"]);
+
+/**
+ * The banner is decoration, so every uncertainty resolves to not printing it:
+ * quiet mode, a pipe, a terminal without truecolor, or a machine-readable
+ * subcommand all skip it. Goes to stderr so it can never land in captured stdout.
+ */
+function printBanner(logMode: LogMode, subcommand: string | null): void {
+  if (logMode === "quiet") return;
+  if (subcommand && MACHINE_READABLE.has(subcommand)) return;
+  const level = colorLevel(process.stderr);
+  if (level < 3) return;
+  console.error(banner({ version: pkg.version, detail: ["claude + codex"] }, level));
 }
 
 export function printHelp(): void {
@@ -195,6 +217,7 @@ export async function main() {
   const { logMode, registryCmd } = parsed;
   if (parsed.versionFlag) { printVersion(); process.exit(0); }
   if (parsed.helpFlag) { printHelp(); process.exit(0); }
+  printBanner(logMode, registryCmd?.kind ?? null);
   if (!registryCmd && !parsed.prompt) {
     console.log(
       [
