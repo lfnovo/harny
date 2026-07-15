@@ -28,25 +28,43 @@ export interface ExecutionSummary { current_phase: string | null; retries: numbe
  * Only leaves count. A `foreach` container reports `running` for as long as any of
  * its children run, so counting it would make every task-phase run look like it was
  * sitting in `tasks`, and its attempts would double-count its children's.
+ *
+ * The winner is chosen by the clock, not by traversal order. An earlier version kept
+ * the last terminal leaf it walked past, which assumed `execution.nodes` is in
+ * execution order -- it is in *declaration* order, and a workflow is free to declare
+ * `final_validator` before the `tasks` it depends on. That version also ignored
+ * `cancelled` leaves, so a cancelled run pointed at the phase before the one it
+ * actually stopped in. Attempts carry `startedAt`/`endedAt`, so ask them.
  */
+const LIVE = new Set(["running", "paused"]);
+// `skipped` is terminal but did no work, so it is never "where the run got to".
+const TERMINAL = new Set(["completed", "failed", "cancelled"]);
+
 export function summarizeExecution(run: RunSnapshot): ExecutionSummary {
-  let current: string | null = null;
-  let last: string | null = null;
-  let retries = 0;
-  const leaf = (name: string, node: NodeInstance) => {
-    retries += Math.max(0, (node.attemptHistory?.length ?? node.attempts) - 1);
-    // First running wins: with a live node the run is there, whatever ran before.
-    if (!current && (node.status === "running" || node.status === "paused")) current = name;
-    if (node.status === "completed" || node.status === "failed") last = name;
-  };
+  const leaves: { name: string; status: string; at: string }[] = [];
   for (const node of Object.values(run.execution.nodes)) {
     const steps = Object.entries(node.steps ?? {});
-    if (!steps.length) leaf(node.id, node);
-    else for (const [key, step] of steps) leaf(`${node.id}:${key}`, step);
+    const add = (name: string, n: NodeInstance) => {
+      const attempt = n.attemptHistory?.at(-1);
+      leaves.push({ name, status: n.status, at: (LIVE.has(n.status) ? attempt?.startedAt : attempt?.endedAt) ?? "" });
+    };
+    if (!steps.length) add(node.id, node);
+    else for (const [key, step] of steps) add(`${node.id}:${key}`, step);
   }
-  // Nothing running: the run is over, or between nodes. Either way the last phase
-  // that did something is the truthful answer, and it beats falling back to Planner.
-  return { current_phase: current ?? last, retries };
+  const retries = Object.values(run.execution.nodes)
+    .flatMap((node) => (Object.keys(node.steps ?? {}).length ? Object.values(node.steps!) : [node]))
+    .reduce((sum, n) => sum + Math.max(0, (n.attemptHistory?.length ?? n.attempts) - 1), 0);
+
+  // Several leaves can be live at once across foreach items; the newest start is
+  // where the run most recently went.
+  const newest = (of: string[]) =>
+    leaves.filter((l) => of.includes(l.status)).sort((a, b) => a.at.localeCompare(b.at)).at(-1);
+  const live = newest([...LIVE]);
+  const done = leaves.filter((l) => TERMINAL.has(l.status) && l.at).sort((a, b) => a.at.localeCompare(b.at)).at(-1);
+  // A node can be terminal with no attempt recorded at all. Falling back to the last
+  // one declared is a guess, but it still beats falling back to Planner.
+  const untimed = leaves.filter((l) => TERMINAL.has(l.status)).at(-1);
+  return { current_phase: (live ?? done ?? untimed)?.name ?? null, retries };
 }
 
 export function toRunView(run: RunSnapshot, events: RunEvent[] = []): RunView {

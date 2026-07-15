@@ -37,6 +37,9 @@ function snap(nodes: RunSnapshot["execution"]["nodes"], status: RunSnapshot["exe
   };
 }
 const node = (id: string, status: string, attempts = 1) => ({ id, status, attempts } as never);
+/** A node that records when its attempt ran, which is what the clock-based pick reads. */
+const timed = (id: string, status: string, endedAt: string, startedAt = "2026-01-01T00:00:00.000Z") =>
+  ({ id, status, attempts: 1, attemptHistory: [{ number: 1, status, startedAt, endedAt }] } as never);
 
 test("summarizeExecution reports the planner while it plans", () => {
   const s = summarizeExecution(snap({ planner: node("planner", "running"), final_validator: node("final_validator", "pending", 0) }));
@@ -102,4 +105,36 @@ test("summarizeExecution reports nothing for a run that has not started", () => 
   const s = summarizeExecution(snap({ planner: node("planner", "pending", 0) }));
   expect(s.current_phase).toBeNull();
   expect(s.retries).toBe(0);
+});
+
+test("summarizeExecution picks by the clock, not by declaration order", () => {
+  // execution.nodes is in DECLARATION order, and a workflow may declare a node
+  // before the one it depends on. Walking and overwriting would answer whatever
+  // came last in the file.
+  const s = summarizeExecution(snap({
+    planner: timed("planner", "completed", "2026-01-01T00:01:00.000Z"),
+    final_validator: timed("final_validator", "completed", "2026-01-01T00:09:00.000Z"),
+    tasks: { id: "tasks", status: "completed", attempts: 1, steps: { "0.developer": timed("developer", "completed", "2026-01-01T00:05:00.000Z") } } as never,
+  }, "done"));
+  expect(s.current_phase).toBe("final_validator");
+});
+
+test("summarizeExecution reports the cancelled leaf the run stopped in", () => {
+  // Skipping cancelled leaves pointed at the phase BEFORE the one it stopped in,
+  // which is not vague, it is wrong.
+  const s = summarizeExecution(snap({
+    planner: timed("planner", "completed", "2026-01-01T00:01:00.000Z"),
+    tasks: { id: "tasks", status: "cancelled", attempts: 1, steps: { "0.developer": timed("developer", "cancelled", "2026-01-01T00:05:00.000Z") } } as never,
+  }, "cancelled"));
+  expect(s.current_phase).toBe("tasks:0.developer");
+});
+
+test("summarizeExecution prefers the newest live leaf when a foreach runs several", () => {
+  const s = summarizeExecution(snap({
+    tasks: { id: "tasks", status: "running", attempts: 1, steps: {
+      "0.developer": { id: "developer", status: "running", attempts: 1, attemptHistory: [{ number: 1, status: "running", startedAt: "2026-01-01T00:02:00.000Z" }] },
+      "1.developer": { id: "developer", status: "running", attempts: 1, attemptHistory: [{ number: 1, status: "running", startedAt: "2026-01-01T00:06:00.000Z" }] },
+    } } as never,
+  }));
+  expect(s.current_phase).toBe("tasks:1.developer");
 });
