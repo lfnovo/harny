@@ -32,7 +32,7 @@ export const PALETTE = {
 export const TAGLINE = "the harness that herds";
 
 /**
- * The collie at 24x24, as raw RGBA.
+ * The collie at 18x18, as raw RGBA.
  *
  * Baked from the illustration the viewer serves at /collie.png, so the terminal and
  * the browser show the same dog — but baked as pixel art, not as a downsample.
@@ -67,9 +67,9 @@ export const TAGLINE = "the harness that herds";
  * fur and get crushed to a flat bar. Exact colour beat extra pixels here.
  */
 const COLLIE_RGBA_B64 =
-  "AAAAAAAAAAAAAAAAOD1H/zg9R/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg9R/84PUf/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/zg9R/84PUf/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/yQoMP8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/yQoMP84PUf/OD1H/zg9R/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg9R/84PUf/OD1H/zg9R/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/1NaZv84PUf/OD1H/zg9R/84PUf/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/zg9R/84PUf/OD1H/3Z9iv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8mHkv9TWmb/JCgw/zg9R/84PUf/JCgw/5yjrf/09ff/9PX3/5yjrf8kKDD/OD1H/zg9R/8kKDD/U1pm/8mHkv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/8mHkv9TWmb/JCgw/zg9R/84PUf/OD1H/1NaZv/09ff/9PX3/1NaZv84PUf/OD1H/zg9R/8kKDD/U1pm/8mHkv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/8mHkv9TWmb/JCgw/zg9R/84PUf/OD1H/zg9R//09ff/wsjQ/zg9R/84PUf/OD1H/zg9R/8kKDD/U1pm/8mHkv8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/1NaZv84PUf/JCgw/zg9R/8kKDD/OD1H/zg9R//CyND/wsjQ/yQoMP84PUf/OD1H/zg9R/8kKDD/U1pm/1NaZv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/yQoMP84PUf/OD1H/zg9R/+co63/dn2K/yQoMP/CyND/wsjQ/yQoMP92fYr/dn2K/zg9R/84PUf/OD1H/yQoMP8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/yQoMP84PUf/OD1H/zg9R/84PUf/U1pm/zg9R//CyND/wsjQ/zg9R/9TWmb/OD1H/zg9R/84PUf/OD1H/yQoMP8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/yQoMP84PUf/OD1H/4+/6P+Pv+j/JCgw/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/yQoMP84PUf/OD1H/yQoMP8UFhr/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/zg9R/84PUf/JCgw/xQWGv+Pv+j/FBYa/1NaZv/09ff/9PX3/1NaZv+Pv+j/j7/o/3Z9iv8kKDD/OD1H/zg9R/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/zg9R/84PUf/OD1H/3Z9iv9TWmb/OD1H/5yjrf/09ff/9PX3/3Z9iv8UFhr/j7/o/1NaZv84PUf/OD1H/zg9R/84PUf/AAAAAAAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/zg9R/84PUf/OD1H/zg9R/84PUf/dn2K//T19//09ff/9PX3//T19/9TWmb/OD1H/zg9R/84PUf/OD1H/zg9R/8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/zg9R/84PUf/OD1H/zg9R/9TWmb/9PX3/8LI0P9TWmb/U1pm/8LI0P/09ff/U1pm/zg9R/84PUf/OD1H/zg9R/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/zg9R/84PUf/OD1H/1NaZv/09ff/9PX3/zg9R/8UFhr/FBYa/1NaZv/09ff/9PX3/zg9R/84PUf/OD1H/zg9R/8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/yQoMP8kKDD/FBYa/1NaZv/CyND/9PX3/8LI0P84PUf/OD1H/8LI0P/09ff/wsjQ/1NaZv8UFhr/JCgw/yQoMP8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/xQWGv8kKDD/nKOt/8LI0P+co63/nKOt//T19/92fYr/nKOt//T19/+co63/nKOt/8LI0P92fYr/JCgw/xQWGv8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACco63/9PX3//T19//CyND/dn2K/zg9R/9TWmb/U1pm/zg9R/+co63/wsjQ//T19//09ff/nKOt/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwsjQ//T19//CyND/wsjQ/3Z9iv92fYr/dn2K/3Z9iv/CyND/wsjQ//T19//CyND/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwsjQ/8LI0P/09ff/wsjQ/5yjrf+co63/nKOt/5yjrf/CyND/9PX3/8LI0P/CyND/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCyND/wsjQ/8LI0P/CyND/nKOt/8LI0P/CyND/wsjQ/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMLI0P/CyND/wsjQ/8LI0P8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACco63/nKOt/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  "AAAAAAAAAAA4PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAA4PUf/U1pm/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAA4PUf/OD1H/zg9R/9TWmb/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/zg9R/84PUf/OD1H/zg9R//09ff/9PX3/zg9R/84PUf/OD1H/zg9R//Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/yYeS/zg9R/84PUf/OD1H/zg9R//CyND/wsjQ/zg9R/84PUf/OD1H/zg9R//Jh5L/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/U1pm/yQoMP84PUf/OD1H/yQoMP/CyND/nKOt/yQoMP84PUf/OD1H/zg9R/9TWmb/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/84PUf/dn2K/zg9R/+co63/nKOt/zg9R/92fYr/OD1H/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/zg9R/+Pv+j/j7/o/yQoMP/CyND/wsjQ/yQoMP84PUf/OD1H/zg9R/8kKDD/FBYa/wAAAAAAAAAAAAAAAAAAAAAAAAAAOD1H/yQoMP8UFhr/j7/o/yQoMP/CyND/wsjQ/4+/6P+Pv+j/U1pm/zg9R/84PUf/AAAAAAAAAAAAAAAAAAAAAAAAAAA4PUf/OD1H/zg9R/9TWmb/U1pm/1NaZv/09ff/9PX3/xQWGv+Pv+j/U1pm/zg9R/84PUf/OD1H/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/8kKDD/U1pm/8LI0P/CyND/wsjQ/8LI0P9TWmb/JCgw/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/OD1H/zg9R/84PUf/9PX3/8LI0P8UFhr/FBYa/8LI0P/09ff/OD1H/zg9R/84PUf/JCgw/wAAAAAAAAAAAAAAAAAAAAAkKDD/JCgw/xQWGv9TWmb/wsjQ//T19/92fYr/dn2K//T19//CyND/U1pm/xQWGv8kKDD/JCgw/wAAAAAAAAAAAAAAAAAAAAAAAAAAJCgw/5yjrf/09ff/wsjQ/3Z9iv92fYr/dn2K/3Z9iv/CyND/9PX3/5yjrf8kKDD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMLI0P/09ff/wsjQ/3Z9iv9TWmb/U1pm/3Z9iv/CyND/9PX3/8LI0P8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADCyND/9PX3/8LI0P+co63/nKOt/8LI0P/09ff/wsjQ/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwsjQ/8LI0P/CyND/wsjQ/8LI0P/CyND/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACco63/nKOt/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
-const COLLIE_PX = 24;
+const COLLIE_PX = 18;
 /** Below this the pixel is background, not dog. */
 const ALPHA_FLOOR = 100;
 
@@ -90,9 +90,18 @@ function at(x: number, y: number): Px {
 }
 
 /**
- * The collie as half-block rows: each cell packs two vertical pixels via
- * foreground/background on U+2580, which is what makes it read as a solid image
- * instead of the gappy mush braille gives you at this size.
+ * The collie as rows of full blocks, two cells per pixel.
+ *
+ * Half-blocks (one cell, two stacked pixels) pack more detail into fewer rows,
+ * and that is exactly what made this read as a shrunken photo rather than as
+ * pixel art: at 9x9 screen pixels each, the blocks are too fine to look chosen.
+ * Two cells side by side make one ~18x18 square — the size Claude Code's own
+ * mascot uses, and the size at which a block reads as a deliberate mark.
+ *
+ * The trade is height. A collie needs more pixels than a simple blob does (ears,
+ * blaze, eyes, muzzle all have to survive), and bigger pixels over more of them
+ * costs rows: 18 lines against the 12 half-blocks would take. Their creature fits
+ * in 8 because it is a body with four legs, not a face.
  *
  * Truecolor only. There is no meaningful degraded form — without per-pixel
  * colour every cell is the same block and the dog is a rectangle — so callers
@@ -100,15 +109,13 @@ function at(x: number, y: number): Px {
  */
 export function collieRows(): string[] {
   const rows: string[] = [];
-  for (let y = 0; y < COLLIE_PX; y += 2) {
+  for (let y = 0; y < COLLIE_PX; y++) {
     let line = "";
     for (let x = 0; x < COLLIE_PX; x++) {
-      const top = at(x, y);
-      const bot = at(x, y + 1);
-      if (!top && !bot) line += "\x1b[0m ";
-      else if (top && !bot) line += `\x1b[0m\x1b[38;2;${top[0]};${top[1]};${top[2]}m▀`;
-      else if (!top && bot) line += `\x1b[0m\x1b[38;2;${bot[0]};${bot[1]};${bot[2]}m▄`;
-      else line += `\x1b[0m\x1b[38;2;${top![0]};${top![1]};${top![2]}m\x1b[48;2;${bot![0]};${bot![1]};${bot![2]}m▀`;
+      const px = at(x, y);
+      // Two cells wide: on the usual 1:2 cell this is a square, and the glyph is
+      // U+2588 rather than a half-block so there is no top/bottom seam.
+      line += px ? `\x1b[38;2;${px[0]};${px[1]};${px[2]}m██` : "\x1b[0m  ";
     }
     rows.push(`${line}\x1b[0m`);
   }
