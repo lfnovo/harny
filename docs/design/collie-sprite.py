@@ -7,13 +7,13 @@ one you preview is the one that ships. Edit a letter there, run this, look.
     python3 docs/design/collie-sprite.py        # writes collie-preview.png
 
 --------------------------------------------------------------------------------
-How the sprite was made, and why it took four tries
+How the sprite was made, and what it cost to learn
 
-The reference artwork is a 1254x1254 PNG of a border collie's face. Three earlier
-attempts converted it and none read as a dog:
+The reference artwork is a 1254x1254 PNG of a border collie's face. Several
+attempts treated it as an illustration to shrink, and every one produced mud:
 
   1. Downsample + median-cut. The palette is picked by pixel frequency, so the
-     ~6px of ice-blue eye got merged into the fur. It threw away the brand to
+     few pixels of blue eye got merged into the fur. It threw away the brand to
      save the background.
   2. Downsample + declared palette. Better, still mud -- because LANCZOS averages,
      and the mean of a black/white edge is a grey that exists nowhere in the art.
@@ -21,28 +21,46 @@ attempts converted it and none read as a dog:
   3. Vote sampling, then hand-drawing at 18x18. Clean, but 18px cannot hold a face
      with erect ears, a blaze, two eyes, a muzzle and a mouth.
 
-What all three missed: the reference IS pixel art. There was never anything to
-convert. Its native grid is 64x64 -- found by scoring candidate sizes for
-intra-cell flatness, where 64 is a sharp minimum (16.4 against 32.2 at 62 and
-23.9 at 66) -- and every cell is one flat colour. Sample at that grid by vote and
-the extraction is lossless. The other 1190 pixels are upscale and JPEG noise.
+What all of them missed: the reference IS pixel art. There was never anything to
+convert -- the job is to find the grid it was drawn on and read it there. Score
+candidate sizes by cell purity (how much of a cell is a single colour) and the
+true grid is the peak: this art peaks at 57 with 93.8%, every neighbour lower.
+Sample at that grid by vote and the extraction is lossless; the other 1197px of
+the file are upscale and JPEG noise.
 
-Two things still had to be decided rather than measured:
+That test is worth keeping, because a generator will happily say "pixel art" and
+hand back a 57-grid drawing when you asked for 32x32. Measure before trusting.
 
-  - The palette. Twelve declared entries. The two mid-greys are load-bearing:
-    without them the ramp has a hole between the fur and the white, and pink --
-    whose green channel sits exactly in that hole -- becomes the nearest colour
-    to every mid-tone. That is what speckled the muzzle twice.
+Three things still had to be decided rather than measured:
 
-  - The outline. The art draws the dog's contour in pure black on a pure black
-    field, so no threshold can separate contour from background. Only
-    reachability can: flood from the border, and the 108px of black the flood
-    never reaches are outline. Left as background they are invisible on a dark
-    terminal and holes on a light one.
+  - The palette, declared, and belonging to THIS artwork. Reusing the previous
+    sprite's palette washed the eyes to grey: that dog's eye was pale ice blue,
+    this one's is saturated cyan, so every eye pixel snapped to the nearest
+    neutral. A colour never vanishes on its own -- it vanishes when the palette
+    leaves it no seat. The mid-grey is the same story: drop it and the ramp
+    between fur and white has a hole that pink's green sits exactly inside, which
+    speckled the muzzle on two bakes.
+
+  - The vote, cast on the snapped colour rather than the raw one and biased by
+    1/frequency^0.3. This eye is a soft gradient, not blocks, so no raw value
+    repeats often enough to win its cell, and the thin blue ring loses to the fur
+    around it. Without both the eye drops from 22px to 14.
+
+  - The outline. The art draws the contour in pure black on a pure black field,
+    so no threshold separates contour from background. Only reachability can:
+    flood from the border, and the black the flood never reaches is outline. Left
+    as background it is invisible on a dark terminal and a hole on a light one.
 
 Rendering is half blocks (U+2580, fg = top pixel, bg = bottom). A terminal cell
-is about twice as tall as it is wide, so each half is square: 52 rows of art in
-26 rows of terminal.
+is about twice as tall as it is wide, so each half is square: 42 rows of art in
+21 rows of terminal.
+
+On size: rows = height / 2, and there is no trick below it -- quadrants and
+sextants subdivide a cell into non-square shapes and buy columns, not rows. So a
+smaller banner means a smaller drawing. Rescaling this sprite to buy rows was
+tried and reverted: 27% of the art is 1px detail, so a fractional rescale
+re-decides the drawing by coin flip in ~16% of cells, and the dog's face visibly
+changes. Fewer rows has to come from art drawn smaller, never squeezed smaller.
 """
 import pathlib
 import re

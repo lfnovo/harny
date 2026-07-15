@@ -3,127 +3,141 @@
  *
  * The mark is a border collie: a herding dog, which is what the harness does to
  * agents. Its coat gives the palette (graphite and white) and its eye gives the
- * one accent (ice blue).
+ * one accent (electric blue).
  *
- * The viewer mirrors PALETTE in `src/viewer/index.html` as CSS custom properties.
- * That file is static and served as a string, so it cannot import this module —
- * the hexes are duplicated there on purpose and this file is the source of truth.
+ * These are the values that actually ship: every entry is either painted by the
+ * sprite below or declared by `src/viewer/index.html`. That file is static and
+ * served as a string, so it cannot import this module — the hexes are duplicated
+ * there on purpose, and drift between the two is a bug in this file.
+ *
+ * Nothing imports PALETTE; it is documentation. That is exactly how it went wrong
+ * before, so it is worth saying plainly: an earlier version declared ice blue as
+ * "the eye" and dusty pink as "the ear" long after the artwork had changed, and
+ * named three status colours the viewer had never used. A palette no compiler
+ * checks only stays true if it is read against the thing it describes.
  */
 
 export const PALETTE = {
-  /** Coat. */
+  /** Coat. The viewer's surfaces and type. */
   graphite: "#0D0E11",
   charcoal: "#171A20",
-  slate: "#4E5663",
   silver: "#969DA8",
   white: "#F2F3F5",
-  /** The eye. The only accent harny gets. */
-  ice: "#7FB2D4",
-  iceLight: "#A6CDE4",
-  /** The ear. The only colour outside the coat, kept dusty so it cannot
-   *  compete with ice for the eye. */
-  pink: "#C98792",
-  /** Status. Sage/amber/brick sit far enough from ice to stay distinguishable. */
-  sage: "#86BF9E",
-  amber: "#D9A85C",
-  brick: "#D97070",
+  /** The eye, and the one accent. The sprite paints the eye #5199F2 and the
+   *  viewer paints the accent #4DA3F0 — near enough that the mark and the UI
+   *  finally agree, which was not true of the palette this replaced. */
+  accent: "#4DA3F0",
+  accentLight: "#7CC0FF",
+  /** The ear. The only colour outside the coat. */
+  pink: "#F09894",
+  /** Status, as the viewer declares them. */
+  wait: "#F0B849",
+  done: "#5FD39B",
+  fail: "#FF6B6B",
 } as const;
 
 export const TAGLINE = "the harness that herds";
 
 /**
- * The collie at 36x40, extracted from the reference artwork at its own native grid
- * and then scaled down by vote.
+ * The collie at 37x42, extracted from the reference artwork at its own native grid.
  *
- * The earlier attempts converted a 1254px illustration and never read as a dog, so
- * the sprite was drawn by hand instead. This one is neither: the reference IS pixel
- * art, so there was nothing to convert. Its native grid is 64x64 (found by scoring
- * candidate sizes for intra-cell flatness -- 64 is a sharp minimum), and every cell
- * is one flat colour. Sampling at that grid by vote is lossless; the extra 1190px of
- * the file are upscale and JPEG noise, and averaging them is what produced mud before.
+ * The reference IS pixel art, so there is nothing to convert -- the job is to find
+ * the grid it was drawn on and read it there. That grid is 57x57, found by scoring
+ * candidate sizes for cell purity (how much of a cell is a single colour): 57 peaks
+ * at 93.8% and every neighbour is lower. The other 1197px of the 1254px file are
+ * upscale and JPEG noise. Averaging them is what produced mud on the early attempts;
+ * a vote at the true grid is lossless.
  *
- * Two details the extraction had to decide rather than measure:
+ * Three details the extraction had to decide rather than measure:
  *
- *   - The palette is declared, not derived. Twelve entries, and the two mid-greys
- *     are load-bearing: without them the ramp has a hole between the fur and the
- *     white, and pink -- whose green sits exactly there -- becomes the nearest
- *     colour to every mid-tone. That speckled the muzzle on two earlier bakes.
+ *   - The palette is declared, not derived, and it is THIS artwork's. Inheriting the
+ *     previous sprite's palette washed the eyes out to grey: that dog's eye was a
+ *     pale ice blue and this one's is a saturated cyan, so every eye pixel snapped
+ *     to the nearest neutral. A colour does not vanish on its own -- it vanishes
+ *     when the palette leaves it no seat. The mid-grey is the same story: without
+ *     it the ramp between fur and white has a hole, and pink's green sits exactly
+ *     in that hole, which speckled the muzzle on two earlier bakes.
+ *
+ *   - The vote is on the SNAPPED colour, not the raw one, and biased by
+ *     1/frequency^0.3. This eye is drawn with a soft gradient rather than in blocks,
+ *     so no raw value repeats often enough to win a cell, and the thin blue ring is
+ *     outnumbered by the fur around it. Without both, the eye drops from 22px to 14.
  *
  *   - The artwork outlines the dog in pure black on a pure black field, so colour
  *     alone cannot tell contour from background. Only reachability can: flood from
- *     the border, and the 108px of black the flood never reaches are outline. Left
- *     transparent they are invisible on a dark terminal and holes on a light one.
+ *     the border, and the black the flood never reaches is outline. Left as
+ *     background it is invisible on a dark terminal and a hole on a light one.
  *
- * The extraction lands at 46x52, which is 26 rows of terminal on every invocation
- * and was simply too much banner. Scaling down is the one step where mud could
- * still creep back in, so it is a vote as well -- an average would invent tones
- * that the palette does not contain, which is the whole failure mode above. The
- * vote is biased by 1/frequency^0.35: a plain majority erases the eye, because six
- * pixels of ice always lose to the fur surrounding them. 36x40 is the floor. Below
- * it the eyes smudge to a single blue pixel and the muzzle stops holding its shape;
- * at that size the face would have to be drawn, not resampled.
+ * On size: rows = height / 2, and that is not negotiable (see collieRows). 42 rows
+ * of art is 21 rows of terminal. Scaling the sprite down to buy rows was tried and
+ * reverted -- 27% of this art is 1px detail, so a fractional rescale re-decides the
+ * drawing by coin flip in ~16% of cells and visibly changes the dog's face. Fewer
+ * rows has to come from art drawn smaller, not from art squeezed smaller.
  *
  * The grid below is the source of truth and the form worth editing -- change a
  * letter and rebuild. `docs/design/collie-sprite.py` reads it back to render a
  * preview, so there is only ever one copy.
  */
 const COLORS: Record<string, readonly [number, number, number]> = {
-  k: [0x14, 0x16, 0x1a], // ink: outline, nose, pupil
-  d: [0x24, 0x28, 0x30], // fur, shadowed
-  "#": [0x3a, 0x40, 0x4b], // fur
-  "+": [0x4e, 0x56, 0x63], // fur, lit
-  ":": [0x76, 0x7d, 0x8a], // }  the ramp between fur and white. Remove either and
-  "-": [0x9c, 0xa3, 0xad], // }  pink becomes the nearest colour to every mid grey.
-  s: [0xc2, 0xc8, 0xd0], // white, shadowed
-  w: [0xf4, 0xf5, 0xf7], // white: blaze, muzzle, ruff
-  b: [0x8f, 0xbf, 0xe8], // the eye. The one accent.
-  l: [0xd6, 0xe8, 0xf7], // the eye, catchlight
-  p: [0xc9, 0x87, 0x92], // inner ear
-  t: [0xa8, 0x5f, 0x68], // tongue
+  k: [0x16, 0x18, 0x20], // ink: outline, nose, pupil
+  d: [0x20, 0x24, 0x2c], // fur, shadowed
+  "#": [0x38, 0x3c, 0x44], // fur
+  "+": [0x48, 0x48, 0x54], // fur, lit
+  ":": [0x76, 0x7d, 0x8a], // the ramp between fur and white. Drop it and pink,
+  //                          whose green sits exactly there, wins every mid grey.
+  s: [0xc0, 0xb8, 0xb8], // white, shadowed
+  w: [0xf8, 0xf8, 0xf8], // white: blaze, muzzle, ruff
+  B: [0x0c, 0x4f, 0xa1], // }
+  b: [0x51, 0x99, 0xf2], // }  the eye, in three tones. It is drawn with a soft
+  l: [0x6f, 0xd2, 0xfd], // }  gradient, so one flat blue would not read as an eye.
+  p: [0xf0, 0x98, 0x94], // inner ear
+  t: [0xcc, 0x78, 0x78], // tongue
 };
 
 /** `.` is background: the terminal's own, never painted. */
 const SPRITE: string[] = [
-  "...##...........................###.",
-  "..####.........................####.",
-  "..#kk##.......................##kk#.",
-  "..#kkk##.d.................d.##kkk#.",
-  "..dttkk##dd..............#dd##kktkd.",
-  "..dtttkk##dk.............k###kkttkd.",
-  "..kptttkk##d.k..wwwww.dd.###ktttpkk.",
-  "..kpppkdkkddd#d#wwwwwd##d##kkdkppkk.",
-  "..kppppd########wwwww#######dkpppkk.",
-  ".kkppptkdd#####dswwwsd#####dd+tppkkk",
-  ".kdkptkdk########www########kdktpkdk",
-  "..dktptkd########wwwd#######dktpt#d.",
-  "..k#kpkd#########www########dkkpk#k.",
-  ".kkd#d#####www###www###ww####d###dk.",
-  "..kddd####wddws##www##sw#w#####dddd.",
-  "...kdd#####ddd###www###ddd######dk..",
-  "...kddd####kkd###www###dkkdd##ddkk..",
-  "..kkdd####k#+kd#+www#ddk+kkd###ddkk.",
-  "...kd####kswwkk#swwwsdkwksskd###dk..",
-  "...k####dd+wkk:dwwwww#bwk+wdd#####..",
-  "..#######dd:kkd#wwwwwdw:k:dd####d#..",
-  ".d##d######wbbdwwwwwww#bbdd########d",
-  "##dd########dddwwwwwwwddd#######dddd",
-  ".kk#########dwwwwwwwwwwwdd#######dk.",
-  "..k#dd######wwwkk###kkwwwd#####dd#k.",
-  "..ddd######wwwwkkkkkkkwwwd######d#d.",
-  ".kddd####kwwwwwkkkkkkkwwwwdd#d##kkdk",
-  ".k.d#dddkkkkwwwwkkkkkwwwwkkkdddddk.k",
-  "...ddkkkkkkwkwwwwskswwwwkwkkkkdkdk..",
-  "...kdkkksss-llws-kks-wsls-ssskkkkk..",
-  "...k.kkswwss-skkddkddkks-swwlskk.k..",
-  "......-swwwssssktt#ttksssswwss-.....",
-  "......sswwwws-wkpttppkw-swwwws-.....",
-  "......s.wwwwss-kwpppww-ssw-ww.s.....",
-  "........swwwww-lwkkkwlswww.ws.......",
-  ".........sswwws-swwws-wwws.s........",
-  "...........sswwss---swsws...........",
-  ".............s-wwwwwws.s............",
-  "...............s-www-s..............",
-  ".................-ls................",
+  "..k+++.........................+++...",
+  "..+#+++......................k+++++..",
+  "..+kk+++....................k+++kk+..",
+  "..+kkk#++k+k...............k++#kkk+..",
+  "..+ktkk##+++k...........k.k+##kktk+..",
+  "..dkptkk##d#+...........+k###kktpk+..",
+  "..dkpttkk####..kkkkkkkk.+###kkttpkd..",
+  "..dkppttkk##dk#:wwwww+#kd##kkttppkd..",
+  "..dkppd##kd#####wwwww#####dk##pppkd..",
+  ".kdkpptkd########www########dktppkd..",
+  ".ddkppptk########www########ktpppk#d.",
+  ".d##kpkkkd#######www#######dkkkpk##d.",
+  "..d#kptk#########www#########ktpk#d..",
+  "...##kdd#########www#########dtk##...",
+  ".dddd######www###www###www#######ddd.",
+  ".ddddd####w###w##www##w###w####ddddd.",
+  "..kdd+###########www###########+ddk..",
+  "...d++#####kkk###www###kkk#####++k...",
+  "..k+######kBwkk##www##kwB+k#####+#k..",
+  "..ddd####kwBwkB##www##BwkBwk####ddd..",
+  "...k#####kwbkkl#wwwww#lkkBwk#####d...",
+  "..++#######blbl#wwwww#lbll#######++..",
+  ".++#########lb#wwwwwww#bl##########+.",
+  "+#############wwwkkkwww#############+",
+  "..dd########wwwwk###kwwww########dd..",
+  "...########wwwwwkkkkkwwwwwd#######...",
+  "..k##d####dwwwwwkkkkkwwwwwd####d##k..",
+  "..d#dd##ddwwkwwwwkkkwwwwkwwdd##dd#d..",
+  "..ddk##dddwwkwwwwwkwwwwwkwwddd##ddd..",
+  "..d.d#dddd#wwkwwwkkkwwwkww+dddd#d.d..",
+  "....ddkdwwswwskkk#k#kkkswwswwdkdd....",
+  "....dkkwwwssswkkttkttkkwwsswwwkkd....",
+  ".....kwwwwwsswwktptptkwssswwwww......",
+  ".....kwswwwwsswkwpppwkwsswwwwsw......",
+  ".....kskwwwwwsswkpppkwsswwwwwks......",
+  ".......kwswwwwssskkkwsswwwwsw........",
+  ".......kskwwwswsswwwsswswwwkk........",
+  "..........kwwswwssssswwkww...........",
+  "...........kkkwswwwwwswkw............",
+  ".............kk.kwwwk.k..............",
+  ".................kwk.................",
+  ".................kk..................",
 ];
 
 const COLLIE_W = SPRITE[0]!.length;
@@ -139,9 +153,13 @@ function at(x: number, y: number): readonly [number, number, number] | null {
  *
  * A terminal cell is about twice as tall as it is wide, so U+2580 -- foreground on
  * the top half, background on the bottom -- makes each half a square. That is the
- * whole trick: square pixels at two per row, so 40 rows of art cost 20 rows of
+ * whole trick: square pixels at two per row, so 42 rows of art cost 21 rows of
  * terminal. Painting a pixel with two full blocks side by side is square too, but
- * costs one terminal row each, and 40 of them is not a banner.
+ * costs one terminal row each, and 42 of them is not a banner.
+ *
+ * This is the densest a square pixel gets. Quadrants (U+2596..) and sextants
+ * (U+1FB00..) subdivide a cell further, but into 1x2 and 3x4 shapes -- they buy
+ * columns, never rows, and they distort. rows = height / 2 is the floor.
  *
  * An earlier note here claimed half blocks made the dog read as a shrunken photo.
  * That was true of the art at the time, not of the technique: it was a conversion
@@ -199,7 +217,7 @@ export function banner(opts: BannerOpts, level: number): string {
   // art's own height instead of stacking two blocks of vertical space.
   const text = [wordmark(WORDMARK), dim(TAGLINE), "", dim(`v${version}`), ...detail.map(dim)];
   // Centre the text against the art rather than pinning it to fixed rows, so
-  // changing COLLIE_PX cannot silently leave it stranded at the top.
+  // resizing the sprite cannot silently leave it stranded at the top.
   const top = Math.max(0, Math.floor((art.length - text.length) / 2));
   const out: string[] = [""];
   art.forEach((row, i) => {
