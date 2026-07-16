@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format loosely foll
 
 ## [Unreleased]
 
+### Added
+- **Visual identity.** A border collie mark (a herding dog — which is what the harness does to agents), an electric-blue accent taken from its eye, and the line "the harness that herds". `src/harness/brand.ts` is the source of truth for the palette and the sprite; the viewer duplicates the hexes on purpose, because it is served as a static string and cannot import the module.
+- **CLI banner.** A truecolor TTY gets the collie and wordmark on **stderr**, before a run and before `ui`, `clean`, `answer` and `scan`. It is skipped by `--quiet`, by `ls` and `show` — whose stdout is a contract, so `show --tail` NDJSON and the `ls` table stay parseable — by `--version` and `--help`, which exit first, and by any terminal below truecolor, where the art has no meaningful degraded form. A pipe skips it too, unless `FORCE_COLOR` says otherwise: that variable is the caller stating a level on purpose, and it wins, which is what makes the banner scriptable.
+
+### Changed
+- **Run detail page rebuilt around the run's own story** (partially addresses #117). The page led with eight equal-weight KPI cards and buried what the run produced; it now reads ask → work → result. A timeline built from each phase's real `started_at`/`ended_at` replaces the pipeline ribbon, which told a three-stage story these five-phase runs do not have — and omitted `final_validator`, which turns out to eat ~50% of the wall clock.
+
+### Fixed
+- **Phase matching ignored scoped node names.** `startsWith('developer')` never matched `tasks:0.developer` or `final_validator`, and `if (idx < 0) idx = 0` pinned the pipeline to Planner for entire runs. Five call sites were affected, including iteration grouping, which never split.
+- **The live pipeline froze between phase transitions.** The bars are a function of `Date.now()`, but the page only re-renders when the run's JSON signature changes — and a running phase changes nothing while it runs. Only a manual reload moved them.
+- **Phases that had not started rendered in the "done" colour.** The bare `.tnode` is the pending state, and it was styled with `var(--done)`.
+- **Recent events showed bare timestamps.** The summariser read `e.event` and `e.phase`; `RunEvent` has never had either field.
+- **Finished Claude tools rendered as a nameless `tool`.** The adapter emits the real name on `tool_use` but hardcodes `name: "tool"` on `tool_result`, and the transcript replaced records by id. The viewer now merges records and keeps identity fields from the first — the adapter itself is unchanged, so the provider-side bug remains.
+
 ## [0.5.0] — 2026-07-13
 
 ### Added

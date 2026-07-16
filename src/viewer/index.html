@@ -4,48 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>harny viewer</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iIzhCN0JGRiIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iNSIgcj0iMiIgZmlsbD0iI0VDRUNGMiIvPjxsaW5lIHgxPSIxNiIgeTE9IjciIHgyPSIxNiIgeTI9IjEwIiBzdHJva2U9IiNFQ0VDRjIiIHN0cm9rZS13aWR0aD0iMiIvPjxyZWN0IHg9IjYiIHk9IjkiIHdpZHRoPSIyMCIgaGVpZ2h0PSIxNiIgcng9IjUiIGZpbGw9IiMxNDE0MUQiLz48cmVjdCB4PSIxMSIgeT0iMTQiIHdpZHRoPSIzLjIiIGhlaWdodD0iNiIgcng9IjEuNiIgZmlsbD0iI0E3OUFGRiIvPjxyZWN0IHg9IjE3LjgiIHk9IjE0IiB3aWR0aD0iMy4yIiBoZWlnaHQ9IjYiIHJ4PSIxLjYiIGZpbGw9IiNBNzlBRkYiLz48L3N2Zz4=" />
+  <link rel="icon" type="image/png" href="data:image/png;base64,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KFfbvvSlL736wvO/+riO7AFA1M/+f20f/FuvuLXWv//++8V111779XPP635vpVJlaGho3BojFy5a2FypVKyUShitGRkeplKp1lB6YoK3vvV6nn3uOe6663cYHxll07mr6WzKIYRgYGyUZ3ftprv7XP7u619jwYL5/OSxH7NwwQI8zyORTNLU3ITruRhtbDKZEEePHd+XSqY6srlMNpFIyscf/9kDu3bt+kh/f7/z1FN73VOnXi39P3wi6990VZ988knV29trDhw8+GipWBKVcpkf/vChO4IweNpxHKJImyiqdYRaWlsRQpCIxdBRxL8+/TQb3vxmHv/pj7n34/eh29vZMTbBSxNTJBcs4tOf+Qt+9MjDLFwwn74nniQRj6MchRfzaGmt7SJGYUgURcaLxTg0cPjRF7dv/0gsFpcjw8PR4cOHt/X29pof/OAH0b9V+P9XDxDTZW7nunXJx77x969MjE/YazZvPqevr+/PVq9eeV8+n4+stc70rqBf9TkxNIQ1lgMHD7Fw0QK6u1eTSqUxWlOp1iq+RCJR++hLPs/LL+9kanKS5cuWYQV0ze2q1xTTvT+h4/G4+vnPf3Hn+973vq/vfPmlqUq18sLGjZdurm+D2Tfe2Hzj638D9r5wRLnOpcMAAAAASUVORK5CYII=" />
   <script>document.documentElement.setAttribute('data-theme', 'dark');</script>
   <script src="https://cdn.jsdelivr.net/npm/marked@14.1.3/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <style>
     :root {
-      --bg:#0B0B11; --bg-2:#101018; --surface:#14141D; --surface-2:#191924;
-      --border:#262633; --border-2:#32323F; --text:#ECECF2; --text-mut:#9A9AAB; --text-dim:#6C6C7D;
-      --accent:#8B7BFF; --accent-2:#A79AFF; --accent-bg:rgba(139,123,255,0.12); --accent-line:rgba(139,123,255,0.30);
-      --run:#5EA0FF;  --run-bg:rgba(94,160,255,0.13);
-      --wait:#F0B84D; --wait-bg:rgba(240,184,77,0.13);
-      --done:#4FD8A0; --done-bg:rgba(79,216,160,0.13);
-      --fail:#FF6E86; --fail-bg:rgba(255,110,134,0.13);
+      --bg:#0D0E11; --bg-2:#111318; --surface:#171A20; --surface-2:#1D2128;
+      --border:#262B34; --border-2:#333A45; --text:#F2F3F5; --text-mut:#969DA8; --text-dim:#6A717C;
+      --accent:#4DA3F0; --accent-2:#7CC0FF; --accent-bg:rgba(77,163,240,0.14); --accent-line:rgba(77,163,240,0.38);
+      --plan:#8FA6BC; --plan-bg:rgba(143,166,188,0.14);
+      --run:#4DA3F0;  --run-bg:rgba(77,163,240,0.15);
+      --wait:#F0B849; --wait-bg:rgba(240,184,73,0.14);
+      --done:#5FD39B; --done-bg:rgba(95,211,155,0.14);
+      --fail:#FF6B6B; --fail-bg:rgba(255,107,107,0.14);
       --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
       --radius:12px;
     }
     @media (prefers-color-scheme: light) {
       :root {
-        --bg:#F6F6FA; --bg-2:#FFFFFF; --surface:#FFFFFF; --surface-2:#FBFBFE;
-        --border:#E7E7EF; --border-2:#DBDBE6; --text:#1A1A24; --text-mut:#5B5B6B; --text-dim:#8C8C9C;
-        --accent:#6252E6; --accent-2:#5443D6; --accent-bg:rgba(98,82,230,0.09); --accent-line:rgba(98,82,230,0.24);
-        --run:#2B6FD6;  --run-bg:rgba(43,111,214,0.10);
-        --wait:#B47A0C; --wait-bg:rgba(180,122,12,0.10);
-        --done:#128A5A; --done-bg:rgba(18,138,90,0.10);
-        --fail:#D53A54; --fail-bg:rgba(213,58,84,0.10);
+        --bg:#F6F7F9; --bg-2:#FFFFFF; --surface:#FFFFFF; --surface-2:#FAFBFC;
+        --border:#E4E7EB; --border-2:#D5DAE0; --text:#171A20; --text-mut:#586170; --text-dim:#828B99;
+        --accent:#1B7FD4; --accent-2:#1568B0; --accent-bg:rgba(27,127,212,0.10); --accent-line:rgba(27,127,212,0.30);
+        --plan:#5A6675; --plan-bg:rgba(90,102,117,0.11);
+        --run:#1B7FD4;  --run-bg:rgba(27,127,212,0.11);
+        --wait:#A9720A; --wait-bg:rgba(169,114,10,0.11);
+        --done:#12925E; --done-bg:rgba(18,146,94,0.11);
+        --fail:#D93A3A; --fail-bg:rgba(217,58,58,0.11);
         --shadow:0 1px 2px rgba(24,24,40,0.05), 0 10px 30px -18px rgba(24,24,40,0.18);
       }
     }
     :root[data-theme="dark"] {
-      --bg:#0B0B11; --bg-2:#101018; --surface:#14141D; --surface-2:#191924;
-      --border:#262633; --border-2:#32323F; --text:#ECECF2; --text-mut:#9A9AAB; --text-dim:#6C6C7D;
-      --accent:#8B7BFF; --accent-2:#A79AFF; --accent-bg:rgba(139,123,255,0.12); --accent-line:rgba(139,123,255,0.30);
-      --run:#5EA0FF; --run-bg:rgba(94,160,255,0.13); --wait:#F0B84D; --wait-bg:rgba(240,184,77,0.13);
-      --done:#4FD8A0; --done-bg:rgba(79,216,160,0.13); --fail:#FF6E86; --fail-bg:rgba(255,110,134,0.13);
-      --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
+    --bg:#0D0E11; --bg-2:#111318; --surface:#171A20; --surface-2:#1D2128;
+    --border:#262B34; --border-2:#333A45; --text:#F2F3F5; --text-mut:#969DA8; --text-dim:#6A717C;
+    --accent:#4DA3F0; --accent-2:#7CC0FF; --accent-bg:rgba(77,163,240,0.14); --accent-line:rgba(77,163,240,0.38);
+    --plan:#8FA6BC; --plan-bg:rgba(143,166,188,0.14);
+    --run:#4DA3F0;  --run-bg:rgba(77,163,240,0.15);
+    --wait:#F0B849; --wait-bg:rgba(240,184,73,0.14);
+    --done:#5FD39B; --done-bg:rgba(95,211,155,0.14);
+    --fail:#FF6B6B; --fail-bg:rgba(255,107,107,0.14);
+    --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
     }
     :root[data-theme="light"] {
-      --bg:#F6F6FA; --bg-2:#FFFFFF; --surface:#FFFFFF; --surface-2:#FBFBFE;
-      --border:#E7E7EF; --border-2:#DBDBE6; --text:#1A1A24; --text-mut:#5B5B6B; --text-dim:#8C8C9C;
-      --accent:#6252E6; --accent-2:#5443D6; --accent-bg:rgba(98,82,230,0.09); --accent-line:rgba(98,82,230,0.24);
-      --run:#2B6FD6; --run-bg:rgba(43,111,214,0.10); --wait:#B47A0C; --wait-bg:rgba(180,122,12,0.10);
-      --done:#128A5A; --done-bg:rgba(18,138,90,0.10); --fail:#D53A54; --fail-bg:rgba(213,58,84,0.10);
+      --bg:#F6F7F9; --bg-2:#FFFFFF; --surface:#FFFFFF; --surface-2:#FAFBFC;
+      --border:#E4E7EB; --border-2:#D5DAE0; --text:#171A20; --text-mut:#586170; --text-dim:#828B99;
+      --accent:#1B7FD4; --accent-2:#1568B0; --accent-bg:rgba(27,127,212,0.10); --accent-line:rgba(27,127,212,0.30);
+      --plan:#5A6675; --plan-bg:rgba(90,102,117,0.11);
+      --run:#1B7FD4;  --run-bg:rgba(27,127,212,0.11);
+      --wait:#A9720A; --wait-bg:rgba(169,114,10,0.11);
+      --done:#12925E; --done-bg:rgba(18,146,94,0.11);
+      --fail:#D93A3A; --fail-bg:rgba(217,58,58,0.11);
       --shadow:0 1px 2px rgba(24,24,40,0.05), 0 10px 30px -18px rgba(24,24,40,0.18);
     }
 
@@ -123,10 +131,8 @@
     .pg { position:absolute; inset:0; }
     .pg .edge { stroke:var(--accent-line); stroke-width:1.5; fill:none; stroke-dasharray:60; stroke-dashoffset:60; animation:draw 3s ease-in-out infinite; }
     .pg .edge.e2 { animation-delay:.5s } .pg .edge.e3 { animation-delay:1s } .pg .edge.e4 { animation-delay:1.4s }
-    @keyframes draw { 0%{stroke-dashoffset:60} 40%{stroke-dashoffset:0} 86%{stroke-dashoffset:0; opacity:1} 100%{stroke-dashoffset:0; opacity:.15} }
     .pg .pn { fill:var(--surface-2); stroke:var(--accent-2); stroke-width:1.5; transform-origin:center; animation:pop 3s ease-in-out infinite; }
     .pg .pn.n2{animation-delay:.4s} .pg .pn.n3{animation-delay:.9s} .pg .pn.n4{animation-delay:1.3s}
-    @keyframes pop { 0%{transform:scale(0); opacity:0} 18%{transform:scale(1.15)} 30%{transform:scale(1); opacity:1} 90%{opacity:1} 100%{opacity:.2} }
 
     .code { position:absolute; inset:0; padding:9px 10px; display:flex; flex-direction:column; gap:6px; }
     .code .ln { height:6px; border-radius:3px; width:0; }
@@ -146,28 +152,14 @@
     @keyframes sweep { 0%{left:6px} 46%{left:118px} 54%{left:118px} 100%{left:6px} }
     .bug { position:absolute; left:120px; top:30px; color:var(--fail); animation:bugcatch 3s ease-in-out infinite; }
     .bug svg { width:15px; height:15px; display:block; }
-    @keyframes bugcatch { 0%,38%{opacity:1; transform:scale(1)} 50%{opacity:1; transform:scale(1.25)} 60%{opacity:0; transform:scale(.4)} 100%{opacity:0} }
     .caught { position:absolute; left:120px; top:31px; color:var(--done); opacity:0; animation:caught 3s ease-in-out infinite; }
     .caught svg{width:14px;height:14px;display:block}
-    @keyframes caught { 0%,58%{opacity:0; transform:scale(.4)} 68%{opacity:1; transform:scale(1)} 92%{opacity:1} 100%{opacity:0} }
 
     .mascot { position:absolute; left:50%; top:150px; transform:translateX(-50%); z-index:3; width:150px; animation:bob 5s ease-in-out infinite; }
     @keyframes bob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-9px)} }
     .mascot .shadow { position:absolute; left:50%; bottom:-18px; width:96px; height:16px; transform:translateX(-50%);
                       background:radial-gradient(closest-side, rgba(0,0,0,.35), transparent); animation:shadow 5s ease-in-out infinite; }
     @keyframes shadow { 0%,100%{opacity:.55; transform:translateX(-50%) scale(1)} 50%{opacity:.3; transform:translateX(-50%) scale(.8)} }
-    .antenna-orb { animation:orbpulse 2.4s ease-in-out infinite; transform-origin:center; }
-    @keyframes orbpulse { 0%,100%{opacity:.7} 50%{opacity:1} }
-    .eyes { animation:blink 5.5s infinite; transform-origin:center; transform-box:fill-box; }
-    @keyframes blink { 0%,92%,100%{transform:scaleY(1)} 96%{transform:scaleY(.12)} }
-    .pupils { animation:look 9s ease-in-out infinite; }
-    @keyframes look {
-      0%,6%{transform:translate(0,-2px)}
-      22%,30%{transform:translate(0,-2px)}
-      41%,61%{transform:translate(4px,2px)}
-      74%,94%{transform:translate(-4px,2px)}
-      100%{transform:translate(0,-2px)}
-    }
 
     .agent-legend { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; max-width:760px; margin:20px auto 0; }
     .leg { text-align:left; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; }
@@ -231,14 +223,131 @@
     .back { display:inline-flex; align-items:center; gap:6px; color:var(--accent-2); text-decoration:none; font-size:13px; font-weight:520; }
     .back:hover { text-decoration:underline; }
     .head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:14px 0 4px; flex-wrap:wrap; }
-    .cta-out { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; background:var(--accent);
-               color:#fff; font-size:13px; font-weight:560; text-decoration:none; }
-    .metaline { color:var(--text-mut); font-size:13px; margin:4px 0 24px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .metaline { color:var(--text-mut); font-size:13px; margin:9px 0 26px; display:flex; gap:9px;
+                align-items:baseline; flex-wrap:wrap; }
+    /* A rule, not a glyph: a "·" sits on the text baseline and drifts when the
+       items around it are different sizes. A block with its own height stays put. */
+    .f-sep { width:1px; height:15px; background:var(--text-dim); opacity:.55; flex:0 0 auto; align-self:center; }
+    /* the numbers you scan */
+    .f-val { font-size:15px; font-weight:600; color:var(--text); letter-spacing:-0.015em;
+             font-variant-numeric:tabular-nums; }
+    .f-val span { font-variant-numeric:tabular-nums; }
+    /* the context you read once */
+    .f-ctx { font-size:12.5px; color:var(--text-dim); }
     .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
     .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
     .panel h3 { margin:0 0 12px; font-size:11px; font-weight:640; letter-spacing:0.07em; text-transform:uppercase; color:var(--text-dim); }
     dl { margin:0; display:grid; grid-template-columns:auto 1fr; gap:7px 14px; font-size:13px; }
     dl dt { color:var(--text-dim); } dl dd { margin:0; color:var(--text); word-break:break-word; }
+    /* ---- timeline: the run's real shape. Offset = when, width = how long. ---- */
+    .timeline { padding:18px 22px 14px; margin-bottom:24px; }
+    /* Ticks turn the empty stretch of a track into a scale: without them the gap
+       before a bar reads as blank space rather than as elapsed time. */
+    .tl-grid { position:absolute; inset:4px; pointer-events:none; border-radius:3px; overflow:hidden;
+               background-image:repeating-linear-gradient(90deg,
+                 transparent 0, transparent calc(25% - 1px),
+                 var(--border) calc(25% - 1px), var(--border) 25%); opacity:.5; }
+    .tl-axis { display:grid; grid-template-columns:88px 1fr 92px; gap:12px; margin-top:8px; }
+    .tl-axis-in { position:relative; height:14px; margin:0 4px; }
+    .tl-axis-in span { position:absolute; top:0; transform:translateX(-50%); font-size:10px;
+                       color:var(--text-dim); font-variant-numeric:tabular-nums; }
+    .tl-axis-in span:first-child { transform:none; }
+    .tl-axis-in span:last-child { transform:translateX(-100%); }
+    .tl-row { display:grid; grid-template-columns:88px 1fr 92px; gap:12px; align-items:center; padding:3px 0; }
+    .tl-name { font-size:12.5px; color:var(--text-mut); text-align:right; white-space:nowrap;
+               overflow:hidden; text-overflow:ellipsis; }
+    .tl-track { position:relative; height:26px; border-radius:7px; background:var(--bg-2);
+                box-shadow:inset 0 0 0 1px var(--border); padding:4px; }
+    /* the lane is the 0 -> total-time span; bars and the axis below both measure against it */
+    .tl-lane { position:relative; height:100%; }
+    /* Duration and share ride together at a fixed offset from the track, so the
+       numbers stay next to the thing they measure instead of drifting to the far
+       edge of a wide card. */
+    .tl-meta { display:flex; align-items:baseline; justify-content:flex-end; gap:8px; }
+    .tl-bar { position:absolute; top:0; bottom:0; border-radius:5px; min-width:3px;
+              background:linear-gradient(180deg, color-mix(in srgb,var(--c) 92%,white), var(--c));
+              box-shadow:0 1px 3px -1px color-mix(in srgb,var(--c) 60%,transparent);
+              animation:tl-in .5s cubic-bezier(.2,.8,.2,1) both; transform-origin:left center; }
+    @keyframes tl-in { from { transform:scaleX(0); opacity:0 } to { transform:scaleX(1); opacity:1 } }
+    .tl-bar.live { box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 45%,transparent), 0 0 18px -2px var(--c); }
+    .tl-bar.fail { --c:var(--fail); }
+    /* the dog rides the head of the bar that is still growing */
+    .tl-dog { position:absolute; right:-11px; top:50%; width:22px; height:22px; margin-top:-11px;
+              border-radius:50%; background:var(--bg-2); box-shadow:0 0 0 1.5px var(--c); overflow:hidden;
+              display:grid; place-items:center; animation:tl-bob 2.4s ease-in-out infinite; }
+    .tl-dog img { width:20px; height:20px; display:block; }
+    @keyframes tl-bob { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-2px) } }
+    .tl-dur { font-size:12px; color:var(--text-mut); font-variant-numeric:tabular-nums; }
+    .tl-pct { font-size:11px; color:var(--text-dim); font-variant-numeric:tabular-nums; min-width:30px; text-align:right; }
+    .tl-row:hover .tl-name, .tl-row:hover .tl-dur { color:var(--text); }
+    @media (max-width:720px) { .tl-row, .tl-axis { grid-template-columns:62px 1fr 62px; } .tl-pct { display:none; } }
+
+    /* ---- the ask: the prompt that started it all ---- */
+    .ask { position:relative; margin:0 0 24px; padding:14px 18px 14px 20px; border-radius:var(--radius);
+           background:var(--surface); border:1px solid var(--border); }
+    /* Tapers in WIDTH, not opacity: full thickness at the middle, drawn down to a
+       hairline at both ends. A gradient cannot do this — it changes alpha and
+       leaves the stroke the same thickness the whole way down — so the shape is
+       cut with clip-path instead. */
+    .ask::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px;
+                   background:var(--accent);
+                   clip-path:polygon(50% 0%, 100% 12%, 100% 88%, 50% 100%, 0% 88%, 0% 12%); }
+    .ask p { margin:0; font-size:13.5px; color:var(--text-mut); line-height:1.6; text-wrap:pretty;
+             display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .ask.open p { -webkit-line-clamp:unset; }
+
+    /* ---- outcome: what the run produced. The reason the page gets opened. ---- */
+    .outcome { padding:4px 0; margin-bottom:24px; }
+    .oc-row { display:grid; grid-template-columns:auto 1fr; gap:12px; padding:14px 18px; border-top:1px solid var(--border); }
+    .oc-row:first-child { border-top:0; }
+    .oc-mark { width:20px; height:20px; margin-top:1px; flex:0 0 auto; overflow:visible; }
+    .oc-mark.ok { --c:var(--done); } .oc-mark.bad { --c:var(--fail); }
+    .oc-ring { fill:color-mix(in srgb,var(--c) 13%,transparent); stroke:var(--c); stroke-width:1.6; opacity:.85; }
+    .oc-tick { fill:none; stroke:var(--c); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;
+               stroke-dasharray:26; stroke-dashoffset:26; animation:oc-draw .42s .12s cubic-bezier(.2,.8,.2,1) forwards; }
+    @keyframes oc-draw { to { stroke-dashoffset:0 } }
+    .oc-mark.ok .oc-ring { animation:oc-pop .38s cubic-bezier(.2,1.4,.3,1) both; transform-origin:center; transform-box:fill-box; }
+    @keyframes oc-pop { from { transform:scale(.7); opacity:0 } to { transform:scale(1); opacity:.85 } }
+    .oc-msg { font-size:14px; font-weight:560; letter-spacing:-0.01em; text-wrap:balance; }
+    .oc-meta { display:flex; align-items:center; gap:8px; margin-top:5px; font-size:12px; color:var(--text-dim); }
+    .oc-files { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+    .oc-files span { font-size:11.5px; color:var(--text-mut); background:var(--surface-2);
+                     border:1px solid var(--border); border-radius:6px; padding:2px 7px; }
+    .oc-cta { border-top:1px solid var(--border); padding:11px 18px; }
+    .oc-cta code { font-size:12px; color:var(--text-mut); background:var(--bg-2);
+                   border:1px solid var(--border); border-radius:7px; padding:5px 9px; user-select:all; }
+
+    /* ---- provenance: last on the page, but not behind a click ---- */
+    .fold { margin-bottom:24px; }
+    .fold-body { padding:2px 18px 18px; }
+
+    /* ---- usage by attempt: a table, because these are columns to compare ---- */
+    .ua { width:100%; border-collapse:collapse; font-size:12px; margin:16px 0 22px; }
+    .ua th { text-align:left; font-size:10px; font-weight:640; letter-spacing:.07em; text-transform:uppercase;
+             color:var(--text-dim); padding:0 10px 7px 0; white-space:nowrap; }
+    .ua th.r, .ua td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .ua td { padding:6px 10px 6px 0; border-top:1px solid var(--border); white-space:nowrap; }
+    .ua .ua-name { color:var(--text); }
+    .ua .ua-att { color:var(--text-dim); margin-left:5px; font-size:11px; }
+    .ua .ua-model { color:var(--text-mut); font-size:11.5px; }
+    .ua .ua-cost { color:var(--text); }
+    .ua .dim { color:var(--text-dim); }
+    .ua tr.ua-fail .ua-name { color:var(--fail); }
+    .ua tfoot td { border-top:1px solid var(--border-2); padding-top:8px; color:var(--text-mut);
+                   font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .ua tfoot .ua-cost { font-size:12.5px; font-weight:600; color:var(--text); text-transform:none; letter-spacing:0; }
+
+    /* ---- collision warning: other runs touched these same files ---- */
+    .sib { padding:0; margin-bottom:24px; border-color:color-mix(in srgb,var(--wait) 34%,var(--border)); }
+    .sib-why { margin:0; padding:13px 18px; font-size:12.5px; color:var(--text-mut); line-height:1.55;
+               background:color-mix(in srgb,var(--wait) 7%,transparent); border-bottom:1px solid var(--border); }
+    .sib-row { padding:12px 18px; border-top:1px solid var(--border); }
+    .sib-row:first-of-type { border-top:0; }
+    .sib-branch { font-size:12.5px; font-weight:600; color:var(--wait); }
+    .sib-files { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .sib-files span { font-size:11.5px; color:var(--text-mut); background:var(--surface-2);
+                      border:1px solid var(--border); border-radius:6px; padding:2px 7px; }
+
     .section-h { display:flex; align-items:baseline; justify-content:space-between; margin:4px 0 12px; gap:12px; }
     .section-h h2 { margin:0; font-size:15px; font-weight:620; letter-spacing:-0.01em; }
     .section-h .meta { font-size:12.5px; color:var(--text-mut); }
@@ -254,14 +363,24 @@
     .phase:hover { background:var(--surface-2); }
     .phase .pmain { display:flex; flex-direction:column; gap:9px; min-width:0; }
     .phase .pname { font-size:13px; font-weight:560; display:flex; align-items:center; }
-    .phase .pright { display:flex; flex-direction:column; align-items:flex-end; gap:3px; text-align:right; }
+    /* Verdict and duration sit on the row itself: the phase's whole story in one
+       line, so five phases read as five lines instead of five hundred pixels. */
+    .phase .pright { display:flex; align-items:center; gap:12px; text-align:right; }
+    .pverdict { font-size:11.5px; font-weight:560; padding:2px 8px; border-radius:999px; white-space:nowrap;
+                background:color-mix(in srgb,var(--vc) 13%,transparent); color:var(--vc);
+                box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--vc) 26%,transparent); }
+    .pverdict.ok { --vc:var(--done); } .pverdict.bad { --vc:var(--fail); }
+    .pverdict.info { --vc:var(--plan); }
+    .pverdict.mono { --vc:var(--text-dim); font-family:ui-monospace,"SF Mono",Menlo,monospace; }
+    .pcost { font-size:11.5px; color:var(--text-dim); white-space:nowrap; }
+    .phase:hover .pcost { color:var(--text-mut); }
     .phase .pdur { font-size:13px; color:var(--text); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
     .phase.run .pdur { color:var(--run); }
     .phase .psid { font-size:11px; color:var(--text-dim); }
     .phase-wrap { border-radius:10px; }
-    .transcripts { margin:0 14px 10px 48px; }
+    .transcripts { margin:0 14px 8px 48px; }
     details.transcript { border:1px solid var(--border); border-radius:9px; background:var(--bg-2); margin-top:7px; overflow:hidden; }
-    details.transcript > summary { grid-template-columns:1fr auto; padding:9px 12px; font-size:12px; color:var(--text-mut); }
+    details.transcript > summary { grid-template-columns:14px 1fr auto; padding:8px 12px; font-size:12px; color:var(--text-mut); }
     .transcript-body { padding:4px 12px 12px; display:grid; gap:8px; }
     .tr-event { border-left:2px solid var(--border-2); padding:6px 9px; min-width:0; }
     .tr-event.message { border-color:var(--accent); background:var(--accent-bg); border-radius:0 7px 7px 0; }
@@ -271,13 +390,27 @@
     .tr-text p:first-child { margin-top:0; } .tr-text p:last-child { margin-bottom:0; }
     .tr-payload { white-space:pre-wrap; overflow-wrap:anywhere; max-height:420px; overflow:auto; margin:6px 0 0; padding:8px; border-radius:7px; background:var(--surface-2); color:var(--text-mut); font-size:11px; }
     .tr-sub { border:0; background:transparent; }
-    .tr-sub > summary { display:flex; grid-template-columns:none; gap:8px; padding:3px 0; color:var(--text-mut); font-size:12px; }
+    .tr-sub > summary { display:flex; grid-template-columns:none; gap:9px; padding:4px 0; color:var(--text-mut);
+                        font-size:12px; align-items:baseline; }
+    /* the tool's name leads, its argument follows: "Read" alone says nothing */
+    .tr-tool { font-weight:600; color:var(--accent-2); flex:0 0 auto; }
+    .tr-tool.bad { color:var(--fail); }
+    .tr-kind { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); flex:0 0 auto; }
+    .tr-peek { color:var(--text-dim); font-size:11.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    /* .tr-status is a generic right-aligned slot: sometimes a status word, sometimes
+       a timestamp. Only the status words get an s-* class, and those carry --p, so a
+       status reads the same colour here as it does in a pill. Timestamps stay dim. */
     .tr-status { margin-left:auto; color:var(--text-dim); }
+    .tr-status.s-done, .tr-status.s-running, .tr-status.s-failed,
+    .tr-status.s-waiting, .tr-status.s-pending { color:var(--p); font-weight:560; }
 
+    /* The bare .tnode is the PENDING node -- every other state adds a class or is
+       reached through .phase.ok, which drops the border for a tick. It was green,
+       which is the done colour, so phases that had not started yet read as finished. */
     .tnode { justify-self:center; width:12px; height:12px; border-radius:50%; box-sizing:border-box;
-             background:var(--surface); border:2px solid var(--done); }
+             background:var(--surface); border:2px solid var(--border-2); }
     .tnode.run { background:var(--run); border-color:var(--run); animation:pulse 1.6s infinite; }
-    .tnode.planner { border-color:var(--accent-2); }
+    .tnode.planner { border-color:var(--plan); }
     .tnode.fail { background:var(--fail); border-color:var(--fail); }
     .tnode.parked { border-color:var(--wait); }
     .phase.ok .tnode { background:transparent; border:0; border-radius:0; position:relative; }
@@ -289,39 +422,44 @@
     .runmeta { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
     .runmeta .pdur { font-size:13px; color:var(--run); font-variant-numeric:tabular-nums; }
     .runmeta .psid { font-size:11px; color:var(--text-dim); }
-    .workframe { margin:11px 0 2px 33px; max-width:300px; background:var(--bg-2); border:1px solid var(--border);
-                 border-radius:10px; padding:6px 12px; }
-    .workframe svg { display:block; width:100%; height:auto; }
+    /* live activity of the running phase — real tool calls, not a looping cartoon */
+    .workframe { margin:10px 0 2px 33px; max-width:560px; background:var(--bg-2); border:1px solid var(--border);
+                 border-radius:10px; padding:9px 12px; }
+    .act { display:flex; align-items:baseline; gap:9px; min-width:0; }
+    .act .act-dot { width:6px; height:6px; border-radius:50%; background:var(--text-dim); flex:0 0 auto; align-self:center; }
+    .act.act-live .act-dot { background:var(--run); animation:pulse 1.6s infinite; }
+    .act.act-fail .act-dot { background:var(--fail); }
+    .act .act-name { font-size:12.5px; font-weight:600; letter-spacing:-0.01em; flex:0 0 auto; }
+    .act.act-fail .act-name { color:var(--fail); }
+    .act .act-arg { font-size:12px; color:var(--text-mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .act .act-time { margin-left:auto; font-size:12px; color:var(--text-dim); flex:0 0 auto; }
+    .act.act-live .act-time { color:var(--run); }
+    .act-idle .act-name { font-weight:500; color:var(--text-dim); font-size:12px; }
+    .act-sum { margin-top:5px; font-size:11px; color:var(--text-dim); }
 
-    .deskscene { display:block; margin-top:4px; }
-    .dv-glow  { animation:dv-glow 2.4s ease-in-out infinite; }
-    @keyframes dv-glow  { 0%,100%{opacity:.20} 50%{opacity:.46} }
-    .dv-hands { transform-box:fill-box; transform-origin:center; animation:dv-hands .5s ease-in-out infinite; }
-    @keyframes dv-hands { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.4px)} }
-    .dv-head  { transform-box:fill-box; transform-origin:center bottom; animation:dv-head 3.4s ease-in-out infinite; }
-    @keyframes dv-head  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1px)} }
-    .dv-steam { transform-box:fill-box; transform-origin:center bottom; animation:dv-steam 2.8s ease-in-out infinite; }
-    @keyframes dv-steam { 0%{opacity:0; transform:translateY(3px)} 25%{opacity:.55} 100%{opacity:0; transform:translateY(-10px)} }
-    .sc-edge  { stroke-dasharray:60; stroke-dashoffset:60; animation:draw 3s ease-in-out infinite; }
-    .sc-node  { transform-box:fill-box; transform-origin:center; animation:pop 3s ease-in-out infinite; }
-    .sc-point { transform-box:fill-box; transform-origin:right center; animation:sc-point 2.6s ease-in-out infinite; }
-    @keyframes sc-point { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
-    .sc-arm   { transform-box:fill-box; transform-origin:right center; animation:sc-arm 3s ease-in-out infinite; }
-    @keyframes sc-arm { 0%,100%{transform:rotate(-4.5deg)} 50%{transform:rotate(4.5deg)} }
-    .sc-bug   { transform-box:fill-box; transform-origin:center; animation:bugcatch 3s ease-in-out infinite; }
-    .sc-catch { transform-box:fill-box; transform-origin:center; animation:caught 3s ease-in-out infinite; }
 
     details.task { border-top:1px solid var(--border); }
+    details.task > summary { grid-template-columns:14px minmax(30px,auto) minmax(0,1fr) auto auto minmax(0,auto); }
     details.task:first-of-type { border-top:0; }
-    summary { list-style:none; cursor:pointer; padding:13px 16px; display:grid; grid-template-columns:44px 1fr auto auto 70px; gap:12px; align-items:center; transition:background .12s; }
+    /* The native marker is off, so rows need their own affordance -- without one
+       there is nothing telling you a task opens at all. */
+    summary { list-style:none; cursor:pointer; padding:13px 16px; display:grid;
+              grid-template-columns:14px minmax(30px,auto) minmax(0,1fr) auto auto minmax(0,auto);
+              gap:12px; align-items:center; transition:background .12s; }
+    summary > * { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    summary::before { content:""; width:6px; height:6px; border:solid var(--text-dim);
+                      border-width:0 1.6px 1.6px 0; transform:rotate(-45deg); margin-left:3px;
+                      transition:transform .18s cubic-bezier(.2,.8,.2,1), border-color .15s; }
+    details[open] > summary::before { transform:rotate(45deg); }
+    summary:hover::before { border-color:var(--accent); }
     summary::-webkit-details-marker { display:none; }
     summary:hover { background:var(--surface-2); }
-    summary .tid { font-size:12px; color:var(--text-dim); }
+    summary .tid { font-size:12px; color:var(--text-dim); white-space:nowrap; }
     summary .ttitle { font-size:13px; font-weight:540; }
     .task-body { padding:4px 16px 16px 72px; color:var(--text-mut); font-size:12.5px; }
     .events { display:grid; gap:2px; }
     .ev { display:flex; gap:10px; align-items:baseline; font-size:12.5px; padding:4px 0; }
-    .ev .when { color:var(--text-dim); min-width:60px; } .ev .ph { color:var(--text-mut); min-width:92px; }
+    .ev .when { color:var(--text-dim); min-width:60px; }
     .ev .msg { font-weight:500; } .ev .msg.pass { color:var(--done); } .ev .msg.fail { color:var(--fail); }
 
     .pipe { display:inline-flex; align-items:center; }
@@ -332,45 +470,32 @@
     .pipe .cn { width:16px; height:2px; background:var(--border-2); flex:0 0 auto; }
     .pipe .cn.on { background:var(--accent-line); }
 
-    .ribbon { display:flex; align-items:center; gap:0; background:var(--surface); border:1px solid var(--border);
-              border-radius:14px; padding:14px 18px; margin:0 0 24px; box-shadow:var(--shadow); overflow-x:auto; position:relative; }
-    .ribbon::before { content:""; position:absolute; inset:0; border-radius:14px; pointer-events:none;
-                      background:radial-gradient(120% 120% at 50% 0%, var(--run-bg), transparent 55%); opacity:.6; }
-    .rb-stage { display:flex; align-items:center; gap:11px; padding:8px 14px; border-radius:11px; flex:0 0 auto; position:relative; z-index:1; }
-    .rb-stage .ic { width:32px; height:32px; border-radius:9px; display:grid; place-items:center;
                     background:var(--surface-2); border:1px solid var(--border); color:var(--text-dim); }
-    .rb-stage .ic svg { width:17px; height:17px; }
-    .rb-stage .rn { font-size:13px; font-weight:600; letter-spacing:-0.01em; }
-    .rb-stage .rs { font-size:11.5px; color:var(--text-dim); }
-    .rb-stage.on .ic { color:var(--sc); border-color:color-mix(in srgb,var(--sc) 40%,transparent); background:color-mix(in srgb,var(--sc) 12%,transparent); }
-    .rb-stage.on .rs { color:var(--sc); }
-    .rb-stage.act { background:color-mix(in srgb,var(--sc) 9%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--sc) 34%,transparent); }
-    .rb-stage.act .ic { color:#fff; background:var(--sc); border-color:var(--sc); animation:glowpulse 1.9s ease-in-out infinite; }
-    .rb-stage.act .rs { color:var(--sc); }
-    @keyframes glowpulse { 0%,100%{box-shadow:0 0 0 0 transparent} 50%{box-shadow:0 0 16px 0 var(--sc)} }
-    .rb-cn { flex:1 1 28px; height:2px; min-width:22px; background:var(--border-2); position:relative; z-index:1; }
-    .rb-cn.on { background:var(--accent-line); }
-    .rb-cn.flow::after { content:""; position:absolute; top:50%; left:0; width:7px; height:7px; margin-top:-3.5px;
                          border-radius:50%; background:var(--run); box-shadow:0 0 10px 1px var(--run); animation:cnflow 1.7s linear infinite; }
     @keyframes cnflow { 0%{left:0; opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{left:100%; opacity:0} }
-    .rb-stage .mini { margin-top:6px; height:3px; width:56px; border-radius:2px; overflow:hidden; position:relative;
                       background:color-mix(in srgb,var(--sc) 22%,transparent); }
-    .rb-stage .mini::after { content:""; position:absolute; top:0; bottom:0; left:0; width:42%; border-radius:2px;
                              background:var(--sc); animation:mini 1.2s ease-in-out infinite; }
-    @keyframes mini { 0%{transform:translateX(-110%)} 100%{transform:translateX(280%)} }
 
     .animate .reveal { animation:revealUp .55s cubic-bezier(.2,.7,.2,1) both; animation-delay:calc(var(--i,0)*70ms); }
     @keyframes revealUp { from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
-    .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 10px; border-radius:999px;
-            background:var(--surface); border:1px solid var(--border); color:var(--text-mut); }
-    .chip .cd { width:6px; height:6px; border-radius:50%; background:var(--run); animation:pulse 1.6s infinite; }
     .live-hd { display:inline-flex; width:6px; height:6px; border-radius:50%; background:var(--done); margin-left:8px; vertical-align:middle; animation:pulse 1.8s infinite; }
 
     .gg { position:relative; }
-    .gg::before { content:""; position:absolute; left:5px; top:14px; bottom:14px; width:2px; background:var(--accent-line); }
-    .commit { display:flex; gap:10px; align-items:baseline; padding-left:22px; position:relative; padding-top:7px; padding-bottom:7px; }
-    .commit::before { content:""; position:absolute; left:0; top:8px; width:12px; height:12px; border-radius:50%;
-                      box-sizing:border-box; background:var(--surface); border:2px solid var(--accent); }
+    /* --dot and --line are declared so the marker can be centred on the text's
+       first line instead of guessing with a hardcoded offset. */
+    .commit { --line:20px; --dot:12px; display:flex; gap:10px; align-items:baseline; padding-left:22px;
+              position:relative; padding-top:7px; padding-bottom:7px; }
+    .commit .sha, .commit .csub { line-height:var(--line); }
+    .commit::before { content:""; position:absolute; left:0; top:calc(7px + (var(--line) - var(--dot)) / 2);
+                      width:var(--dot); height:var(--dot); border-radius:50%;
+                      box-sizing:border-box; background:var(--surface); border:2px solid var(--accent); z-index:1; }
+    /* Each commit draws the line down to the NEXT one, so a lone commit has no
+       line to nowhere. One stroke across the whole list left a stub dangling
+       whenever there was a single commit. */
+    .commit::after { content:""; position:absolute; left:calc(var(--dot) / 2 - 1px);
+                     top:calc(7px + (var(--line) - var(--dot)) / 2 + var(--dot));
+                     bottom:-2px; width:2px; background:var(--accent-line); }
+    .commit:last-child::after { display:none; }
     .commit .sha { color:var(--accent-2); font-size:12px; } .commit .csub { font-size:13px; }
 
     /* markdown task descriptions */
@@ -398,13 +523,7 @@
   <header>
     <div class="bar">
       <a class="brand" href="#/">
-        <svg viewBox="0 0 40 40" width="26" height="26" fill="none" aria-hidden="true">
-          <rect x="6" y="10" width="28" height="21" rx="7" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
-          <line x1="20" y1="10" x2="20" y2="5" stroke="var(--accent-line)" stroke-width="2"/>
-          <circle cx="20" cy="4" r="2.4" fill="var(--accent)"/>
-          <rect x="14" y="16" width="4" height="7" rx="2" fill="var(--accent-2)"/>
-          <rect x="22" y="16" width="4" height="7" rx="2" fill="var(--accent-2)"/>
-        </svg>
+        <img class="mark" src="/collie.png" width="26" height="26" alt="" />
         harny <span class="ver mono" id="version"></span>
       </a>
       <span class="spacer"></span>
@@ -432,17 +551,19 @@
     function liveDur(startIso, endIso) {
       if (!startIso) return '<span>—</span>';
       if (endIso) return `<span>${fmtDuration(durationMs(startIso, endIso))}</span>`;
-      const s = msOf(startIso);
-      return `<span data-dur-start="${s}">${fmtDuration(Date.now() - s)}</span>`;
+      return `<span data-dur-start="${escapeHtml(startIso)}">${fmtDuration(Date.now() - msOf(startIso))}</span>`;
     }
     function agoSpan(iso) {
       return `<span data-iso="${escapeHtml(iso)}" title="${escapeHtml(fmtTime(iso))}">${escapeHtml(fmtRelative(iso))}</span>`;
     }
     function updateTimers() {
+      // Before the text pass: it rebuilds the nodes the text pass then walks.
+      refreshTimeline();
       const now = Date.now();
       document.querySelectorAll('[data-dur-start]').forEach(el => {
-        const s = parseInt(el.dataset.durStart, 10);
-        if (s) el.textContent = fmtDuration(now - s);
+        // ISO, not ms: parseInt on an ISO string yields the year and reads as truthy.
+        const s = Date.parse(el.dataset.durStart);
+        if (Number.isFinite(s)) el.textContent = fmtDuration(now - s);
       });
       document.querySelectorAll('[data-iso]').forEach(el => { el.textContent = fmtRelative(el.dataset.iso); });
     }
@@ -511,50 +632,60 @@
       return DOMPurify.sanitize(marked.parse(String(s)), { FORBID_TAGS: ['img', 'picture', 'source', 'video', 'audio', 'iframe'], FORBID_ATTR: ['src', 'srcset', 'poster'] });
     }
 
+    // RunEvent is { at, run_id, type, node_id?, data? } -- see state/runSchema.ts.
+    // This read `e.event` and `e.phase`, neither of which has ever existed on the
+    // type, so the guard was always true and every row rendered `undefined`. That
+    // is why the panel showed nothing but timestamps.
+    const EVENT_TEXT = {
+      'run.created': () => ({ text: 'run started', kind: 'info' }),
+      'run.completed': () => ({ text: 'run completed', kind: 'pass' }),
+      'run.failed': (e) => ({ text: `run failed${e.data && e.data.reason ? `: ${e.data.reason}` : ''}`, kind: 'fail' }),
+      'run.cancelled': () => ({ text: 'run cancelled', kind: 'fail' }),
+      'changeset.captured': (e) => ({ text: `changeset captured${countPaths(e)}`, kind: 'info' }),
+      'changeset.validated': () => ({ text: 'changeset validated', kind: 'pass' }),
+      'changeset.rejected': () => ({ text: 'changeset rejected', kind: 'fail' }),
+      'changeset.committed': (e) => ({ text: `committed${e.data && e.data.sha ? ` ${String(e.data.sha).slice(0, 7)}` : ''}`, kind: 'pass' }),
+      'human.asked': () => ({ text: 'waiting on you', kind: 'info' }),
+      'human.answered': () => ({ text: 'answered', kind: 'info' }),
+    };
+    function countPaths(e) {
+      const n = e.data && Array.isArray(e.data.entries) ? e.data.entries.length : null;
+      return n == null ? '' : ` · ${n} file${n === 1 ? '' : 's'}`;
+    }
     function eventSubstance(e, state, plan) {
-      if (e.event !== 'phase_end') return { text: e.event, kind: 'info' };
-      const phase = e.phase ?? '';
-      if (phase === 'planner') {
-        const text = (plan && Array.isArray(plan.tasks)) ? plan.tasks.length + ' tasks planned' : 'planner done';
-        return { text, kind: 'info' };
-      }
-      const findEntry = () => (state.phases ?? []).find(p => p.name === phase && p.ended_at === e.at);
-      if (phase.startsWith('developer')) {
-        const entry = findEntry();
-        if (entry && entry.verdict) {
-          try {
-            const v = JSON.parse(entry.verdict);
-            return { text: truncate('task ' + (v.task_id ?? '?') + ': ' + (v.status ?? '?'), 80), kind: 'info' };
-          } catch {}
-        }
-        return { text: 'developer done', kind: 'info' };
-      }
-      if (phase.startsWith('validator')) {
-        const entry = findEntry();
-        if (entry && entry.verdict) {
-          try {
-            const v = JSON.parse(entry.verdict);
-            const pass = v.verdict === 'pass';
-            const reason = Array.isArray(v.reasons) ? v.reasons[0] : '';
-            return { text: (pass ? 'PASS' : 'FAIL') + (reason ? ': ' + truncate(reason, 80) : ''), kind: pass ? 'pass' : 'fail' };
-          } catch {}
-        }
-        return { text: 'validator done', kind: 'info' };
-      }
-      return { text: e.event, kind: 'info' };
+      const build = EVENT_TEXT[e.type];
+      if (build) return build(e);
+      // Unknown types stay legible instead of vanishing: `node.failed` -> "node failed".
+      const text = String(e.type || 'event').replace(/[._]/g, ' ');
+      const kind = /fail|reject|error/.test(e.type || '') ? 'fail' : /pass|complete|commit/.test(e.type || '') ? 'pass' : 'info';
+      return { text: e.node_id ? `${phaseLabel(e.node_id)} · ${text}` : text, kind };
     }
 
-    // --- shared bits ---------------------------------------------------------
     function statusPill(status) {
       const map = { running: ['s-running', 'spin'], waiting_human: ['s-waiting', ''], done: ['s-done', ''], failed: ['s-failed', ''] };
       const [cls, spin] = map[status] || ['s-pending', ''];
       return `<span class="pill ${cls} ${spin}"><span class="d"></span>${escapeHtml(status)}</span>`;
     }
+    // Which of the three roles a phase plays.
+    //
+    // Phase names are scoped by the workflow, not bare: a loop emits
+    // `tasks:0.developer`, `tasks:0.validator`, `tasks:0.commit`, and the closing
+    // gate is `final_validator`. Matching those with startsWith('developer')
+    // fails for every one of them, and the old `if (idx < 0) idx = 0` fallback
+    // then pinned the pipeline to Planner for the entire run. Match the leaf
+    // segment and look for the role inside it instead.
+    const ROLES = ['planner', 'developer', 'validator'];
+    const ROLE_COLORS = ['var(--plan)', 'var(--run)', 'var(--done)'];
+    function phaseRole(name) {
+      const leaf = String(name || '').toLowerCase().split('.').pop();
+      return ROLES.findIndex(role => leaf.includes(role));
+    }
+    /** Stage index to highlight: the running role if there is one, else the furthest reached. */
     function pipeHtml(status, phase) {
-      const order = ['planner', 'developer', 'validator'];
-      const colors = ['var(--accent-2)', 'var(--run)', 'var(--done)'];
+      const order = ROLES;
+      const colors = ROLE_COLORS;
       const p = (phase || '').toLowerCase();
-      let idx = order.findIndex(k => p.startsWith(k));
+      let idx = phaseRole(p);
       const st = ['', '', ''];
       if (status === 'done') { st[0] = st[1] = st[2] = 'on'; }
       else if (status === 'failed') { if (idx < 0) idx = 0; for (let i = 0; i < 3; i++) st[i] = i < idx ? 'on' : (i === idx ? 'bad' : ''); }
@@ -568,144 +699,11 @@
       return h + '</span>';
     }
 
-    const IC = [
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 7l3 9M16 7l-3 9"/></svg>',
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>',
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
-    ];
-    function ribbonHtml(state, plan) {
-      const order = ['planner', 'developer', 'validator'];
-      const colors = ['var(--accent-2)', 'var(--run)', 'var(--done)'];
-      const verbs = ['planning', 'writing code', 'checking'];
-      const status = state.lifecycle.status;
-      const phases = (state.phases || []).filter(p => p.name !== 'committing');
-      const last = phases[phases.length - 1];
-      let idx = last ? order.findIndex(k => last.name.startsWith(k)) : -1;
-      if (idx < 0) idx = 0;
-      const running = status === 'running' || status === 'waiting_human';
-      const tasks = (plan && Array.isArray(plan.tasks)) ? plan.tasks.length : null;
-      let h = '';
-      for (let i = 0; i < 3; i++) {
-        let cls = '';
-        if (status === 'done') cls = 'on';
-        else if (running) cls = i < idx ? 'on' : (i === idx ? 'act' : '');
-        else cls = i <= idx ? 'on' : '';
-        const sub = cls === 'act' ? verbs[i] : cls === 'on' ? (i === 0 && tasks != null ? `${tasks} tasks planned` : 'done') : 'waiting';
-        const mini = cls === 'act' ? '<div class="mini"></div>' : '';
-        h += `<div class="rb-stage ${cls}" style="--sc:${colors[i]}"><span class="ic">${IC[i]}</span><div><div class="rn">${cap(order[i])}</div><div class="rs">${sub}</div>${mini}</div></div>`;
-        if (i < 2) {
-          const on = status === 'done' || i < idx;
-          const flow = running && i === idx - 1;
-          h += `<div class="rb-cn${on ? ' on' : ''}${flow ? ' flow' : ''}"></div>`;
-        }
-      }
-      return `<div class="ribbon reveal" style="--i:1">${h}</div>`;
-    }
+    const COLLIE_IC_TAG = `<img src="/collie.png" width="20" height="20" alt="" />`;
 
-    // --- agent scenes (shown on the active phase) ----------------------------
-    const SCENE_DEV = `<svg class="deskscene" viewBox="0 0 180 96" fill="none" aria-label="developer coding">
-      <defs><filter id="scGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.5"/></filter></defs>
-      <rect x="6" y="76" width="168" height="7" rx="3.5" fill="var(--surface-2)" stroke="var(--border)"/>
-      <rect x="30" y="66" width="12" height="10" rx="2" fill="var(--surface)" stroke="var(--border-2)" stroke-width="1.3"/>
-      <path d="M36 66 q-2 -8 -5 -10 M36 66 q2 -9 6 -11 M36 66 q0 -6 0 -11" stroke="var(--done)" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      <ellipse class="dv-glow" cx="90" cy="50" rx="34" ry="19" fill="var(--run)" filter="url(#scGlow)"/>
-      <rect x="78" y="26" width="24" height="12" rx="6" fill="var(--run)"/>
-      <g class="dv-head">
-        <circle cx="90" cy="17" r="10" fill="#CDA06E"/>
-        <path d="M80 17 a10 10 0 0 1 20 0 z" fill="var(--accent-2)"/>
-        <circle cx="85.5" cy="19" r="3.1" fill="none" stroke="#3a3a46" stroke-width="1.2"/>
-        <circle cx="94.5" cy="19" r="3.1" fill="none" stroke="#3a3a46" stroke-width="1.2"/>
-        <line x1="88.6" y1="19" x2="91.4" y2="19" stroke="#3a3a46" stroke-width="1.2"/>
-        <circle cx="85.5" cy="19.7" r="1" fill="#2a2a33"/><circle cx="94.5" cy="19.7" r="1" fill="#2a2a33"/>
-        <path d="M87 24 q3 2 6 0" stroke="#8a6a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-      </g>
-      <rect x="87" y="64" width="6" height="10" fill="var(--border-2)"/>
-      <rect x="77" y="73" width="26" height="4" rx="2" fill="var(--border-2)"/>
-      <rect x="64" y="34" width="52" height="30" rx="5" fill="var(--surface-2)" stroke="var(--border-2)" stroke-width="1.5"/>
-      <rect x="69" y="38" width="8" height="8" rx="2" fill="var(--run)" opacity=".5"/>
-      <circle cx="92" cy="49" r="2.4" fill="var(--text-dim)"/>
-      <rect x="70" y="70" width="40" height="5" rx="2" fill="var(--surface)" stroke="var(--border-2)"/>
-      <rect class="dv-hands" x="79" y="67" width="9" height="5" rx="2.5" fill="#CDA06E"/>
-      <rect class="dv-hands" style="animation-delay:.25s" x="92" y="67" width="9" height="5" rx="2.5" fill="#CDA06E"/>
-      <path class="dv-steam" d="M140 50 q3.5 -4 0 -8" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round"/>
-      <path class="dv-steam" style="animation-delay:.9s" d="M146 50 q3.5 -4 0 -8" stroke="var(--text-dim)" stroke-width="2" stroke-linecap="round"/>
-      <rect x="134" y="56" width="16" height="18" rx="3" fill="var(--surface)" stroke="var(--border-2)" stroke-width="1.5"/>
-      <rect x="136.5" y="58" width="11" height="4" rx="2" fill="#8B5A32"/>
-      <path d="M150 60 q7 1.5 0 9" stroke="var(--border-2)" stroke-width="2" fill="none"/>
-    </svg>`;
-    const SCENE_PLANNER = `<svg class="deskscene" viewBox="0 0 180 96" fill="none" aria-label="planner sketching the plan">
-      <rect x="6" y="76" width="168" height="7" rx="3.5" fill="var(--surface-2)" stroke="var(--border)"/>
-      <rect x="14" y="14" width="94" height="54" rx="5" fill="var(--surface-2)" stroke="var(--border-2)" stroke-width="1.5"/>
-      <rect x="22" y="21" width="34" height="3.4" rx="1.7" fill="var(--accent-2)"/>
-      <path class="sc-edge" d="M34 40 L64 40" stroke="var(--accent-line)" stroke-width="1.6"/>
-      <path class="sc-edge" style="animation-delay:.5s" d="M34 40 L50 55" stroke="var(--accent-line)" stroke-width="1.6"/>
-      <path class="sc-edge" style="animation-delay:1s" d="M64 40 L84 55" stroke="var(--accent-line)" stroke-width="1.6"/>
-      <circle class="sc-node" cx="34" cy="40" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
-      <circle class="sc-node" style="animation-delay:.4s" cx="64" cy="40" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
-      <circle class="sc-node" style="animation-delay:.9s" cx="50" cy="55" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
-      <circle class="sc-node" style="animation-delay:1.3s" cx="84" cy="55" r="5" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.6"/>
-      <rect x="120" y="46" width="30" height="30" rx="12" fill="var(--accent)"/>
-      <g class="dv-head">
-        <circle cx="135" cy="36" r="10" fill="#CDA06E"/>
-        <path d="M125 36 a10 10 0 0 1 20 0 z" fill="var(--accent-2)"/>
-        <circle cx="131" cy="38" r="1.1" fill="#2a2a33"/><circle cx="139" cy="38" r="1.1" fill="#2a2a33"/>
-        <path d="M132 42 q3 2 6 0" stroke="#8a6a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-      </g>
-      <g class="sc-point">
-        <line x1="123" y1="54" x2="104" y2="46" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>
-        <circle cx="103" cy="45" r="2.6" fill="#CDA06E"/>
-      </g>
-    </svg>`;
-    const SCENE_VALIDATOR = `<svg class="deskscene" viewBox="0 0 180 96" fill="none" aria-label="validator hunting bugs">
-      <rect x="6" y="76" width="168" height="7" rx="3.5" fill="var(--surface-2)" stroke="var(--border)"/>
-      <rect x="16" y="16" width="82" height="54" rx="5" fill="var(--surface-2)" stroke="var(--border-2)" stroke-width="1.5"/>
-      <rect x="24" y="24" width="46" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
-      <rect x="24" y="32" width="60" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
-      <rect x="24" y="40" width="38" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
-      <rect x="24" y="48" width="54" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
-      <rect x="24" y="56" width="30" height="3.2" rx="1.6" fill="color-mix(in srgb,var(--text-dim) 45%,transparent)"/>
-      <g transform="translate(74 44)"><g class="sc-bug" stroke="var(--fail)" stroke-width="2" stroke-linecap="round">
-        <ellipse cx="0" cy="0" rx="4.5" ry="5.5" fill="var(--fail)" opacity=".25" stroke="none"/>
-        <path d="M0 -5 V5 M-4.5 0 H4.5 M-3.5 -3.5 L-6 -5 M3.5 -3.5 L6 -5 M-3.5 3.5 L-6 5 M3.5 3.5 L6 5"/>
-      </g></g>
-      <g transform="translate(74 44)"><path class="sc-catch" d="M-4 0 l3 3 l6 -8" stroke="var(--done)" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
-      <rect x="120" y="46" width="30" height="30" rx="12" fill="var(--done)"/>
-      <g class="dv-head">
-        <circle cx="135" cy="36" r="10" fill="#CDA06E"/>
-        <path d="M125 36 a10 10 0 0 1 20 0 z" fill="var(--accent-2)"/>
-        <circle cx="131" cy="38" r="1.1" fill="#2a2a33"/><circle cx="139" cy="38" r="1.1" fill="#2a2a33"/>
-        <path d="M132 42 q3 2 6 0" stroke="#8a6a48" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-      </g>
-      <g class="sc-arm">
-        <line x1="122" y1="54" x2="78" y2="52" stroke="var(--done)" stroke-width="5" stroke-linecap="round"/>
-        <circle cx="66" cy="44" r="11" fill="color-mix(in srgb,var(--done) 10%,transparent)" stroke="var(--done)" stroke-width="2.4"/>
-        <line x1="74" y1="52" x2="79" y2="57" stroke="var(--done)" stroke-width="3.2" stroke-linecap="round"/>
-        <circle cx="76" cy="52" r="2.6" fill="#CDA06E"/>
-      </g>
-    </svg>`;
-    function sceneFor(name) {
-      const n = (name || '').toLowerCase();
-      if (n.startsWith('planner')) return SCENE_PLANNER;
-      if (n.startsWith('validator')) return SCENE_VALIDATOR;
-      return SCENE_DEV;
-    }
 
     // --- empty-state hero ----------------------------------------------------
-    const MASCOT = `<svg viewBox="0 0 150 150" width="150" height="150" fill="none" aria-label="Harny the harness bot" role="img">
-      <line x1="75" y1="34" x2="75" y2="20" stroke="var(--accent-line)" stroke-width="2.5"/>
-      <circle class="antenna-orb" cx="75" cy="15" r="6" fill="var(--accent)"/>
-      <circle class="antenna-orb" cx="75" cy="15" r="10" fill="var(--accent)" opacity="0.18"/>
-      <rect x="16" y="34" width="118" height="86" rx="27" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
-      <rect x="16" y="34" width="118" height="40" rx="27" fill="#fff" opacity="0.03"/>
-      <rect x="29" y="47" width="92" height="58" rx="18" fill="var(--bg)"/>
-      <g class="eyes"><g class="pupils" fill="var(--accent-2)">
-        <rect x="51" y="63" width="13" height="19" rx="6.5"/>
-        <rect x="86" y="63" width="13" height="19" rx="6.5"/>
-      </g></g>
-      <path d="M64 93 Q75 100 86 93" stroke="var(--accent-2)" stroke-width="2.4" stroke-linecap="round"/>
-      <circle cx="16" cy="88" r="4" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
-      <circle cx="134" cy="88" r="4" fill="var(--surface-2)" stroke="var(--accent-line)" stroke-width="2"/>
-    </svg>`;
+    const MASCOT = `<img src="/collie.png" width="150" height="150" alt="Harny, the border collie that herds the agents" />`;
     function heroHtml() {
       return `<div class="hero">
         <span class="eyebrow">Harness engineering, watched live</span>
@@ -736,7 +734,7 @@
           <div class="mascot">${MASCOT}<div class="shadow"></div></div>
         </div></div>
         <div class="agent-legend">
-          <div class="leg"><div class="lh"><span class="lk" style="background:var(--accent-2)"></span>Planner</div><p>Reads the repo and produces a typed plan artifact with ordered tasks and acceptance criteria.</p></div>
+          <div class="leg"><div class="lh"><span class="lk" style="background:var(--plan)"></span>Planner</div><p>Reads the repo and produces a typed plan artifact with ordered tasks and acceptance criteria.</p></div>
           <div class="leg"><div class="lh"><span class="lk" style="background:var(--run)"></span>Developer</div><p>Implements one task at a time and proposes a commit message. Never commits itself.</p></div>
           <div class="leg"><div class="lh"><span class="lk" style="background:var(--done)"></span>Validator</div><p>Read-only, runs against the working tree. On pass, the harness commits the work.</p></div>
         </div>
@@ -769,7 +767,7 @@
     }
 
     let pollHandle = null;
-    function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } }
+    function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } liveTimelineState = null; }
 
     const openDetails = new Set();
     const transcriptCache = new Map();
@@ -863,15 +861,191 @@
       if (cost != null) parts.push(`$${Number(cost).toFixed(4)} reported`);
       return parts.join(' · ');
     }
-    function usageModels(value) {
-      return Object.entries((value && value.models) || {}).map(([model, metrics]) => `<div class="mut" style="font-size:11px;margin-top:5px"><span class="mono">${escapeHtml(model)}</span> · ${escapeHtml(usageLine(metrics))}</div>`).join('');
+    // --- live activity (replaces the old looping desk scenes) ----------------
+    // A 3s animation loop says "something is happening" and tells you nothing.
+    // The transcript is written as the agent works (no buffering), so the real
+    // current tool call is available and it actually changes.
+    const ACT_PENDING = '<div class="act act-idle"><span class="act-name">waiting for the first tool call</span></div>';
+
+    // The one input field worth showing per tool. Anything unlisted falls back to
+    // the first short string in the input, so a new tool degrades to something
+    // sensible rather than to nothing.
+    const TOOL_ARG = {
+      Read: 'file_path', Write: 'file_path', Edit: 'file_path', MultiEdit: 'file_path',
+      NotebookEdit: 'notebook_path', Bash: 'command', shell: 'command',
+      Grep: 'pattern', Glob: 'pattern', WebFetch: 'url', web_search: 'query',
+      Task: 'description', TodoWrite: null,
+    };
+    function toolArg(event) {
+      const input = event.input;
+      if (!input || typeof input !== 'object') return '';
+      const key = Object.prototype.hasOwnProperty.call(TOOL_ARG, event.name) ? TOOL_ARG[event.name] : undefined;
+      if (key === null) return '';
+      if (key && typeof input[key] === 'string') return input[key];
+      if (key === undefined) {
+        const guess = Object.values(input).find(v => typeof v === 'string' && v.length && v.length < 160);
+        if (typeof guess === 'string') return guess;
+      }
+      return '';
     }
+    // Paths are long and the useful end is the right-hand one; keep the tail.
+    function shortenArg(text, max = 52) {
+      if (text.length <= max) return text;
+      const oneLine = text.replace(/\s+/g, ' ');
+      if (oneLine.includes('/')) return '…' + oneLine.slice(-(max - 1));
+      return oneLine.slice(0, max - 1) + '…';
+    }
+    function activityHtml(records) {
+      const items = collapseRecords(records);
+      const tools = items.filter(r => r.event.type === 'tool');
+      if (!tools.length) return ACT_PENDING;
+      // "Now" is the newest tool still open; if none, the last one that finished.
+      const open = [...tools].reverse().find(r => r.event.status === 'started' || r.event.status === 'updated');
+      const current = open || tools[tools.length - 1];
+      const e = current.event;
+      const arg = toolArg(e);
+      const files = new Set();
+      items.forEach(r => { if (r.event.type === 'file_change') (r.event.changes || []).forEach(c => files.add(c.path)); });
+      // Count every tool call, not just finished ones: "0 tools" while one is
+      // visibly running reads as broken.
+      const seen = tools.length;
+      const failed = tools.filter(r => r.event.status === 'failed').length;
+      // Duration is not a field: derive it from the envelope timestamps.
+      const since = current.at_started || current.at;
+      const live = Boolean(open);
+      const cls = e.status === 'failed' ? 'act act-fail' : live ? 'act act-live' : 'act';
+      const bits = [`${seen} tool${seen === 1 ? '' : 's'}`];
+      if (failed) bits.push(`${failed} failed`);
+      if (files.size) bits.push(`${files.size} file${files.size === 1 ? '' : 's'} touched`);
+      return `<div class="${cls}">
+        <span class="act-dot"></span>
+        <span class="act-name">${escapeHtml(e.name)}</span>
+        ${arg ? `<span class="act-arg mono" title="${escapeHtml(arg)}">${escapeHtml(shortenArg(arg))}</span>` : ''}
+        <span class="act-time num">${live ? liveDur(since, null) : escapeHtml(e.status)}</span>
+      </div><div class="act-sum">${escapeHtml(bits.join(' · '))}</div>`;
+    }
+
+    // --- timeline ------------------------------------------------------------
+    // Every phase records started_at and ended_at, so the run's real shape — where
+    // the time actually went — has been in the state all along and never on screen.
+    // A waterfall shows it directly: offset is when it began, width is how long it
+    // took. It replaces the old ribbon, which spent ~130px restating three names.
+
+    /** Container phases (`tasks`) merely span their children; drawing both double-counts. */
+    function isContainer(phase, all) {
+      return all.some(other => other !== phase && other.name.startsWith(`${phase.name}:`));
+    }
+    /** `tasks:0.developer` -> `developer`; a second pass -> `developer 2`. */
+    function phaseLabel(name) {
+      const leaf = String(name).split('.').pop().replace(/_/g, ' ');
+      const iter = String(name).match(/:(\d+)\./);
+      const n = iter ? Number(iter[1]) : 0;
+      return n > 0 ? `${leaf} ${n + 1}` : leaf;
+    }
+    const ROLE_VAR = ['var(--plan)', 'var(--run)', 'var(--done)'];
+    /**
+     * Geometry only. Split from the markup because the bars have to be recomputed
+     * every second (see refreshTimeline) and re-rendering them was not an option:
+     * .tl-bar carries a grow-in animation, so rebuilding the DOM would replay it
+     * forever, and a title tooltip cannot survive its own element being replaced.
+     */
+    function timelineGeom(state) {
+      const all = (state.phases || []).filter(p => p.started_at);
+      const rows = all.filter(p => !isContainer(p, all));
+      const t0 = msOf(state.origin.started_at);
+      const endMs = state.lifecycle.ended_at ? msOf(state.lifecycle.ended_at) : Date.now();
+      const span = Math.max(1, endMs - t0);
+      return {
+        span,
+        rows: rows.map(p => {
+          const a = msOf(p.started_at);
+          const b = p.ended_at ? msOf(p.ended_at) : Date.now();
+          const left = Math.max(0, (a - t0) / span * 100);
+          // Sub-second phases (the commit) would otherwise be invisible; floor the
+          // width so every phase that happened can be seen to have happened.
+          const width = Math.max(0.8, (b - a) / span * 100);
+          const role = phaseRole(p.name);
+          const live = p.status === 'running';
+          const failed = p.status === 'failed';
+          return {
+            p, live, failed,
+            color: failed ? 'var(--fail)' : role >= 0 ? ROLE_VAR[role] : 'var(--text-dim)',
+            left: left.toFixed(2), width: Math.min(width, 100 - left).toFixed(2),
+            dur: fmtDuration(b - a), pct: Math.round((b - a) / span * 100),
+          };
+        }),
+      };
+    }
+    function tlTitle(g) { return `${g.p.name} · ${g.dur} · ${g.pct}% of the run`; }
+    function tlAxis(span) {
+      // A four-tick axis: enough to read proportion at a glance, few enough to stay quiet.
+      return [0, 0.25, 0.5, 0.75, 1].map(f =>
+        `<span style="left:${(f * 100).toFixed(0)}%">${f === 0 ? '0s' : fmtDuration(span * f)}</span>`).join('');
+    }
+    function timelineInner(state) {
+      const { span, rows } = timelineGeom(state);
+      if (!rows.length) return '';
+      const bars = rows.map(g => `<div class="tl-row" title="${escapeHtml(tlTitle(g))}">
+          <div class="tl-name">${escapeHtml(phaseLabel(g.p.name))}</div>
+          <div class="tl-track"><div class="tl-grid"></div><div class="tl-lane">
+            <div class="${['tl-bar', g.live ? 'live' : '', g.failed ? 'fail' : ''].filter(Boolean).join(' ')}" style="--c:${g.color}; left:${g.left}%; width:${g.width}%">
+              ${g.live ? `<span class="tl-dog">${COLLIE_IC_TAG}</span>` : ''}
+            </div>
+          </div></div>
+          <div class="tl-meta">
+            <span class="tl-dur"${g.live ? ` data-dur-start="${escapeHtml(g.p.started_at)}"` : ''}>${g.dur}</span>
+            <span class="tl-pct">${g.pct >= 1 ? `${g.pct}%` : ''}</span>
+          </div>
+        </div>`).join('');
+      return `${bars}
+        <div class="tl-axis"><div></div><div class="tl-axis-in">${tlAxis(span)}</div><div></div></div>`;
+    }
+
+    /**
+     * The bars are a function of Date.now(), but the page only re-renders when the
+     * run's JSON signature changes -- and a running phase changes nothing as it runs:
+     * started_at is already set and ended_at stays null. So the "Live pipeline" froze
+     * at whatever the clock said when the last phase transition happened, which left
+     * the running phase pinned at its 0.8% minimum width and the phase before it
+     * stretched to 100%. Only F5 fixed it, which is the tell: a view that needs a
+     * reload is a view that is not live.
+     *
+     * So the geometry is recomputed on the timer instead, from the last known state.
+     * innerHTML rather than outerHTML: replacing the card would restart its reveal
+     * animation once a second.
+     */
+    let liveTimelineState = null;
+    function refreshTimeline() {
+      if (!liveTimelineState) return;
+      const card = document.querySelector('.card.timeline');
+      if (!card) return;
+      const { span, rows } = timelineGeom(liveTimelineState);
+      const els = card.querySelectorAll('.tl-row');
+      // A phase started or ended: the row count moved, so the shape is the poll's
+      // job, not the timer's. Bail and let the next draw rebuild it.
+      if (els.length !== rows.length) return;
+      rows.forEach((g, i) => {
+        const row = els[i];
+        const bar = row.querySelector('.tl-bar');
+        if (bar) { bar.style.left = `${g.left}%`; bar.style.width = `${g.width}%`; }
+        row.title = tlTitle(g);
+        const pct = row.querySelector('.tl-pct');
+        if (pct) pct.textContent = g.pct >= 1 ? `${g.pct}%` : '';
+        // Ended phases have a fixed duration; only the live one's text moves, and
+        // the data-dur-start pass right after this owns that.
+        const dur = row.querySelector('.tl-dur');
+        if (dur && !g.live) dur.textContent = g.dur;
+      });
+      const axis = card.querySelector('.tl-axis-in');
+      if (axis) axis.innerHTML = tlAxis(span);
+    }
+
     function transcriptPanels(p) {
       const attempts = (p.attempts_detail || []).filter(a => a.transcript_available);
       if (!attempts.length) return '';
       return `<div class="transcripts">${attempts.map(a => {
         const key = `${p.instance_id}:${a.number}`;
-        return `<details class="transcript" data-detail-id="transcript-${escapeHtml(key)}" data-instance="${escapeHtml(p.instance_id)}" data-attempt="${a.number}"><summary><span>Transcript · attempt ${a.number}</span><span class="tr-status">${escapeHtml(a.status)}</span></summary><div class="transcript-body" data-transcript-key="${escapeHtml(key)}"><span class="mut">Open to load events.</span></div></details>`;
+        return `<details class="transcript" data-detail-id="transcript-${escapeHtml(key)}" data-instance="${escapeHtml(p.instance_id)}" data-attempt="${a.number}"><summary><span>Transcript · attempt ${a.number}</span><span class="tr-status ${statusCls(a.status)}">${escapeHtml(a.status)}</span></summary><div class="transcript-body" data-transcript-key="${escapeHtml(key)}"><span class="mut">Open to load events.</span></div></details>`;
       }).join('')}</div>`;
     }
     function jsonPayload(value) {
@@ -879,45 +1053,138 @@
       try { return `<pre class="tr-payload mono">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`; }
       catch { return `<pre class="tr-payload mono">${escapeHtml(String(value))}</pre>`; }
     }
-    function renderTranscript(records) {
-      const items = []; const replaceable = new Map();
+    // Collapse the started/updated/completed records of one tool, file_change or
+    // plan into a single item, keyed by event id.
+    //
+    // This MERGES rather than replaces on purpose. Claude's adapter emits the real
+    // tool name on tool_use but hardcodes name:"tool" on tool_result
+    // (providers/claude.ts), so overwriting with the last record turns every
+    // finished tool into a nameless "tool" and drops its input. Merging keeps the
+    // identity fields from the first record and lets later ones advance status and
+    // attach output. Codex names every record, so it is unaffected either way.
+    const IDENTITY_WINS = ['name', 'kind', 'input'];
+    function mergeRecords(older, newer) {
+      const merged = { ...older.event, ...newer.event };
+      for (const field of IDENTITY_WINS) {
+        const first = older.event[field];
+        const last = newer.event[field];
+        if (first !== undefined && (last === undefined || last === 'tool')) merged[field] = first;
+      }
+      return { ...newer, at_started: older.at_started || older.at, event: merged };
+    }
+    function collapseRecords(records) {
+      const items = []; const seen = new Map();
       records.forEach(record => {
         const event = record.event || {};
         const key = ['tool', 'file_change', 'plan'].includes(event.type) && event.id ? `${event.type}:${event.id}` : null;
-        if (key && replaceable.has(key)) items[replaceable.get(key)] = record;
-        else { if (key) replaceable.set(key, items.length); items.push(record); }
+        if (key && seen.has(key)) { const i = seen.get(key); items[i] = mergeRecords(items[i], record); }
+        else { if (key) seen.set(key, items.length); items.push(record); }
       });
-      return items.map(record => {
-        const e = record.event; const when = fmtTime(record.at).split(' ').pop();
-        if (e.type === 'request') return `<div class="tr-event"><div class="tr-label">request · ${escapeHtml(when)}</div><details class="tr-sub"><summary>Prompt</summary>${jsonPayload({ prompt:e.prompt, system_prompt:e.systemPrompt, model:e.model, tools:e.tools, guards:e.guards })}</details></div>`;
-        if (e.type === 'message') return `<div class="tr-event message"><div class="tr-label">${escapeHtml(e.role)} · ${escapeHtml(when)}</div><div class="tr-text">${renderTranscriptMarkdown(e.text)}</div></div>`;
-        if (e.type === 'reasoning') return `<div class="tr-event"><details class="tr-sub"><summary>Reasoning <span class="tr-status">${escapeHtml(when)}</span></summary><div class="tr-text">${renderTranscriptMarkdown(e.text)}</div></details></div>`;
-        if (e.type === 'tool') return `<div class="tr-event"><details class="tr-sub"><summary>${escapeHtml(e.name)} <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload({ kind:e.kind, input:e.input, output:e.output, error:e.error })}</details></div>`;
-        if (e.type === 'file_change') return `<div class="tr-event"><details class="tr-sub"><summary>File changes <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.changes)}</details></div>`;
-        if (e.type === 'plan') return `<div class="tr-event"><details class="tr-sub"><summary>Agent plan <span class="tr-status">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.items)}</details></div>`;
-        if (e.type === 'usage') return `<div class="tr-event"><div class="tr-label">usage</div><div class="tr-text mono">${escapeHtml(usageLine(e.usage))}</div></div>`;
-        if (e.type === 'error') return `<div class="tr-event error"><div class="tr-label">error</div><div class="tr-text">${escapeHtml(e.message)}</div></div>`;
-        if (e.type === 'lifecycle') return `<div class="tr-event"><div class="tr-label">${escapeHtml(e.scope)} · ${escapeHtml(e.status)}</div>${e.message ? `<div class="tr-text">${escapeHtml(e.message)}</div>` : ''}</div>`;
-        return `<div class="tr-event"><div class="tr-label">${escapeHtml(e.name || e.type)}</div>${jsonPayload(e.data)}</div>`;
-      }).join('') || '<span class="mut">No transcript events yet.</span>';
+      return items;
+    }
+    function renderTranscript(records) {
+      // `status` and `lifecycle` are provider plumbing: SessionStart hooks firing and
+      // turn markers. They were 43% of a planner transcript and told a reader nothing
+      // — none of them change what you would do next. Hidden when they behave.
+      //
+      // But a hook that FAILS is a different animal: it can break the run, and a
+      // transcript that hides it would send you digging through the .jsonl by hand.
+      // So routine plumbing is dropped and failing plumbing is surfaced, in red.
+      //
+      // Nothing is lost either way: the audit log is the .jsonl on disk, not this
+      // view. The viewer is a reading tool and is allowed to stay quiet.
+      const PLUMBING = new Set(['status', 'lifecycle']);
+      const plumbingFailed = (e) =>
+        e.status === 'failed' || e.status === 'cancelled' ||
+        Boolean(e.data && (e.data.error || e.data.stderr)) ||
+        /error|fail/i.test(String(e.name || ''));
+
+      const items = collapseRecords(records);
+      if (!items.length) return '<span class="mut">No transcript events yet.</span>';
+
+      const out = [];
+      for (const record of items) {
+        const e = record.event;
+        if (PLUMBING.has(e.type)) {
+          if (!plumbingFailed(e)) continue;
+          const when = fmtTime(record.at).split(' ').pop();
+          out.push(`<div class="tr-event error"><details class="tr-sub"><summary><span class="tr-kind">provider</span><span class="tr-tool bad">${escapeHtml(e.name || `${e.scope} ${e.status}`)}</span><span class="tr-status">${escapeHtml(when)}</span></summary>${jsonPayload(e.data ?? e.message)}</details></div>`);
+          continue;
+        }
+        const when = fmtTime(record.at).split(' ').pop();
+        if (e.type === 'request') { out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">request</span>Prompt<span class="tr-status">${escapeHtml(when)}</span></summary>${jsonPayload({ prompt:e.prompt, system_prompt:e.systemPrompt, model:e.model, tools:e.tools, guards:e.guards })}</details></div>`); continue; }
+        if (e.type === 'message') { out.push(`<div class="tr-event message"><div class="tr-label">${escapeHtml(e.role)} · ${escapeHtml(when)}</div><div class="tr-text">${renderTranscriptMarkdown(e.text)}</div></div>`); continue; }
+        if (e.type === 'reasoning') { out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">thought</span><span class="tr-peek">${escapeHtml(shortenArg(String(e.text || '').replace(/\s+/g, ' '), 72))}</span><span class="tr-status">${escapeHtml(when)}</span></summary><div class="tr-text">${renderTranscriptMarkdown(e.text)}</div></details></div>`); continue; }
+        if (e.type === 'tool') {
+          // The arg is the point: "Read" says nothing, "Read src/text.ts" says it all.
+          const arg = toolArg(e);
+          const bad = e.status === 'failed';
+          out.push(`<div class="tr-event${bad ? ' error' : ''}"><details class="tr-sub"><summary><span class="tr-tool${bad ? ' bad' : ''}">${escapeHtml(e.name)}</span>${arg ? `<span class="tr-peek mono" title="${escapeHtml(arg)}">${escapeHtml(shortenArg(arg, 68))}</span>` : ''}<span class="tr-status ${bad ? 's-failed' : ''}">${escapeHtml(bad ? 'failed' : when)}</span></summary>${jsonPayload({ kind:e.kind, input:e.input, output:e.output, error:e.error })}</details></div>`);
+          continue;
+        }
+        if (e.type === 'file_change') { const n = (e.changes || []).length; out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">files</span><span class="tr-peek mono">${escapeHtml((e.changes || []).map(c => c.path).join(', '))}</span><span class="tr-status">${n} changed</span></summary>${jsonPayload(e.changes)}</details></div>`); continue; }
+        if (e.type === 'plan') { out.push(`<div class="tr-event"><details class="tr-sub"><summary><span class="tr-kind">plan</span><span class="tr-peek">${escapeHtml((e.items || []).map(i => i.text).join(' · '))}</span><span class="tr-status ${statusCls(e.status)}">${escapeHtml(e.status)}</span></summary>${jsonPayload(e.items)}</details></div>`); continue; }
+        if (e.type === 'usage') { out.push(`<div class="tr-event"><div class="tr-label">usage</div><div class="tr-text mono">${escapeHtml(usageLine(e.usage))}</div></div>`); continue; }
+        if (e.type === 'error') { out.push(`<div class="tr-event error"><div class="tr-label">error${e.retryable ? ' · retryable' : ''}</div><div class="tr-text">${escapeHtml(e.message)}</div></div>`); continue; }
+        out.push(`<div class="tr-event"><div class="tr-label">${escapeHtml(e.name || e.type)}</div>${jsonPayload(e.data)}</div>`);
+      }
+      return out.join('');
+    }
+    // Pull one attempt's new events and cache them. The API paginates forward from
+    // a seq cursor, so keeping `after` between polls means each call costs only the
+    // delta. `complete` tells us the attempt finished; once it has and we have
+    // drained it, there is nothing left to ask for.
+    async function pullTranscript(cwdHash, slug, instance, attempt) {
+      const key = `${cwdHash}:${slug}:${instance}:${attempt}`;
+      const cached = transcriptCache.get(key) || { after: 0, records: [], done: false };
+      if (cached.done) return cached;
+      const page = await fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/transcripts?instance=${encodeURIComponent(instance)}&attempt=${attempt}&after=${cached.after}&limit=200`);
+      if (page.events.length) { cached.records.push(...page.events); cached.after = page.next_after; }
+      // Only stop once the attempt is finished AND this page did not fill: a full
+      // page means more is waiting even if the attempt already ended.
+      if (page.complete && page.events.length < 200) cached.done = true;
+      transcriptCache.set(key, cached);
+      return cached;
     }
     async function refreshTranscripts(cwdHash, slug) {
       activeTranscriptRun = { cwdHash, slug };
       const panels = [...app.querySelectorAll('details.transcript[open]')];
-      await Promise.all(panels.map(async panel => {
-        const instance = panel.dataset.instance; const attempt = Number(panel.dataset.attempt); const key = `${cwdHash}:${slug}:${instance}:${attempt}`;
-        const cached = transcriptCache.get(key) || { after:0, records:[] };
-        try {
-          const page = await fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/transcripts?instance=${encodeURIComponent(instance)}&attempt=${attempt}&after=${cached.after}&limit=200`);
-          if (page.events.length) { cached.records.push(...page.events); cached.after = page.next_after; transcriptCache.set(key, cached); }
-          const body = panel.querySelector('.transcript-body'); if (body) body.innerHTML = renderTranscript(cached.records);
-        } catch (error) { const body = panel.querySelector('.transcript-body'); if (body) body.innerHTML = `<span style="color:var(--fail)">${escapeHtml(error.message)}</span>`; }
-      }));
+      const live = [...app.querySelectorAll('[data-act]')];
+      await Promise.all([
+        ...panels.map(async panel => {
+          const instance = panel.dataset.instance; const attempt = Number(panel.dataset.attempt);
+          try {
+            const cached = await pullTranscript(cwdHash, slug, instance, attempt);
+            const body = panel.querySelector('.transcript-body'); if (body) body.innerHTML = renderTranscript(cached.records);
+          } catch (error) { const body = panel.querySelector('.transcript-body'); if (body) body.innerHTML = `<span style="color:var(--fail)">${escapeHtml(error.message)}</span>`; }
+        }),
+        // The running phase's activity line needs its transcript even when the
+        // panel below it is closed, so fetch it on its own.
+        ...live.map(async frame => {
+          const [instance, attemptRaw] = (frame.dataset.act || '').split(':');
+          const attempt = Number(attemptRaw);
+          if (!instance || !Number.isFinite(attempt)) return;
+          try {
+            const cached = await pullTranscript(cwdHash, slug, instance, attempt);
+            // Written in place, never through the main render: activity changes far
+            // more often than the run signature, and re-rendering the page for it
+            // would restart every animation and collapse open panels.
+            const html = activityHtml(cached.records);
+            if (frame.innerHTML !== html) frame.innerHTML = html;
+          } catch { /* the line is decoration for a live run; a failed poll retries in 3s */ }
+        }),
+      ]);
     }
+    /** Status words share the pill palette: one status, one colour, everywhere. */
+    const STATUS_CLS = { completed:'s-done', done:'s-done', skipped:'s-done', running:'s-running',
+                         in_progress:'s-running', failed:'s-failed', cancelled:'s-failed',
+                         parked:'s-waiting', paused:'s-waiting', waiting_human:'s-waiting', pending:'s-pending' };
+    const statusCls = (s) => STATUS_CLS[s] || '';
+
     function phaseRow(p) {
       const dur = liveDur(p.started_at, p.ended_at);
       const sid = p.session_id ? p.session_id.slice(0, 8) : '—';
-      const name = p.attempt > 1 ? `${p.name} #${p.attempt}` : p.name;
+      const name = p.attempt > 1 ? `${phaseLabel(p.name)} #${p.attempt}` : phaseLabel(p.name);
       if (p.status === 'running') {
         return `<div class="phase-wrap"><div class="phase run">
           <div class="runhead">
@@ -925,7 +1192,7 @@
             <span class="pname">${escapeHtml(name)} <span class="pill s-running spin" style="margin-left:8px"><span class="d"></span>running</span></span>
             <span class="runmeta"><span class="pdur">${dur}</span><span class="psid mono" title="session id">${escapeHtml(sid)}</span></span>
           </div>
-          <div class="workframe">${sceneFor(p.name)}</div>
+          <div class="workframe" data-act="${escapeHtml(`${p.instance_id}:${p.attempt}`)}">${ACT_PENDING}</div>
         </div>${transcriptPanels(p)}</div>`;
       }
       const ok = p.status === 'completed';
@@ -934,16 +1201,42 @@
       if (!ok) {
         if (p.status === 'failed') nodeCls += ' fail';
         else if (p.status === 'parked') nodeCls += ' parked';
-        else if (p.name.startsWith('planner')) nodeCls += ' planner';
+        else if (phaseRole(p.name) === 0) nodeCls += ' planner';
       }
+      const v = phaseVerdict(p);
       return `<div class="phase-wrap"><div class="${phaseCls}">
         <span class="${nodeCls}"></span>
-        <div class="pmain"><span class="pname">${escapeHtml(name)}</span>${p.usage ? `<div class="mut" style="font-size:11px;margin-top:3px">${escapeHtml(usageLine(p.usage))}</div>` : ''}</div>
-        <div class="pright"><span class="pdur">${dur}</span><span class="psid mono" title="session id">${escapeHtml(sid)}</span></div>
+        <div class="pmain"><span class="pname">${escapeHtml(name)}</span></div>
+        <div class="pright">${v ? `<span class="pverdict ${v.kind}">${escapeHtml(v.text)}</span>` : ''}${phaseCost(p)}<span class="pdur">${dur}</span></div>
       </div>${transcriptPanels(p)}</div>`;
     }
+
+    /** Just the cost. The full token breakdown wrapped into two unreadable grey
+     *  lines; it lives in the provenance fold where someone auditing spend looks. */
+    function phaseCost(p) {
+      const c = p.usage && p.usage.cost_usd;
+      if (c == null) return '';
+      return `<span class="pcost mono" title="${escapeHtml(usageLine(p.usage))}">${escapeHtml(usageCost(c, p.usage.cost_coverage))}</span>`;
+    }
+
+    /** The one thing each phase decided, in the fewest words that stay true. */
+    function phaseVerdict(p) {
+      if (!p.verdict) return null;
+      let v; try { v = JSON.parse(p.verdict); } catch { return null; }
+      const role = phaseRole(p.name);
+      if (role === 0 && Array.isArray(v.tasks)) return { text: `${v.tasks.length} task${v.tasks.length === 1 ? '' : 's'}`, kind: 'info' };
+      if (role === 2 || typeof v.verdict === 'string') {
+        const pass = v.verdict === 'pass';
+        return { text: String(v.verdict ?? ''), kind: pass ? 'ok' : 'bad' };
+      }
+      if (v.verdict && typeof v.verdict === 'object' && v.verdict.status) {
+        return { text: String(v.verdict.status), kind: v.verdict.status === 'done' ? 'ok' : 'bad' };
+      }
+      if (v.sha) return { text: String(v.sha).slice(0, 7), kind: 'mono' };
+      return null;
+    }
     function iterTitle(group) {
-      const dev = group.find(p => p.name.startsWith('developer') && p.verdict);
+      const dev = group.find(p => phaseRole(p.name) === 1 && p.verdict);
       if (dev) { try { const v = JSON.parse(dev.verdict); const s = (v.commit_message || '').split('\n')[0].trim(); if (s) return truncate(s, 70); } catch {} }
       return '';
     }
@@ -958,17 +1251,23 @@
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/sibling-branches`).catch(() => ({ siblingBranches: [] })),
           ]);
 
+          // The timeline redraws on the timer, so it needs the freshest state even on
+          // the ticks where the signature says nothing changed. Cleared once the run
+          // ends: then the bars are history and history does not move.
+          liveTimelineState = state.lifecycle.ended_at ? null : state;
+
           const sig = JSON.stringify({ state, plan, commits, gitErr, siblingBranches });
           if (sig === lastDetailSig && app.querySelector('.head')) { await refreshTranscripts(cwdHash, slug); return; }
           const animate = detailAnimate;
           detailAnimate = false;
           lastDetailSig = sig;
 
-          const visiblePhases = state.phases.filter(p => p.name !== 'committing');
+          const allPhases = state.phases.filter(p => p.name !== 'committing');
+          const visiblePhases = allPhases.filter(p => !isContainer(p, allPhases));
           const groups = [];
           let curGroup = [];
           visiblePhases.forEach(p => {
-            if (p.name.startsWith('developer') && curGroup.some(x => x.name.startsWith('developer'))) { groups.push(curGroup); curGroup = []; }
+            if (phaseRole(p.name) === 1 && curGroup.some(x => phaseRole(x.name) === 1)) { groups.push(curGroup); curGroup = []; }
             curGroup.push(p);
           });
           if (curGroup.length) groups.push(curGroup);
@@ -977,25 +1276,106 @@
             return `<div class="iter"><div class="iter-h"><span class="iter-tag">Iteration ${i + 1}</span>${title ? `<span class="t">${escapeHtml(title)}</span>` : ''}</div>${g.map(phaseRow).join('')}</div>`;
           }).join('');
 
+          const live = state.lifecycle.status === 'running' || state.lifecycle.status === 'waiting_human';
           const elapsedHtml = liveDur(state.origin.started_at, state.lifecycle.ended_at);
           const iterN = (plan && plan.iterations_global != null) ? plan.iterations_global : groups.length;
           const tasksKpi = (plan && Array.isArray(plan.tasks) && plan.tasks.length) ? `${plan.tasks.filter(t => t.status === 'done').length}/${plan.tasks.length}` : '—';
           const retriesKpi = visiblePhases.reduce((n, p) => n + Math.max(0, (p.attempt || 1) - 1), 0);
+
+          // --- the facts line -------------------------------------------------
+          // The same numbers the four KPI cards used to shout, on one line. A card
+          // per number gave "0 retries" the same weight as the elapsed time, and
+          // spent the first screen on counts instead of on what the run produced.
+          // Zeros are dropped: no retries is the boring default and deserves silence.
+          // Each fact carries its own markup: `elapsedHtml` is already a <span> with
+          // the data-dur-start hook the live timer ticks, so escaping it here would
+          // print the tag AND stop the clock. Plain strings get escaped as they are
+          // added; nothing in this list is escaped twice.
+          const facts = [`<span class="f-ctx">${escapeHtml(state.origin.workflow)}</span>`, `<span class="f-val">${elapsedHtml}</span>`];
+          const addFact = (text) => facts.push(`<span class="f-val">${escapeHtml(text)}</span>`);
+          if (tasksKpi !== '—') addFact(`${tasksKpi} task${plan.tasks.length === 1 ? '' : 's'}`);
+          if (iterN > 1) addFact(`${iterN} iterations`);
+          if (retriesKpi > 0) addFact(`${retriesKpi} retr${retriesKpi === 1 ? 'y' : 'ies'}`);
+          const totalUsage = state.usage && state.usage.total;
+          if (totalUsage && totalUsage.cost_usd != null) addFact(usageCost(totalUsage.cost_usd, totalUsage.cost_coverage));
+          const factsHtml = facts.join('<i class="f-sep" aria-hidden="true"></i>');
+
+          // --- outcome ---------------------------------------------------------
+          // What the run produced, which is the question the page is opened to
+          // answer. It used to be nowhere on the first screen.
+          function outcomeHtml() {
+            const done = state.lifecycle.status === 'done';
+            const failed = state.lifecycle.status === 'failed';
+            if (!done && !failed) return '';
+            const tasks = (plan && Array.isArray(plan.tasks)) ? plan.tasks : [];
+            // The commit message lives on the developer's verdict, the sha on the
+            // task; the touched paths come from the ChangeSet the harness committed.
+            const rows = tasks.map(task => {
+              const dev = visiblePhases.find(p => phaseRole(p.name) === 1 && p.verdict && p.name.includes(`:${tasks.indexOf(task)}.`));
+              let message = '', files = [];
+              if (dev) { try { const v = JSON.parse(dev.verdict); message = v.verdict?.commit_message || ''; files = (v.changeSet?.entries || []).map(e => e.path); } catch {} }
+              const sha = task.commit_sha ? String(task.commit_sha).slice(0, 7) : null;
+              const ok = task.status === 'done';
+              return `<div class="oc-row">
+                <svg class="oc-mark ${ok ? 'ok' : 'bad'}" viewBox="0 0 22 22" aria-hidden="true">
+                  <circle class="oc-ring" cx="11" cy="11" r="9.6"/>
+                  ${ok
+                    ? '<path class="oc-tick" d="M6.4 11.3 L9.6 14.4 L15.6 7.9"/>'
+                    : '<path class="oc-tick" d="M7.4 7.4 L14.6 14.6 M14.6 7.4 L7.4 14.6"/>'}
+                </svg>
+                <div class="oc-main">
+                  <div class="oc-msg">${escapeHtml(message || task.title || task.id)}</div>
+                  <div class="oc-meta">${sha ? `<span class="mono">${escapeHtml(sha)}</span><span class="dim">·</span>` : ''}${files.length ? `<span>${files.length} file${files.length === 1 ? '' : 's'}</span>` : `<span>${escapeHtml(task.status)}</span>`}</div>
+                  ${files.length ? `<div class="oc-files mono">${files.map(f => `<span>${escapeHtml(f)}</span>`).join('')}</div>` : ''}
+                </div>
+              </div>`;
+            }).join('');
+            if (!rows) return '';
+            const branch = state.environment.branch;
+            return `<div class="section-h reveal" style="--i:2"><h2>${failed ? 'What happened' : 'Outcome'}</h2>${branch ? `<span class="meta mono">${escapeHtml(branch)}</span>` : ''}</div>
+              <div class="card outcome reveal" style="--i:2">${rows}
+                ${branch ? `<div class="oc-cta"><code class="mono">git checkout ${escapeHtml(branch)}</code></div>` : ''}
+              </div>`;
+          }
 
           let usageHtml = '';
           const usage = state.usage && state.usage.total;
           if (usage && (usage.input_tokens || usage.output_tokens || usage.cache_read_input_tokens || usage.cache_creation_input_tokens || usage.reasoning_output_tokens || usage.cost_usd != null)) {
             const cache = (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
             const providers = Object.entries(state.usage.by_provider || {}).map(([provider, value]) => `<div class="phase ok"><span class="tnode"></span><div class="pmain"><span class="pname">${escapeHtml(provider)}</span><div class="mut" style="font-size:11px;margin-top:3px">${escapeHtml(usageLine(value))}</div></div></div>`).join('');
-            const attempts = visiblePhases.flatMap(phase => (phase.attempts_detail || []).filter(attempt => attempt.usage).map(attempt => `<details class="task"><summary><span class="tid mono">${escapeHtml(phase.name)}</span><span class="ttitle">attempt ${attempt.number} · ${escapeHtml(attempt.status)} · ${escapeHtml(attempt.usage.provider)}${attempt.usage.model ? `/${escapeHtml(attempt.usage.model)}` : ''}</span><span class="mono dim">${escapeHtml(usageLine(attempt.usage))}</span></summary>${usageModels(attempt.usage) ? `<div class="task-body">${usageModels(attempt.usage)}</div>` : ''}</details>`)).join('');
-            usageHtml = `<div class="section-h reveal" style="--i:3"><h2>Usage</h2><span class="meta">provider-reported metrics</span></div>
-              <div class="summary reveal" style="--i:3; margin:0 0 18px">
-                <div class="stat" style="--c:var(--accent)"><div class="n num">${usageNumber(usage.input_tokens)}</div><div class="l"><span class="k"></span>Input</div></div>
-                <div class="stat" style="--c:var(--run)"><div class="n num">${usageNumber(usage.output_tokens)}</div><div class="l"><span class="k"></span>Output</div></div>
-                <div class="stat" style="--c:var(--done)"><div class="n num">${usageNumber(cache)}</div><div class="l"><span class="k"></span>Cache</div></div>
-                <div class="stat" style="--c:var(--wait)"><div class="n num">${escapeHtml(usageCost(usage.cost_usd, usage.cost_coverage))}</div><div class="l"><span class="k"></span>Reported cost</div></div>
-              </div>
-              <div class="grid2 reveal" style="--i:3; margin-bottom:24px"><div class="panel"><h3>By provider</h3>${providers}</div><div class="panel"><h3>By attempt</h3>${attempts || '<p class="mut" style="font-size:12px">No attempt metrics.</p>'}</div></div>`;
+            // These are columns of numbers meant to be compared, so they belong in a
+            // table. usageLine() ran all five into one sentence, which wrapped to
+            // three lines per row and buried the one genuinely actionable field —
+            // the model. cache-read and cache-write are the two biggest numbers here
+            // and the least actionable: summed into one column, kept for the audit.
+            const rows = visiblePhases.flatMap(phase => (phase.attempts_detail || [])
+              .filter(a => a.usage)
+              .map(a => {
+                const u = a.usage;
+                const cacheN = (u.cacheReadInputTokens || 0) + (u.cacheCreationInputTokens || 0);
+                const many = (phase.attempts_detail || []).length > 1;
+                // The model is the point of this table: strip the vendor prefix so the
+                // column stays narrow and the difference between rows is what shows.
+                const model = String(u.model || '').replace(/^claude-/, '').replace(/^gpt-/, '');
+                return `<tr${a.status === 'failed' ? ' class="ua-fail"' : ''}>
+                  <td class="ua-name">${escapeHtml(phaseLabel(phase.name))}${many ? `<span class="ua-att">#${a.number}</span>` : ''}</td>
+                  <td class="ua-model mono">${escapeHtml(model || u.provider || '—')}</td>
+                  <td class="num">${escapeHtml(usageNumber(u.inputTokens))}</td>
+                  <td class="num">${escapeHtml(usageNumber(u.outputTokens))}</td>
+                  <td class="num dim">${escapeHtml(usageNumber(cacheN))}</td>
+                  <td class="num ua-cost">${escapeHtml(u.costUsd != null ? usageCost(u.costUsd) : '—')}</td>
+                </tr>`;
+              })).join('');
+            usageHtml = `<div class="tablewrap"><table class="ua">
+                <thead><tr><th>phase</th><th>model</th><th class="r">in</th><th class="r">out</th><th class="r">cache</th><th class="r">cost</th></tr></thead>
+                <tbody>${rows || '<tr><td colspan="6" class="mut">No attempt metrics.</td></tr>'}</tbody>
+                <tfoot><tr><td colspan="2">total</td>
+                  <td class="num">${escapeHtml(usageNumber(usage.input_tokens))}</td>
+                  <td class="num">${escapeHtml(usageNumber(usage.output_tokens))}</td>
+                  <td class="num dim">${escapeHtml(usageNumber(cache))}</td>
+                  <td class="num ua-cost">${escapeHtml(usageCost(usage.cost_usd, usage.cost_coverage))}</td>
+                </tr></tfoot>
+              </table></div>`;
           }
 
           let planHtml = '';
@@ -1026,21 +1406,37 @@
             </div>`;
           }
 
+          // This is a collision warning, not a listing. Other harny runs touched the
+          // same paths on their own branches; merging both silently drops one side's
+          // work. AGENTS.md calls it out as a real footgun, but the panel showed a
+          // branch name and a bullet list with no hint of why anyone should care.
           let siblingHtml = '';
           if (Array.isArray(siblingBranches) && siblingBranches.length > 0) {
-            const entries = siblingBranches.map(s => `<div style="margin-bottom:10px"><div class="mono" style="font-weight:600; color:var(--wait)">${escapeHtml(s.branch)}</div><ul style="margin:4px 0 0; padding-left:18px; color:var(--text-mut); font-size:12px">${s.files.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul></div>`).join('');
-            siblingHtml = `<div class="section-h"><h2>Sibling branches</h2></div><div class="panel" style="border-color:color-mix(in srgb,var(--wait) 40%,var(--border)); margin-bottom:24px">${entries}</div>`;
+            const totalFiles = siblingBranches.reduce((n, s) => n + s.files.length, 0);
+            const entries = siblingBranches.map(s => `<div class="sib-row">
+              <div class="sib-branch mono">${escapeHtml(s.branch)}</div>
+              <div class="sib-files">${s.files.map(f => `<span class="mono">${escapeHtml(f)}</span>`).join('')}</div>
+            </div>`).join('');
+            siblingHtml = `<div class="section-h reveal" style="--i:5"><h2>Also touched by other runs</h2><span class="meta">${siblingBranches.length} branch${siblingBranches.length === 1 ? '' : 'es'} · ${totalFiles} file${totalFiles === 1 ? '' : 's'}</span></div>
+              <div class="card sib reveal" style="--i:5">
+                <p class="sib-why">These branches changed the same files as this run. Merging both will silently drop one side's work — review them together before merging.</p>
+                ${entries}
+              </div>`;
           }
 
           const commitsHtml = (gitErr || commits.length === 0)
             ? `<p class="mut" style="font-size:12px">${escapeHtml(gitErr || 'No commits yet on this branch.')}</p>`
             : `<div class="gg">${commits.map(c => `<div class="commit"><span class="sha mono">${escapeHtml(c.sha)}</span><div><div class="csub">${escapeHtml(c.subject)}</div><span class="dim" style="font-size:12px" data-iso="${escapeHtml(c.date)}" title="${escapeHtml(fmtTime(c.date))}">${escapeHtml(fmtRelative(c.date))}</span></div></div>`).join('')}</div>`;
 
-          const recent = state.history.slice(-12).reverse();
+          // `execution.checkpoint` is the scheduler writing state to disk — 18 of this
+          // run's 23 events. Keeping them pushed the five that tell the story
+          // (captured -> validated -> committed) out of the visible twelve, and they
+          // carry no phase or message, so every row rendered as a bare timestamp.
+          const recent = state.history.filter(e => e.type !== 'execution.checkpoint').slice(-12).reverse();
           const eventsHtml = recent.map(e => {
             const sub = eventSubstance(e, state, plan);
             const cls = sub.kind === 'pass' ? 'pass' : sub.kind === 'fail' ? 'fail' : '';
-            return `<div class="ev"><span class="when" data-iso="${escapeHtml(e.at)}" title="${escapeHtml(fmtTime(e.at))}">${escapeHtml(fmtRelative(e.at))}</span><span class="ph">${escapeHtml(e.phase || '')}</span><span class="msg ${cls}">${escapeHtml(sub.text)}</span></div>`;
+            return `<div class="ev"><span class="when" data-iso="${escapeHtml(e.at)}" title="${escapeHtml(fmtTime(e.at))}">${escapeHtml(fmtRelative(e.at))}</span><span class="msg ${cls}">${escapeHtml(sub.text)}</span></div>`;
           }).join('');
           const liveHd = state.lifecycle.status === 'running' ? '<span class="live-hd"></span>' : '';
 
@@ -1049,40 +1445,47 @@
             <div class="head reveal" style="--i:0">
               <div>
                 <h1>${escapeHtml(state.origin.task_slug)}</h1>
-                <div class="metaline"><span>${escapeHtml(state.origin.workflow)}</span><span class="dim">·</span>${statusPill(state.lifecycle.status)}<span class="dim">·</span><span class="mono dim">${escapeHtml(state.run_id)}</span><span class="chip"><span class="cd"></span>elapsed ${elapsedHtml}</span></div>
+                <div class="metaline">${statusPill(state.lifecycle.status)}${factsHtml}</div>
               </div>
             </div>
             ${pendingHtml}
-            <div class="section-h reveal" style="--i:1; margin-top:8px"><h2>Live pipeline</h2><span class="meta">${escapeHtml(state.lifecycle.status)}${state.lifecycle.ended_reason ? ` · ${escapeHtml(state.lifecycle.ended_reason)}` : ''}</span></div>
-            ${ribbonHtml(state, plan)}
-            <div class="summary reveal" style="--i:2; margin:0 0 26px">
-              <div class="stat" style="--c:var(--accent)"><div class="n num">${elapsedHtml}</div><div class="l"><span class="k"></span>Elapsed</div></div>
-              <div class="stat" style="--c:var(--run)"><div class="n num">${iterN}</div><div class="l"><span class="k"></span>Iterations</div></div>
-              <div class="stat" style="--c:var(--done)"><div class="n num">${tasksKpi}</div><div class="l"><span class="k"></span>Tasks done</div></div>
-              <div class="stat" style="--c:var(--wait)"><div class="n num">${retriesKpi}</div><div class="l"><span class="k"></span>Retries</div></div>
+            <div class="ask reveal" style="--i:1" onclick="this.classList.toggle('open')" title="click to expand">
+              <p>${escapeHtml(state.origin.prompt)}</p>
             </div>
-            ${usageHtml}
-            <div class="grid2 reveal" style="--i:3">
-              <div class="panel"><h3>Origin</h3><dl>
-                <dt>prompt</dt><dd>${escapeHtml(state.origin.prompt)}</dd>
-                <dt>started</dt><dd class="mono">${escapeHtml(fmtTime(state.origin.started_at))}</dd>
-                <dt>by</dt><dd class="mono">${escapeHtml(state.origin.user)}@${escapeHtml(state.origin.host)}</dd>
-              </dl></div>
-              <div class="panel"><h3>Environment</h3><dl>
-                <dt>cwd</dt><dd class="mono">${escapeHtml(state.environment.cwd)}</dd>
-                <dt>branch</dt><dd class="mono">${escapeHtml(state.environment.branch)}</dd>
-                <dt>isolation</dt><dd>${escapeHtml(state.environment.isolation)}</dd>
-                <dt>mode</dt><dd>${escapeHtml(state.environment.mode)}</dd>
-                ${state.lifecycle.ended_at ? `<dt>ended</dt><dd class="mono">${escapeHtml(fmtTime(state.lifecycle.ended_at))}${state.lifecycle.ended_reason ? ` (${escapeHtml(state.lifecycle.ended_reason)})` : ''}</dd>` : ''}
-              </dl></div>
-            </div>
+            <div class="section-h reveal" style="--i:2"><h2>${live ? 'Live pipeline' : 'Timeline'}</h2><span class="meta">where the time went</span></div>
+            <div class="card timeline reveal" style="--i:2">${timelineInner(state)}</div>
+            ${outcomeHtml()}
             ${planHtml}
             <div class="section-h reveal" style="--i:5"><h2>Phases</h2><span class="meta">grouped by iteration</span></div>
             <div class="card reveal" style="--i:5; padding:14px; margin-bottom:24px">${phasesHtml || '<p class="mut" style="padding:8px">No phases yet.</p>'}</div>
             ${siblingHtml}
-            <div class="grid2 reveal" style="--i:6">
-              <div class="panel"><h3>Commits on ${escapeHtml(state.environment.branch)}</h3>${commitsHtml}</div>
-              <div class="panel"><h3>Recent events${liveHd}</h3><div class="events">${eventsHtml || '<p class="mut" style="font-size:12px">No events yet.</p>'}</div></div>
+            <!-- Provenance. It sits last because the outcome earns the first screen,
+                 but it stays open: hiding it behind a click made the reader do work to
+                 reach data that was already written and already theirs. -->
+            <div class="section-h reveal" style="--i:6"><h2>Cost, origin &amp; history</h2><span class="meta mono">${escapeHtml(usageLine(state.usage.total || {}))}</span></div>
+            <div class="card fold reveal" style="--i:6">
+              <div class="fold-body">
+                ${usageHtml}
+                <div class="grid2">
+                  <div class="panel"><h3>Origin</h3><dl>
+                    <dt>prompt</dt><dd>${escapeHtml(state.origin.prompt)}</dd>
+                    <dt>started</dt><dd class="mono">${escapeHtml(fmtTime(state.origin.started_at))}</dd>
+                    <dt>by</dt><dd class="mono">${escapeHtml(state.origin.user)}@${escapeHtml(state.origin.host)}</dd>
+                    <dt>run id</dt><dd class="mono">${escapeHtml(state.run_id)}</dd>
+                  </dl></div>
+                  <div class="panel"><h3>Environment</h3><dl>
+                    <dt>cwd</dt><dd class="mono">${escapeHtml(state.environment.cwd)}</dd>
+                    <dt>branch</dt><dd class="mono">${escapeHtml(state.environment.branch)}</dd>
+                    <dt>isolation</dt><dd>${escapeHtml(state.environment.isolation)}</dd>
+                    <dt>mode</dt><dd>${escapeHtml(state.environment.mode)}</dd>
+                    ${state.lifecycle.ended_at ? `<dt>ended</dt><dd class="mono">${escapeHtml(fmtTime(state.lifecycle.ended_at))}</dd>` : ''}
+                  </dl></div>
+                </div>
+                <div class="grid2" style="margin-top:16px">
+                  <div class="panel"><h3>Commits on ${escapeHtml(state.environment.branch)}</h3>${commitsHtml}</div>
+                  <div class="panel"><h3>Recent events${liveHd}</h3><div class="events">${eventsHtml || '<p class="mut" style="font-size:12px">No events yet.</p>'}</div></div>
+                </div>
+              </div>
             </div>
           </div>`;
           bindDetailsTracking(app);
@@ -1103,6 +1506,9 @@
       const m = hash.match(/^#\/runs\/([^/]+)\/(.+)$/);
       if (m) renderRunDetail(m[1], decodeURIComponent(m[2]));
       else if (hash === '#/runs') renderRunList(true);
+      // The hero was reachable only by having zero runs, i.e. once per install and
+      // never again. This makes it addressable without deleting anything.
+      else if (hash === '#/welcome') { app.innerHTML = heroHtml(); stopPoll(); }
       else renderRunList();
     }
     window.addEventListener('hashchange', route);
