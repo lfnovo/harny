@@ -17,6 +17,20 @@ test("ClaudeProvider normalizes output and session", async () => {
   expect(received.env.TMPDIR).toBe("/repo/scratch");
 });
 
+test("ClaudeProvider passes a request's maxTurns through, and defaults it when absent", async () => {
+  // Guards the wiring bug: the heavier phases declare maxTurns: 200, but the value
+  // reached the SDK only if the request carried it. Without this the field was
+  // silently dropped and every phase ran at the provider default of 50.
+  let received: any;
+  const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo",
+    runPhase: (async (args: any) => { received = args; return { sessionId: "s1", status: "completed", error: null, structuredOutput: {}, resultSubtype: "success", events: [] }; }) as any,
+  });
+  await provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}), maxTurns: 200 });
+  expect(received.phaseConfig.maxTurns).toBe(200);
+  await provider.run({ cwd: "/repo", prompt: "go", schema: z.object({}) });
+  expect(received.phaseConfig.maxTurns).toBe(50);
+});
+
 test("ClaudeProvider resumes only its own sessions", async () => {
   let resume: string | undefined;
   const provider = new ClaudeProvider({ workflowId: "flow", runId: "run", taskSlug: "task", primaryCwd: "/repo",

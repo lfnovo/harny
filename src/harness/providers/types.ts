@@ -42,6 +42,9 @@ export interface AgentRequest<T> {
   allowedTools?: string[];
   guards?: string[];
   model?: string;
+  /** Hard cap on agent tool-call round-trips. Falls back to the provider default
+   *  when a caller omits it. */
+  maxTurns?: number;
   env?: Record<string, string | undefined>;
   signal?: AbortSignal;
   onEvent?: AgentEventSink;
