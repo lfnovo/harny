@@ -1,0 +1,21 @@
+package.json
+  s_3bf78f572add17::t_f1802f76c288f2 3
+CHANGELOG.md
+  s_3bf78f572add17::t_be419d321a25e5 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ca11151828cd1301eb8759a8a2156dca79fcb8d5",
+  "prompts": {},
+  "sessions": {
+    "s_3bf78f572add17": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e69073f-15c4-41a6-9ed2-c8e91ff0a655",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Luis Novo <lfnovo@gmail.com>"
+    }
+  }
+}
