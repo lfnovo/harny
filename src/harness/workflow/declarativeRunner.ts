@@ -87,7 +87,7 @@ export async function runDeclarativeWorkflow(args: WorkflowRunRequest) {
 }
 
 async function runPlanner(provider: AgentProvider, node: AgentNode, context: NodeExecutionContext, args: WorkflowRunRequest) {
-  const request = { phase: "planner", cwd: args.cwd, prompt: plannerRequest(args.userPrompt, args.definition.outcome.type), systemPrompt: resolvePrompt("feature-dev", args.variant, "planner", args.primaryCwd), schema: PlannerVerdictSchema, allowedTools: DEFAULT_PLANNER.allowedTools, model: node.model ?? DEFAULT_PLANNER.model, guards: node.guards };
+  const request = { phase: "planner", cwd: args.cwd, prompt: plannerRequest(args.userPrompt, args.definition.outcome.type), systemPrompt: resolvePrompt("feature-dev", args.variant, "planner", args.primaryCwd), schema: PlannerVerdictSchema, allowedTools: DEFAULT_PLANNER.allowedTools, model: node.model ?? DEFAULT_PLANNER.model, maxTurns: DEFAULT_PLANNER.maxTurns, guards: node.guards };
   const result = await callAgent(provider, node, context, args, request);
   return result.output;
 }
@@ -97,7 +97,7 @@ async function runDeveloper(provider: AgentProvider, node: AgentNode, context: N
   if (!task) throw new Error(`${node.command} must run inside foreach`);
   const expectedBase = await headSha(args.cwd);
   const prompt = node.command === "review_fixer" ? `Address all review feedback.\n\n${JSON.stringify(task, null, 2)}` : taskPrompt("Execute", task);
-  const result = await callAgent(provider, node, context, args, { phase: "developer", taskId: task.id, cwd: args.cwd, prompt, systemPrompt: resolvePrompt("feature-dev", args.variant, "developer", args.primaryCwd), schema: DeveloperVerdictSchema, allowedTools: DEFAULT_DEVELOPER.allowedTools, model: node.model ?? DEFAULT_DEVELOPER.model, guards: node.guards });
+  const result = await callAgent(provider, node, context, args, { phase: "developer", taskId: task.id, cwd: args.cwd, prompt, systemPrompt: resolvePrompt("feature-dev", args.variant, "developer", args.primaryCwd), schema: DeveloperVerdictSchema, allowedTools: DEFAULT_DEVELOPER.allowedTools, model: node.model ?? DEFAULT_DEVELOPER.model, maxTurns: DEFAULT_DEVELOPER.maxTurns, guards: node.guards });
   if (result.output.status === "blocked") throw new Error(`developer blocked on task ${task.id}: ${result.output.blocked_reason ?? "unknown"}`);
   const changeSet = await captureChangeSet(args.cwd);
   if (changeSet.base_sha !== expectedBase) { await resetUnauthorizedHistory(args.cwd, expectedBase); throw new Error(`developer changed git history (expected HEAD ${expectedBase}, got ${changeSet.base_sha})`); }
@@ -113,7 +113,7 @@ async function runValidator(provider: AgentProvider, node: AgentNode, context: N
   if (!foreach || !task || !developer?.changeSet) throw new Error("validator must follow developer inside foreach");
   await assertChangeSetUnchanged(args.cwd, developer.changeSet);
   const manifest = `\n\nAuthoritative ChangeSet manifest (${developer.changeSet.entries.length} paths):\n${developer.changeSet.entries.map((entry) => `- ${entry.path}`).join("\n") || "- (empty)"}`;
-  const result = await withValidatorScratch(args.cwd, `${foreach.index}-${context.attempt.attempt}`, (env) => callAgent(provider, node, context, args, { phase: "validator", taskId: task.id, cwd: args.cwd, prompt: taskPrompt("Validate", task) + manifest, systemPrompt: resolvePrompt("feature-dev", args.variant, "validator", args.primaryCwd) + validatorScratchInstructions(env.TMPDIR!), schema: ValidatorSchema, allowedTools: DEFAULT_VALIDATOR.allowedTools, model: node.model ?? DEFAULT_VALIDATOR.model, guards: node.guards, env }));
+  const result = await withValidatorScratch(args.cwd, `${foreach.index}-${context.attempt.attempt}`, (env) => callAgent(provider, node, context, args, { phase: "validator", taskId: task.id, cwd: args.cwd, prompt: taskPrompt("Validate", task) + manifest, systemPrompt: resolvePrompt("feature-dev", args.variant, "validator", args.primaryCwd) + validatorScratchInstructions(env.TMPDIR!), schema: ValidatorSchema, allowedTools: DEFAULT_VALIDATOR.allowedTools, model: node.model ?? DEFAULT_VALIDATOR.model, maxTurns: DEFAULT_VALIDATOR.maxTurns, guards: node.guards, env }));
   await assertChangeSetUnchanged(args.cwd, developer.changeSet);
   if (result.output.verdict === "fail") throw new RetryWorkflowStepError("developer", result.output.reasons.join("; ") || "validation failed");
   if (result.output.verdict === "blocked") throw new Error(`validator blocked on task ${task.id}: ${result.output.reasons.join("; ")}`);
@@ -126,7 +126,7 @@ async function runFinalValidator(provider: AgentProvider, node: AgentNode, conte
   const plan = context.snapshot.nodes.planner?.output ?? args.inputs?.tasks ?? "No explicit plan artifact";
   const prompt = `Validate the final accumulated repository state after all task commits. Re-run every established project-wide gate (typecheck, tests, lint, build when present), confirm the worktree is clean, and verify the complete plan rather than only the last task.\n\nPlan:\n${JSON.stringify(plan, null, 2)}`;
   const finalInstructions = `${resolvePrompt("feature-dev", args.variant, "validator", args.primaryCwd)}\n\nFINAL VALIDATION OVERRIDE: all task ChangeSets have already been committed by the privileged runtime, so a clean git diff is required and is not a no-op failure. Validate the accumulated committed branch and all plan acceptance criteria. Prefix evidence as FINAL/AC entries as appropriate; the per-task one-entry rule does not limit this aggregate report.`;
-  const result = await withValidatorScratch(args.cwd, `final-${context.attempt.attempt}`, (env) => callAgent(provider, node, context, args, { phase: "final_validator", cwd: args.cwd, prompt, systemPrompt: finalInstructions + validatorScratchInstructions(env.TMPDIR!), schema: ValidatorSchema, allowedTools: DEFAULT_VALIDATOR.allowedTools, model: node.model ?? DEFAULT_VALIDATOR.model, guards: node.guards, env }));
+  const result = await withValidatorScratch(args.cwd, `final-${context.attempt.attempt}`, (env) => callAgent(provider, node, context, args, { phase: "final_validator", cwd: args.cwd, prompt, systemPrompt: finalInstructions + validatorScratchInstructions(env.TMPDIR!), schema: ValidatorSchema, allowedTools: DEFAULT_VALIDATOR.allowedTools, model: node.model ?? DEFAULT_VALIDATOR.model, maxTurns: DEFAULT_VALIDATOR.maxTurns, guards: node.guards, env }));
   await assertChangeSetUnchanged(args.cwd, expectedState);
   if (result.output.verdict !== "pass") throw new Error(`final validation ${result.output.verdict}: ${result.output.reasons.join("; ")}`);
   return result.output;

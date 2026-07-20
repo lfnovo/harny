@@ -69,6 +69,7 @@ export class ClaudeProvider implements AgentProvider {
           ...DEFAULT_CONFIG,
           prompt: request.systemPrompt ?? "",
           allowedTools: request.allowedTools ?? [],
+          maxTurns: request.maxTurns ?? DEFAULT_CONFIG.maxTurns,
           model: (request.model ?? this.options.defaultModel) as ResolvedPhaseConfig["model"],
           guards: toPhaseGuards(request.guards),
         },
