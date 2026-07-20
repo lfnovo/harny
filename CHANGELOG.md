@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.5.2] — 2026-07-20
 
 ### Fixed
 - **Phase turn caps were never applied.** The developer and validator phases declare `maxTurns: 200`, but the value was dropped on the way to the provider: `AgentRequest` had no `maxTurns` field, no phase passed one, and the Claude adapter always used its own default of 50. Every phase — planner, developer, validator, `final_validator` — ran at 50 turns regardless. On a real repository the `final_validator`, which re-runs every project gate (typecheck, tests, lint, build), could exhaust 50 turns and fail the run with "Reached maximum number of turns (50)". Each phase now carries its declared cap through to the SDK.
