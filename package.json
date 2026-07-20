@@ -1,6 +1,6 @@
 {
   "name": "@lfnovo/harny",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Local-first declarative workflow runtime for auditable multi-provider AI software development.",
   "license": "MIT",
   "author": "Luis Novo <lfnovo@gmail.com>",

@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.5.1] — 2026-07-20
 
 ### Added
 - **Visual identity.** A border collie mark (a herding dog — which is what the harness does to agents), an electric-blue accent taken from its eye, and the line "the harness that herds". `src/harness/brand.ts` is the source of truth for the palette and the sprite; the viewer duplicates the hexes on purpose, because it is served as a static string and cannot import the module.
