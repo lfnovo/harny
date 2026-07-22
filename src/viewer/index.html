@@ -914,6 +914,15 @@
     let pollHandle = null;
     function stopPoll() { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } liveTimelineState = null; }
 
+    // Bumped by every route change. A draw captures it and drops its own result if
+    // it no longer matches: stopPoll() cancels the next poll but cannot cancel the
+    // fetch already in flight, so a slow detail response could land after the user
+    // had moved on and repaint the page — and, worse, retitle and rebadge the tab
+    // for a run that is no longer on screen. The list and detail views poll, so they
+    // corrected themselves within 3s; #/welcome does not poll at all and would have
+    // kept the wrong identity until the next navigation.
+    let routeGen = 0;
+
     const openDetails = new Set();
     const transcriptCache = new Map();
     let activeTranscriptRun = null;
@@ -931,9 +940,11 @@
     }
     async function renderRunList(forceTable) {
       stopPoll();
+      const gen = routeGen;
       const draw = async () => {
         try {
           const { runs } = await fetchJSON('/api/runs');
+          if (gen !== routeGen) return;
           setTab('Runs · harny', null);
           if (runs.length === 0 && !forceTable) {
             if (!document.getElementById('stage')) {
@@ -1389,6 +1400,7 @@
 
     async function renderRunDetail(cwdHash, slug) {
       stopPoll();
+      const gen = routeGen;
       const draw = async () => {
         try {
           const [{ state, plan }, { commits, error: gitErr }, { siblingBranches }] = await Promise.all([
@@ -1396,6 +1408,7 @@
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/git-log`),
             fetchJSON(`/api/runs/${cwdHash}/${encodeURIComponent(slug)}/sibling-branches`).catch(() => ({ siblingBranches: [] })),
           ]);
+          if (gen !== routeGen) return;
 
           // The timeline redraws on the timer, so it needs the freshest state even on
           // the ticks where the signature says nothing changed. Cleared once the run
@@ -1640,6 +1653,7 @@
           bindDetailsTracking(app);
           await refreshTranscripts(cwdHash, slug);
         } catch (e) {
+          if (gen !== routeGen) return;
           setTab(`${slug} · harny`, null);
           app.innerHTML = `<a class="back" href="#/">← all runs</a><p style="margin-top:16px; color:var(--fail)">Error: ${escapeHtml(e.message)}</p>`;
         }
@@ -1650,6 +1664,7 @@
 
     // --- routing -------------------------------------------------------------
     function route() {
+      routeGen++;
       openDetails.clear();
       lastListSig = null; lastDetailSig = null; detailAnimate = true;
       const hash = location.hash || '#/';
