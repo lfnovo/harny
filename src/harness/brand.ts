@@ -30,10 +30,12 @@ export const PALETTE = {
   accentLight: "#7CC0FF",
   /** The ear. The only colour outside the coat. */
   pink: "#F09894",
-  /** Status, as the viewer declares them. */
-  wait: "#F0B849",
-  done: "#5FD39B",
-  fail: "#FF6B6B",
+  /** Status, as the viewer declares them: GitHub's Primer dark-mode set, so a
+   *  harny tab and a GitHub tab in the same strip mean the same thing by colour. */
+  run: "#F9C512",
+  wait: "#A371F7",
+  done: "#3FB950",
+  fail: "#F85149",
 } as const;
 
 export const TAGLINE = "the harness that herds";
