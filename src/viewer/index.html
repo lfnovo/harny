@@ -14,10 +14,19 @@
       --border:#262B34; --border-2:#333A45; --text:#F2F3F5; --text-mut:#969DA8; --text-dim:#6A717C;
       --accent:#4DA3F0; --accent-2:#7CC0FF; --accent-bg:rgba(77,163,240,0.14); --accent-line:rgba(77,163,240,0.38);
       --plan:#8FA6BC; --plan-bg:rgba(143,166,188,0.14);
-      --run:#4DA3F0;  --run-bg:rgba(77,163,240,0.15);
-      --wait:#F0B849; --wait-bg:rgba(240,184,73,0.14);
-      --done:#5FD39B; --done-bg:rgba(95,211,155,0.14);
-      --fail:#FF6B6B; --fail-bg:rgba(255,107,107,0.14);
+      /* Role colours: WHO ran the phase, not how it went. Kept off the status
+         tokens on purpose -- once status went GitHub-yellow, a developer bar
+         painted with --run read as "in progress" on a run that had long finished. */
+      --role-plan:#8FA6BC; --role-dev:#4DA3F0; --role-val:#5FD39B;
+      /* Status speaks GitHub's colour language, because that is the language the
+         people reading this page already read all day: yellow is in flight, green
+         landed, red broke, purple wants a human. `running` taking the yellow is what
+         forced `waiting_human` off amber — two near-identical yellows for two states
+         that mean opposite things (ignore me / act now) is worse than no colour. */
+      --run:#F9C512;  --run-bg:rgba(249,197,18,0.15);
+      --wait:#A371F7; --wait-bg:rgba(163,113,247,0.15);
+      --done:#3FB950; --done-bg:rgba(63,185,80,0.15);
+      --fail:#F85149; --fail-bg:rgba(248,81,73,0.14);
       --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
       --radius:12px;
     }
@@ -27,10 +36,13 @@
         --border:#E4E7EB; --border-2:#D5DAE0; --text:#171A20; --text-mut:#586170; --text-dim:#828B99;
         --accent:#1B7FD4; --accent-2:#1568B0; --accent-bg:rgba(27,127,212,0.10); --accent-line:rgba(27,127,212,0.30);
         --plan:#5A6675; --plan-bg:rgba(90,102,117,0.11);
-        --run:#1B7FD4;  --run-bg:rgba(27,127,212,0.11);
-        --wait:#A9720A; --wait-bg:rgba(169,114,10,0.11);
-        --done:#12925E; --done-bg:rgba(18,146,94,0.11);
-        --fail:#D93A3A; --fail-bg:rgba(217,58,58,0.11);
+        --role-plan:#5A6675; --role-dev:#1B7FD4; --role-val:#12925E;
+        /* Primer's light-mode status pair. The dark yellow is deliberate: #F9C512 is
+           a dot on a dark tab, but as pill text on white it is unreadable. */
+        --run:#9A6700;  --run-bg:rgba(154,103,0,0.11);
+        --wait:#8250DF; --wait-bg:rgba(130,80,223,0.11);
+        --done:#1A7F37; --done-bg:rgba(26,127,55,0.11);
+        --fail:#D1242F; --fail-bg:rgba(209,36,47,0.11);
         --shadow:0 1px 2px rgba(24,24,40,0.05), 0 10px 30px -18px rgba(24,24,40,0.18);
       }
     }
@@ -39,10 +51,11 @@
     --border:#262B34; --border-2:#333A45; --text:#F2F3F5; --text-mut:#969DA8; --text-dim:#6A717C;
     --accent:#4DA3F0; --accent-2:#7CC0FF; --accent-bg:rgba(77,163,240,0.14); --accent-line:rgba(77,163,240,0.38);
     --plan:#8FA6BC; --plan-bg:rgba(143,166,188,0.14);
-    --run:#4DA3F0;  --run-bg:rgba(77,163,240,0.15);
-    --wait:#F0B849; --wait-bg:rgba(240,184,73,0.14);
-    --done:#5FD39B; --done-bg:rgba(95,211,155,0.14);
-    --fail:#FF6B6B; --fail-bg:rgba(255,107,107,0.14);
+    --role-plan:#8FA6BC; --role-dev:#4DA3F0; --role-val:#5FD39B;
+    --run:#F9C512;  --run-bg:rgba(249,197,18,0.15);
+    --wait:#A371F7; --wait-bg:rgba(163,113,247,0.15);
+    --done:#3FB950; --done-bg:rgba(63,185,80,0.15);
+    --fail:#F85149; --fail-bg:rgba(248,81,73,0.14);
     --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5);
     }
     :root[data-theme="light"] {
@@ -50,10 +63,11 @@
       --border:#E4E7EB; --border-2:#D5DAE0; --text:#171A20; --text-mut:#586170; --text-dim:#828B99;
       --accent:#1B7FD4; --accent-2:#1568B0; --accent-bg:rgba(27,127,212,0.10); --accent-line:rgba(27,127,212,0.30);
       --plan:#5A6675; --plan-bg:rgba(90,102,117,0.11);
-      --run:#1B7FD4;  --run-bg:rgba(27,127,212,0.11);
-      --wait:#A9720A; --wait-bg:rgba(169,114,10,0.11);
-      --done:#12925E; --done-bg:rgba(18,146,94,0.11);
-      --fail:#D93A3A; --fail-bg:rgba(217,58,58,0.11);
+      --role-plan:#5A6675; --role-dev:#1B7FD4; --role-val:#12925E;
+      --run:#9A6700;  --run-bg:rgba(154,103,0,0.11);
+      --wait:#8250DF; --wait-bg:rgba(130,80,223,0.11);
+      --done:#1A7F37; --done-bg:rgba(26,127,55,0.11);
+      --fail:#D1242F; --fail-bg:rgba(209,36,47,0.11);
       --shadow:0 1px 2px rgba(24,24,40,0.05), 0 10px 30px -18px rgba(24,24,40,0.18);
     }
 
@@ -125,8 +139,8 @@
     @keyframes focusD { 0%,37%{} 41%,61%{border-color:var(--c-line); box-shadow:0 0 0 1px var(--c-line),0 0 34px -6px var(--c-glow),var(--shadow); transform:translateY(-3px);} 67%,100%{} }
     @keyframes focusV { 0%,70%{} 74%,94%{border-color:var(--c-line); box-shadow:0 0 0 1px var(--c-line),0 0 34px -6px var(--c-glow),var(--shadow); transform:translateY(-3px);} 100%{} }
     #n-plan { --c:var(--accent-2); --c-line:var(--accent-line); --c-glow:var(--accent); left:252px; top:0; }
-    #n-dev  { --c:var(--run); --c-line:color-mix(in srgb,var(--run) 40%,transparent); --c-glow:var(--run); left:452px; top:300px; }
-    #n-val  { --c:var(--done); --c-line:color-mix(in srgb,var(--done) 40%,transparent); --c-glow:var(--done); left:52px; top:300px; }
+    #n-dev  { --c:var(--role-dev); --c-line:color-mix(in srgb,var(--role-dev) 40%,transparent); --c-glow:var(--role-dev); left:452px; top:300px; }
+    #n-val  { --c:var(--role-val); --c-line:color-mix(in srgb,var(--role-val) 40%,transparent); --c-glow:var(--role-val); left:52px; top:300px; }
 
     .pg { position:absolute; inset:0; }
     .pg .edge { stroke:var(--accent-line); stroke-width:1.5; fill:none; stroke-dasharray:60; stroke-dashoffset:60; animation:draw 3s ease-in-out infinite; }
@@ -283,15 +297,22 @@
     @media (max-width:720px) { .tl-row, .tl-axis { grid-template-columns:62px 1fr 62px; } .tl-pct { display:none; } }
 
     /* ---- the ask: the prompt that started it all ---- */
+    /* overflow:hidden is load-bearing: it makes the card clip its own rail, so the
+       rail follows the corner radius instead of running straight past it. */
     .ask { position:relative; margin:0 0 24px; padding:14px 18px 14px 20px; border-radius:var(--radius);
-           background:var(--surface); border:1px solid var(--border); }
-    /* Tapers in WIDTH, not opacity: full thickness at the middle, drawn down to a
-       hairline at both ends. A gradient cannot do this — it changes alpha and
-       leaves the stroke the same thickness the whole way down — so the shape is
-       cut with clip-path instead. */
-    .ask::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px;
-                   background:var(--accent);
-                   clip-path:polygon(50% 0%, 100% 12%, 100% 88%, 50% 100%, 0% 88%, 0% 12%); }
+           background:var(--surface); border:1px solid var(--border); overflow:hidden; }
+    /* The rail rides the card's edge — full height, flush at left:0 — and the
+       parent's overflow does the shaping: the corner radius eats into it at both
+       ends, so it thins into the curve and belongs to the card's outline instead of
+       floating beside it. Inset versions of this (a short bar held off the edge, or
+       clip-path pointing its own ends) both read as a separate floating element.
+       The alpha still fades out top and bottom, the way the stat cards' hairline
+       does, so the rail dies away rather than stopping against the corner. */
+    .ask::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+                   background:linear-gradient(180deg, transparent 0%,
+                     color-mix(in srgb,var(--accent) 60%,transparent) 22%,
+                     color-mix(in srgb,var(--accent) 60%,transparent) 78%, transparent 100%);
+                   opacity:.85; }
     .ask p { margin:0; font-size:13.5px; color:var(--text-mut); line-height:1.6; text-wrap:pretty;
              display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .ask.open p { -webkit-line-clamp:unset; }
@@ -323,8 +344,12 @@
 
     /* ---- usage by attempt: a table, because these are columns to compare ---- */
     .ua { width:100%; border-collapse:collapse; font-size:12px; margin:16px 0 22px; }
+    /* The vertical padding has to be symmetric because the global `thead th` band
+       lands here too: that rule's background and border-bottom are not overridden
+       below, only its padding is, so the label sits inside a shaded row. At
+       `0 ... 7px` it hugged the top edge of that band with the gap all underneath. */
     .ua th { text-align:left; font-size:10px; font-weight:640; letter-spacing:.07em; text-transform:uppercase;
-             color:var(--text-dim); padding:0 10px 7px 0; white-space:nowrap; }
+             color:var(--text-dim); padding:7px 10px 7px 0; white-space:nowrap; }
     .ua th.r, .ua td.num { text-align:right; font-variant-numeric:tabular-nums; }
     .ua td { padding:6px 10px 6px 0; border-top:1px solid var(--border); white-space:nowrap; }
     .ua .ua-name { color:var(--text); }
@@ -483,18 +508,26 @@
     .gg { position:relative; }
     /* --dot and --line are declared so the marker can be centred on the text's
        first line instead of guessing with a hardcoded offset. */
-    .commit { --line:20px; --dot:12px; display:flex; gap:10px; align-items:baseline; padding-left:22px;
-              position:relative; padding-top:7px; padding-bottom:7px; }
+    /* --mark-top is where the dot starts: the row's own padding, plus half the
+       leading, so the marker centres on the first line of text however the subject
+       wraps. The connector below is expressed in the same term, which is the whole
+       point of naming it — the two used to repeat the arithmetic and drift apart. */
+    .commit { --line:20px; --dot:12px; --pad:7px; --mark-top:calc(var(--pad) + (var(--line) - var(--dot)) / 2);
+              display:flex; gap:10px; align-items:baseline; padding-left:22px;
+              position:relative; padding-top:var(--pad); padding-bottom:var(--pad); }
     .commit .sha, .commit .csub { line-height:var(--line); }
-    .commit::before { content:""; position:absolute; left:0; top:calc(7px + (var(--line) - var(--dot)) / 2);
+    .commit::before { content:""; position:absolute; left:0; top:var(--mark-top);
                       width:var(--dot); height:var(--dot); border-radius:50%;
                       box-sizing:border-box; background:var(--surface); border:2px solid var(--accent); z-index:1; }
     /* Each commit draws the line down to the NEXT one, so a lone commit has no
        line to nowhere. One stroke across the whole list left a stub dangling
-       whenever there was a single commit. */
+       whenever there was a single commit.
+       The line has to clear this row's bottom padding AND the next row's --mark-top
+       to actually touch the next dot; stopping at -2px left it hanging in the gap.
+       It runs 2px under the dot, which is opaque and on top, so there is no seam. */
     .commit::after { content:""; position:absolute; left:calc(var(--dot) / 2 - 1px);
-                     top:calc(7px + (var(--line) - var(--dot)) / 2 + var(--dot));
-                     bottom:-2px; width:2px; background:var(--accent-line); }
+                     top:calc(var(--mark-top) + var(--dot));
+                     bottom:calc(-1 * var(--mark-top) - 2px); width:2px; background:var(--accent-line); }
     .commit:last-child::after { display:none; }
     .commit .sha { color:var(--accent-2); font-size:12px; } .commit .csub { font-size:13px; }
 
@@ -661,6 +694,118 @@
       return { text: e.node_id ? `${phaseLabel(e.node_id)} · ${text}` : text, kind };
     }
 
+    // --- tab identity --------------------------------------------------------
+    // Several viewer tabs open at once all read "harny viewer" with the same collie,
+    // so the tab strip says nothing about which run is where. The title names the
+    // page; a run detail keeps the collie and pins a status badge to its corner the
+    // way GitHub badges the octocat, so a run that finished or broke is visible
+    // without switching tab — and the tab still looks like harny.
+    const FAVICON = document.querySelector('link[rel="icon"]');
+    const COLLIE_HREF = FAVICON ? FAVICON.getAttribute('href') : '';
+    // The dark-theme status hexes, hardcoded: the badge sits on the browser's tab
+    // strip, not on our page, so it cannot follow --run/--wait through a media query.
+    // These saturated values are the ones that survive both tab strips.
+    const STATUS_INK = { running: '#F9C512', waiting_human: '#A371F7', done: '#3FB950', failed: '#F85149' };
+    // Glyphs are drawn in the dark ink on top of a saturated disc, so they hold up
+    // against a light tab strip as well as a dark one.
+    const BADGE_INK = '#0D0E11';
+
+    /**
+     * Collie + status badge, composited to a PNG data URI.
+     *
+     * Async because the collie is an <img> that has to decode first, and cached per
+     * status because the detail view asks for the same icon every 3s poll.
+     */
+    const badgedIcons = new Map();
+    let collieReady = null;
+    function loadCollie() {
+      if (collieReady) return collieReady;
+      collieReady = new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = COLLIE_HREF;
+      });
+      return collieReady;
+    }
+
+    async function badgedFavicon(status) {
+      if (badgedIcons.has(status)) return badgedIcons.get(status);
+      const img = await loadCollie();
+      const S = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = S; canvas.height = S;
+      const ctx = canvas.getContext('2d');
+      // The collie gets the whole canvas — at 16px it is already small, and shrinking
+      // it to dodge the badge cost more than the overlap did.
+      ctx.drawImage(img, 0, 0, S, S);
+
+      // Sized off GitHub's badge, which is a small dot tucked in the corner rather
+      // than a second logo: at the 16px the tab actually renders, r=10 of 64 lands
+      // at ~5px across. Pushed as far into the corner as it goes — cx+r+1 = 64, so
+      // one more pixel right or down would flatten the disc against the edge.
+      // Every glyph below is expressed in units of `r`, so the badge stays
+      // proportional if this number ever moves again.
+      const cx = 53, cy = 53, r = 10, k = r / 16;
+      // Punch the gap transparent rather than filling it with the page background:
+      // the tab strip is the browser's colour, not ours, and a dark ring would sit
+      // as a visible blob on a light one.
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath(); ctx.arc(cx, cy, r + 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+      const ink = STATUS_INK[status];
+      if (!ink) {
+        // Hollow grey ring for anything unrecognised: nothing has happened yet, or
+        // nothing we have a word for, so the badge stays quiet.
+        ctx.strokeStyle = '#6A717C'; ctx.lineWidth = 5 * k;
+        ctx.beginPath(); ctx.arc(cx, cy, r - 2.5 * k, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.fillStyle = ink;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+
+        ctx.strokeStyle = BADGE_INK; ctx.fillStyle = BADGE_INK;
+        ctx.lineWidth = 4.5 * k; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        if (status === 'done') {
+          ctx.beginPath();
+          ctx.moveTo(cx - 7 * k, cy + 0.5 * k); ctx.lineTo(cx - 2.2 * k, cy + 5.4 * k); ctx.lineTo(cx + 7.2 * k, cy - 5 * k);
+          ctx.stroke();
+        } else if (status === 'failed') {
+          ctx.beginPath();
+          ctx.moveTo(cx - 5.5 * k, cy - 5.5 * k); ctx.lineTo(cx + 5.5 * k, cy + 5.5 * k);
+          ctx.moveTo(cx + 5.5 * k, cy - 5.5 * k); ctx.lineTo(cx - 5.5 * k, cy + 5.5 * k);
+          ctx.stroke();
+        } else if (status === 'waiting_human') {
+          ctx.fillRect(cx - 5.6 * k, cy - 6 * k, 3.8 * k, 12 * k);
+          ctx.fillRect(cx + 1.8 * k, cy - 6 * k, 3.8 * k, 12 * k);
+        }
+        // `running` is the bare disc, the way GitHub leaves its in-progress dot bare.
+      }
+
+      const href = canvas.toDataURL('image/png');
+      badgedIcons.set(status, href);
+      return href;
+    }
+
+    /**
+     * Point the tab at one page. `status` null keeps the unbadged collie.
+     *
+     * The badge composite is async, so a stale one can resolve after the user has
+     * already navigated; `tabToken` drops those instead of letting them land.
+     */
+    let tabToken = 0;
+    function setTab(title, status) {
+      if (document.title !== title) document.title = title;
+      if (!FAVICON) return;
+      const token = ++tabToken;
+      const apply = (href) => {
+        if (token !== tabToken) return;
+        if (FAVICON.getAttribute('href') !== href) FAVICON.setAttribute('href', href);
+      };
+      if (!status) { apply(COLLIE_HREF); return; }
+      badgedFavicon(status).then(apply).catch(() => apply(COLLIE_HREF));
+    }
+
     function statusPill(status) {
       const map = { running: ['s-running', 'spin'], waiting_human: ['s-waiting', ''], done: ['s-done', ''], failed: ['s-failed', ''] };
       const [cls, spin] = map[status] || ['s-pending', ''];
@@ -675,7 +820,7 @@
     // then pinned the pipeline to Planner for the entire run. Match the leaf
     // segment and look for the role inside it instead.
     const ROLES = ['planner', 'developer', 'validator'];
-    const ROLE_COLORS = ['var(--plan)', 'var(--run)', 'var(--done)'];
+    const ROLE_COLORS = ['var(--role-plan)', 'var(--role-dev)', 'var(--role-val)'];
     function phaseRole(name) {
       const leaf = String(name || '').toLowerCase().split('.').pop();
       return ROLES.findIndex(role => leaf.includes(role));
@@ -789,6 +934,7 @@
       const draw = async () => {
         try {
           const { runs } = await fetchJSON('/api/runs');
+          setTab('Runs · harny', null);
           if (runs.length === 0 && !forceTable) {
             if (!document.getElementById('stage')) {
               app.innerHTML = heroHtml();
@@ -942,7 +1088,7 @@
       const n = iter ? Number(iter[1]) : 0;
       return n > 0 ? `${leaf} ${n + 1}` : leaf;
     }
-    const ROLE_VAR = ['var(--plan)', 'var(--run)', 'var(--done)'];
+    const ROLE_VAR = ['var(--role-plan)', 'var(--role-dev)', 'var(--role-val)'];
     /**
      * Geometry only. Split from the markup because the bars have to be recomputed
      * every second (see refreshTimeline) and re-rendering them was not an option:
@@ -1255,6 +1401,9 @@
           // the ticks where the signature says nothing changed. Cleared once the run
           // ends: then the bars are history and history does not move.
           liveTimelineState = state.lifecycle.ended_at ? null : state;
+          // Set before the signature short-circuit: a background tab that never
+          // redraws still has to flip its icon the moment the run ends.
+          setTab(`${state.origin.task_slug} · harny`, state.lifecycle.status);
 
           const sig = JSON.stringify({ state, plan, commits, gitErr, siblingBranches });
           if (sig === lastDetailSig && app.querySelector('.head')) { await refreshTranscripts(cwdHash, slug); return; }
@@ -1491,6 +1640,7 @@
           bindDetailsTracking(app);
           await refreshTranscripts(cwdHash, slug);
         } catch (e) {
+          setTab(`${slug} · harny`, null);
           app.innerHTML = `<a class="back" href="#/">← all runs</a><p style="margin-top:16px; color:var(--fail)">Error: ${escapeHtml(e.message)}</p>`;
         }
       };
@@ -1508,7 +1658,7 @@
       else if (hash === '#/runs') renderRunList(true);
       // The hero was reachable only by having zero runs, i.e. once per install and
       // never again. This makes it addressable without deleting anything.
-      else if (hash === '#/welcome') { app.innerHTML = heroHtml(); stopPoll(); }
+      else if (hash === '#/welcome') { setTab('harny viewer', null); app.innerHTML = heroHtml(); stopPoll(); }
       else renderRunList();
     }
     window.addEventListener('hashchange', route);
