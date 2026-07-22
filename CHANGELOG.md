@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here. The format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.3] — 2026-07-22
+
+### Added
+- **The browser tab now says which run it is showing, and how that run is doing.** Several viewer tabs open at once all read "harny viewer" behind the same collie. The title is now `Runs · harny` on the list and the task slug on a run detail, and a detail composites a status badge onto the collie's corner the way GitHub badges the octocat: a bare disc in flight, a check for done, an X for failed, pause bars for `waiting_human`. The icon is drawn on a canvas and cached per status, and it flips on the 3s poll, so a tab left in the background updates itself.
+
+### Changed
+- **Status colours moved to GitHub's Primer set**, in both themes: yellow is in flight, green landed, red broke, purple wants a human. `running` taking the yellow forced `waiting_human` off amber — two near-identical yellows for states that mean opposite things, "ignore me" and "act now", is worse than no colour at all.
+- **Phase roles no longer borrow the status tokens.** The timeline and pipeline painted *who ran a phase* with the variables for *how it went*, so once status went yellow, the developer bar of a long-finished run read as "in progress". Roles now own `--role-plan`/`--role-dev`/`--role-val`, holding the blue and green they always had.
+
+### Fixed
+- **Stale draws could repaint the page — and retitle the tab — for a run no longer on screen.** `stopPoll()` clears the poll but cannot cancel a fetch already in flight. The list and detail views poll every 3s and corrected themselves within a tick; `#/welcome` does not poll at all and kept the wrong identity until the next navigation. Route changes now bump a generation counter that every draw checks before touching the tab or the DOM.
+- **The commit list's connector stopped 9px short of the next dot.** It ran to `bottom:-2px`, but the next marker starts a row's padding plus half a line-height below it. Both ends now derive from one `--mark-top`; they had been repeating the same arithmetic and had drifted apart.
+- **The usage table's header hugged the top of its band.** `.ua th` overrides the global `thead th` padding but not its background, so the label lived in a shaded row it was never given symmetric padding for.
+- **The prompt card's accent rail read as a floating element**: a straight bar on a card with a 12px corner radius hangs outside the curve at both ends. It now rides the edge at full height and the card clips it, so the radius shapes it.
+
 ## [0.5.2] — 2026-07-20
 
 ### Fixed
